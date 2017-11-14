@@ -754,7 +754,8 @@ def getCTX(coords, cwdPath, uniChromo):
     
    
 if __name__ == "__main__":
-    print(sys.argv)
+    if len(sys.argv) not in [2,3]:
+        sys.exit("Usage: SynSearch <path_to_coords_file> <number_of_CPU_cores>")
     if len(sys.argv) == 2:
         fileLocation = sys.argv[1]   #"/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/tests/nucmer_out/tair_ler/out_max_r.coords"
         nCores = 1
