@@ -8,7 +8,7 @@ Created on Mon Nov  6 14:33:37 2017
 import os
 import sys
 import pandas as pd
-from syri.synsearchFunctions import readSVData, getSV, getNotAligned
+from syri.methods.synsearchFunctions import readSVData, getSV, getNotAligned
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
