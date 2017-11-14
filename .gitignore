@@ -9,3 +9,6 @@
 
 # Test python scripts
 /testScript/
+
+# Python build files
+/build/ 
