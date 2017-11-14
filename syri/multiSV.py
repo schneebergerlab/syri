@@ -9,8 +9,8 @@ import os
 import sys
 import pandas as pd
 import numpy as np
-from myUsefulFunctions import *
-from synsearchFunctions import *
+from syri.methods.myUsefulFunctions import *
+from syri.methods.synsearchFunctions import *
 from itertools import cycle, product
 from collections import Counter
 from igraph import *

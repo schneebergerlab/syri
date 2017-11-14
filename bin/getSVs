@@ -12,8 +12,8 @@ from syri.synsearchFunctions import readSVData, getSV, getNotAligned
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python getSVs.py <path_to_coords_file>")
-        sys.exit()
+#        print("Usage: python getSVs.py <path_to_coords_file>")
+        sys.exit("Usage: getSVs <path_to_coords_file>")
     if len(sys.argv) == 2:
         fileLocation = sys.argv[1]   
 #        fileLocation = "/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_ler_Chr/out_m_i90_l100.coords"

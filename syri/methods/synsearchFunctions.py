@@ -5,7 +5,7 @@ Created on Mon Jun 19 15:54:53 2017
 @author: goel
 """
 import numpy as np
-from syri.myUsefulFunctions import *
+from syri.methods.myUsefulFunctions import *
 import sys
 import pandas as pd
 from matplotlib import pyplot as plt

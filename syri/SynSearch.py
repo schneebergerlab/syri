@@ -16,8 +16,8 @@ import sys
 import pandas as pd
 import numpy as np
 from igraph import *
-from syri.myUsefulFunctions import *
-from syri.synsearchFunctions import *
+from syri.methods.myUsefulFunctions import *
+from syri.methods.synsearchFunctions import *
 from collections import Counter
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
