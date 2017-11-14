@@ -7,7 +7,9 @@ setup(name='syri',
         author_email='goel@mpipz.mpg.de',
         packages=['syri'],
         install_requires=['pandas','numpy','python-igraph','matplotlib','multiprocess'],
-        scripts=['bin/SynSearch'],
+        scripts=['bin/SynSearch',
+                'bin/scaffoldOrder',
+                'bin/getSVs'],
         zip_safe=False)
         
         

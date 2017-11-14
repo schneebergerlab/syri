@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/biodata/dep_coupland/grp_schneeberger/software/lib/anaconda3/bin/python3.5
 # -*- coding: utf-8 -*-
 """
 Created on Tue Jul 25 16:10:48 2017
@@ -16,8 +16,8 @@ import sys
 import pandas as pd
 import numpy as np
 from igraph import *
-from syri.myUsefulFunctions import *
-from syri.synsearchFunctions import *
+from myUsefulFunctions import *
+from synsearchFunctions import *
 from collections import Counter
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
