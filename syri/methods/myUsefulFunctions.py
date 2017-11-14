@@ -12,7 +12,6 @@ from functools import reduce
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-import importlib.util
 
 def unlist(nestedList):
     """Take a nested-list as input and return a 1d list of all elements in it"""
@@ -52,10 +51,3 @@ def extractSeq(filePath, seqID, start = 0, end = -1):
     querySeq.seq = querySeq.seq[start:end+1]
     SeqIO.write(querySeq,seqID+"_"+str(start)+"_"+str(end)+".fasta","fasta")
 #    return str(querySeq[seqID][start:end+1])
-
-def loadModule(moduleName, modulePath):
-    spec = importlib.util.spec_from_file_location(moduleName, modulePath)
-    foo = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(foo)
-    return foo
-    
