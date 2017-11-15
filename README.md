@@ -1,4 +1,4 @@
-General requirements:
+General requirements: lol
   - python3+, corredponding pip (or easy_install, conda)
   - python dependencies: os, sys, pandas, numpy, igraph, collections, matplotlib, multiprocessing, functools, time, scipy, Biopython, subprocess, glob, operator, math, itertools
 
