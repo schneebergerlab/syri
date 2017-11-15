@@ -1,8 +1,31 @@
-# SynSearch
 General requirements:
-  - python3+
-  - python packages: os, sys, pandas, numpy, igraph, collections, matplotlib, multiprocessing, functools, time, scipy, Biopython, subprocess, glob, operator, math, itertools
-  - I use this python variant /biodata/dep_coupland/grp_schneeberger/software/bin/python using this "should" provide all packages on your account as well except igraph, for that I am not confident
+  - python3+, corredponding pip (or easy_install, conda)
+  - python dependencies: os, sys, pandas, numpy, igraph, collections, matplotlib, multiprocessing, functools, time, scipy, Biopython, subprocess, glob, operator, math, itertools
+
+#### **Installing dependencies**:
+Linux:
+  - Install igraph C libraries:
+  	```apt install libigraph0-dev```	
+  - Install dependencies:
+  	```pip install setuptools numpy scipy pandas matplotlib python-igraph biopython glob2 datetime multiprocess```
+  - Depending on your setup, may also need to install python-tk and python-scipy libraries
+  	```apt install python-tk python-scipy```
+
+Windows:
+  - Install igraph C libraries:
+      - Download igraph binary suitable for your python from https://www.lfd.uci.edu/~gohlke/pythonlibs/#python-igraph
+      - install using ```pip install <.whl>```
+  - Install dependencies:
+  	```pip install setuptools numpy scipy pandas matplotlib python-igraph biopython glob2 datetime multiprocess```
+
+
+#### **Installing syri**:
+  - Download and extract the package
+  - Open folder
+  - Run ```python setup.py install```
+
+
+
   
 ### **SynSearch.py**:
 - Main script to find structural rearrangement between two genomes.
