@@ -1,0 +1,19 @@
+Installing without root access on Linux:
+
+cd ~
+mkdir python3
+cd python3
+wget https://www.python.org/ftp/python/3.5.2/Python-3.5.2.tar.xz
+tar xvf Python-3.5.2.tar.xz
+cd Python-3.5.2
+./configure prefix=/home/<user_name>/python3
+make install
+cd ../bin
+./pip3 install numpy scipy pandas matplotlib python-igraph biopython glob2
+cd ~
+git clone https://www.github.com/schneebergerlab/syri
+cd syri
+../python3/bin/python3 setup.py install
+
+
+syri is installed.. Can be used in as python module using import syri, or as commandline tool by adding /home/<user_name>/python3/bin in PATH. Three tools are installed there SynSearch, scaffoldOrder, and getSVs.
