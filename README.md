@@ -1,10 +1,33 @@
-<<<<<<< HEAD
+## **Installation guide**:
+    - #### Linux
+        - Install python, pip, and related libraries
+	    - ```apt install python3 python3-dev python3-pip python3-tk libxml2-dev zlib1g-dev```
+	- Install python modules
+	    - ```pip3 install setuptools numpy scipy pandas matplotlib python-igraph biopython glob2```
+	- Clone the directory
+	    - ```git clone https://www.github.com/schneebergerlab/syri```
+	- Install tool
+	    - ```cd syri```
+	    - ```python3 setup.py install```
+    - #### Windows
+        - Download and install python3 from https://www.python.org/downloads/windows/
+	- Add python and pip executables to Environment Variables Path
+	- Download igraph binary from https://www.lfd.uci.edu/~gohlke/pythonlibs/ sutiable for your system
+	- Install the .whl from command line
+	    - Open cmd with admin right
+	    - Go to directory where .whl is saved
+	    - Run ```pip install <python_igraphXXXXX.whl>
+	- Install remaining python modules
+	    - ```pip install setuptools numpy scipy pandas matplotlib biopython glob2```
+	- Download and extract syri https://www.github.com/schneebergerlab.syri
+	- From command line, go to the extracted directory and install module
+	    - ```python setup.py install```
+
 General requirements:
   - python3+, corredponding pip (or easy_install, conda), python-dev
 =======
 General requirements: lol
   - python3+, corredponding pip (or easy_install, conda)
->>>>>>> 7fc4f6347ffb4347eaffcde6aee5c4f5993d94bd
   - python dependencies: os, sys, pandas, numpy, igraph, collections, matplotlib, multiprocessing, functools, time, scipy, Biopython, subprocess, glob, operator, math, itertools
   - libxml2,libxml2-dev, zlib, python3-tk
 
