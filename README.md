@@ -16,7 +16,7 @@
 - Install the .whl from command line
 	- Open cmd with admin right
 	- Go to directory where .whl is saved
-	- Run ```pip install <python_igraphXXXXX.whl>
+	- Run ```pip install <python_igraphXXXXX.whl>```
 - Install remaining python modules
 	- ```pip install setuptools numpy scipy pandas matplotlib biopython glob2```
 - Download and extract syri https://www.github.com/schneebergerlab.syri
