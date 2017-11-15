@@ -1,5 +1,5 @@
 ## **Installation guide**:
-####- Linux
+#### ** Linux**
         - Install python, pip, and related libraries
 	    - ```apt install python3 python3-dev python3-pip python3-tk libxml2-dev zlib1g-dev```
 	- Install python modules
