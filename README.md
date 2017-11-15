@@ -9,6 +9,8 @@
 - Install tool
 	- ```cd syri```
 	- ```python3 setup.py install```
+- If pip fail to install python-igraph, then try ```easy_install python-igraph``` or first install igraph C core manually by ```apt install libigraph0-dev``` and then use pip to install python-igraph
+
 #### **Windows**
 - Download and install python3 from https://www.python.org/downloads/windows/
 - Add python and pip executables to Environment Variables Path
