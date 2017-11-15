@@ -1,15 +1,13 @@
 General requirements:
-  - python3+, corredponding pip (or easy_install, conda)
+  - python3+, corredponding pip (or easy_install, conda), python-dev
   - python dependencies: os, sys, pandas, numpy, igraph, collections, matplotlib, multiprocessing, functools, time, scipy, Biopython, subprocess, glob, operator, math, itertools
+  - libxml2,libxml2-dev, zlib, python3-tk
 
 #### **Installing dependencies**:
 Linux:
-  - Install igraph C libraries:
-  	```apt install libigraph0-dev```	
-  - Install dependencies:
-  	```pip install setuptools numpy scipy pandas matplotlib python-igraph biopython glob2 datetime multiprocess```
-  - Depending on your setup, may also need to install python-tk and python-scipy libraries
-  	```apt install python-tk python-scipy```
+  - Install igraph C libraries: ```apt install libigraph0-dev```	
+  - Install dependencies: ```pip install setuptools numpy scipy pandas matplotlib python-igraph biopython glob2 datetime multiprocess```
+  - Depending on your setup, may also need to install python-tk and python-scipy libraries: ```apt install python-tk python-scipy```
 
 Windows:
   - Install igraph C libraries:
