@@ -1,5 +1,6 @@
 Installing without root access on Linux:
 
+## Installing python
 cd ~
 mkdir python3
 cd python3
@@ -8,10 +9,16 @@ tar xvf Python-3.5.2.tar.xz
 cd Python-3.5.2
 ./configure prefix=/home/<user_name>/python3
 make install
+
+## Installing required modules
 cd ../bin
 ./pip3 install numpy scipy pandas matplotlib python-igraph biopython glob2
 cd ~
+
+## Downloading syri
 git clone https://www.github.com/schneebergerlab/syri
+
+## Installing syri
 cd syri
 ../python3/bin/python3 setup.py install
 
