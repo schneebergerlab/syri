@@ -47,7 +47,6 @@ def intersect(*lists):
     
 def extractSeq(filePath, seqID, start = 0, end = -1):
     querySeq = [fasta for fasta in SeqIO.parse(filePath,'fasta') if fasta.id == seqID][0]
-    print(type(start))
     querySeq.seq = querySeq.seq[start:end+1]
     SeqIO.write(querySeq,seqID+"_"+str(start)+"_"+str(end)+".fasta","fasta")
 #    return str(querySeq[seqID][start:end+1])

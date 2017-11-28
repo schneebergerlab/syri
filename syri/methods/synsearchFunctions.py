@@ -648,16 +648,70 @@ def getConnectivityGraph(blocksList):
     outOG.add_vertices(len(blocksList))
     if len(blocksList) == 0:
         return outOG
-    maxScore = max([i.score for i in blocksList])
+#    maxScore = max([i.score for i in blocksList])
     ## Add edges and edge weight
     for i in blocksList:
         if len(i.children) > 0:
             outOG.add_edges(zip([i.id]*len(i.children), i.children))
-            outOG.es[-len(i.children):]["weight"] =  [maxScore - i.score + 1]*len(i.children)               ##Trick to get positive score, and then use the in-built get_shortest_path algorithm 
+#            outOG.es[-len(i.children):]["weight"] =  [maxScore - i.score + 1]*len(i.children)               ##Trick to get positive score, and then use the in-built get_shortest_path algorithm 
+            outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
     return outOG
 
+def getAllLongestPaths(graph,sNode, eNode,by="weight"):
+    """Uses Bellman-Ford Algorithm to find the longest path from node "sNode" in the 
+    directed acyclic graph "graph" to all nodes in the list "eNode".
+       
+        Parameters
+        ----------
+        graph: directeed igraph Graph(),
+            Directed acyclic graph containing all the nodes and edges in the graph.
+           
+        sNode: int, 
+            index of the start node in the graph.
+       
+        eNode: int list,
+            list of all end nodes. longest path from start node to end nodes will be
+            calculated
+        
+        by: igraph edge weight
+        
+        Returns
+        -------
+        list of len(eNodes) longest paths from sNodes to eNodes
+        
+    """
+    
+    pathList = []
+    
+    dist = {}
+    pred = {}
+    
+    allNodes = graph.vs.indices
+    for i in allNodes:
+        dist[i] = float("inf")
+        pred[i] = None
+        
+    dist[sNode] = 0
 
-
+    for i in range(len(allNodes)-1):
+        for e in graph.es:
+            if dist[e.source] + e[by] < dist[e.target]:
+                    dist[e.target] = dist[e.source] + e[by]
+                    pred[e.target] = e.source
+    for e in graph.es:
+        if dist[e.source] + e[by] < dist[e.target]:
+            sys.exit("Negative weight cycle identified")
+    
+    for key in eNode:
+        if dist[key] != float("inf"):
+            path = []
+            while key!=sNode:
+                path.append(key)
+                key = pred[key]
+            path.append(sNode)
+            pathList.append(path[::-1])
+    return(pathList)
+            
 def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
 	nodeStack = []
 	visitedTransBlock = []

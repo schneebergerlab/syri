@@ -73,8 +73,7 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     #######################################################################
     ###### Create list of inverted alignments
     #######################################################################
-#    print("Creating list of inverted alignments")
-    #invTree = pd.read_table("/run/user/1000/gvfs/smb-share:server=static.isilon.mpipz.mpg.de,share=netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/results/invTree.txt")
+
     nrow = invTree.shape[0]
     
     invBlocks = [alingmentBlock(i, np.where(invTree.iloc[i,] == True)[0], invertedCoordsOri.iloc[i]) for i in range(nrow)]
@@ -94,23 +93,45 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     #########################################################################
 #    print("finding possible inversions")
     
-
     shortest = []
-#    print(chromo,":", len(invBlocks))
-    if len(invBlocks) > 0:
-        invG = Graph().as_directed()
-        invG.add_vertices(len(invBlocks))
-        maxScore = max([i.score for i in invBlocks])
-        
-        ## Add edges and edge weight
-        for i in invBlocks:
-            if len(i.children) > 0:
-                invG.add_edges(zip([i.id]*len(i.children), i.children))
-                invG.es[-len(i.children):]["weight"] =  [maxScore - i.score + 1]*len(i.children)    ##Trick to get positive score, and then use the in-built get_shortest_path algorithm 
-        
-        ## find all shortest paths, i.e. all possible inversions
+    invG = getConnectivityGraph(invBlocks)
+#    
+#    if len(invBlocks) > 0:
+#        invG = Graph().as_directed()
+#        invG.add_vertices(len(invBlocks))            
+#        ## Add edges and edge weight
+#        for i in invBlocks:
+#            if len(i.children) > 0:
+#                invG.add_edges(zip([i.id]*len(i.children), i.children))
+#                invG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
+#        
+    if len(invG.es) > 0:        
         for i in range(len(invBlocks)):
-            shortest = shortest + [invG.get_all_shortest_paths(i, range(len(invBlocks)), "weight")]
+            shortest.append(getAllLongestPaths(invG,i,range(len(invBlocks))))
+            
+
+
+
+
+
+#    shortest = []
+##    print(chromo,":", len(invBlocks))
+#    if len(invBlocks) > 0:
+#        invG = Graph().as_directed()
+#        invG.add_vertices(len(invBlocks))
+#        maxScore = max([i.score for i in invBlocks])
+#        
+#        ## Add edges and edge weight
+#        for i in invBlocks:
+#            if len(i.children) > 0:
+#                invG.add_edges(zip([i.id]*len(i.children), i.children))
+#                invG.es[-len(i.children):]["weight"] =  [maxScore - i.score + 1]*len(i.children)    ##Trick to get positive score, and then use the in-built get_shortest_path algorithm 
+#        
+#        ## find all shortest paths, i.e. all possible inversions
+#        for i in range(len(invBlocks)):
+#            shortest = shortest + [invG.get_all_shortest_paths(i, range(len(invBlocks)), "weight")]
+            
+            
     ## Get revenue of shortest paths, score of adding the inversion
     
     ##### NEED TO CHANGE THIS TO GIVE LOWER SCORE TO OVERLAPPING INVERSIONS
@@ -316,12 +337,13 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     shortestOutOG = []
     if len(outOG.es) > 0:
         for i in range(len(orderedBlocksList)):
-            shortestOutOG = shortestOutOG + [outOG.get_all_shortest_paths(i,[i].extend(list(np.where(orderedBlocksTree.iloc[i] == True)[0])), "weight")]
+            shortestOutOG.append(getAllLongestPaths(outOG,i,[i].extend(list(np.where(orderedBlocksTree.iloc[i] == True)[0])),"weight"))
+            
+#            shortestOutOG = shortestOutOG + [outOG.get_all_shortest_paths(i,[i].extend(list(np.where(orderedBlocksTree.iloc[i] == True)[0])), "weight")]
         
     transScores = getTranslocationScore(shortestOutOG, orderedBlocks)
     transBlocks = getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold)
     invertedBlocksTree = outInvertedBlocks
-    #invertedBlocksTree = pd.read_table("/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/results/invertedBlocksTree.txt")
     invertedBlocksList = makeBlocksList(invertedBlocksTree, invertedBlocks)
     outIG = getConnectivityGraph(invertedBlocksList)
     
@@ -329,7 +351,10 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     shortestOutIG = []
     if len(outIG.es) > 0:
         for i in range(len(invertedBlocksList)):
-            shortestOutIG = shortestOutIG + [outIG.get_all_shortest_paths(i,[i].extend(list(np.where(invertedBlocksTree.iloc[i] == True)[0])), "weight")]
+            shortestOutIG.append(getAllLongestPaths(outIG,i,[i].extend(list(np.where(invertedBlocksTree.iloc[i] == True)[0])),"weight"))
+            
+            
+#            shortestOutIG = shortestOutIG + [outIG.get_all_shortest_paths(i,[i].extend(list(np.where(invertedBlocksTree.iloc[i] == True)[0])), "weight")]
         
     invTransScores = getTranslocationScore(shortestOutIG, invertedCoords)
     invTransBlocks = getTransBlocks(invTransScores, shortestOutIG, invertedBlocks, inPlaceBlocks, threshold)
@@ -617,14 +642,15 @@ def getCTX(coords, cwdPath, uniChromo):
     shortestOutOG = []
     if len(outOG.es) > 0:
         for i in range(len(orderedBlocksList)):
-            shortestOutOG = shortestOutOG + [outOG.get_all_shortest_paths(i,[i].extend(list(np.where(orderedBlocksTree.iloc[i] == True)[0])), "weight")]
+            shortestOutOG.append(getAllLongestPaths(outOG,i,[i].extend(list(np.where(orderedBlocksTree.iloc[i] == True)[0])),"weight"))
+            
+#            shortestOutOG = shortestOutOG + [outOG.get_all_shortest_paths(i,[i].extend(list(np.where(orderedBlocksTree.iloc[i] == True)[0])), "weight")]
         
     transScores = getTranslocationScore(shortestOutOG, orderedBlocks, ctx = True)
     transBlocks = getTransBlocks(transScores, shortestOutOG, orderedBlocks, annoCoords, threshold,ctx = True)
     
 
     invertedBlocksTree = outInvertedBlocks
-    #invertedBlocksTree = pd.read_table("/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/results/invertedBlocksTree.txt")
     invertedBlocksList = makeBlocksList(invertedBlocksTree, invertedBlocks)
     outIG = getConnectivityGraph(invertedBlocksList)
     
@@ -632,7 +658,9 @@ def getCTX(coords, cwdPath, uniChromo):
     shortestOutIG = []
     if len(outIG.es) > 0:
         for i in range(len(invertedBlocksList)):
-            shortestOutIG = shortestOutIG + [outIG.get_all_shortest_paths(i,[i].extend(list(np.where(invertedBlocksTree.iloc[i] == True)[0])), "weight")]
+            shortestOutIG.append(getAllLongestPaths(outIG,i,[i].extend(list(np.where(invertedBlocksTree.iloc[i] == True)[0])),"weight"))
+
+#            shortestOutIG = shortestOutIG + [outIG.get_all_shortest_paths(i,[i].extend(list(np.where(invertedBlocksTree.iloc[i] == True)[0])), "weight")]
         
     invTransScores = getTranslocationScore(shortestOutIG, invertedBlocks, ctx = True)
     invTransBlocks = getTransBlocks(invTransScores, shortestOutIG, invertedBlocks, annoCoords, threshold, ctx = True)
@@ -740,13 +768,11 @@ def getCTX(coords, cwdPath, uniChromo):
         if ctxBlocksData[index].dir == 1:
             alignIndices = transBlocks[ctxTransIndexOrder[index]]
             fout.write("#\t" + "\t".join(map(str,ctxTransBlocks.iloc[index])) + "\t" + blocksClasses[index]+ "\n")
-#            alignments = orderedBlocks.iloc[alignIndices]
             for i in alignIndices:
                 fout.write("\t".join(map(str,orderedBlocks.iloc[i,0:-2]))+"\n")            
         elif ctxBlocksData[index].dir == -1:
             alignIndices = invTransBlocks[ctxTransIndexOrder[index]]
             fout.write("#\t" + "\t".join(map(str,ctxTransBlocks.iloc[index]))+ "\t" + blocksClasses[index] +"\n")
-#            alignments = invertedBlocks.iloc[alignIndices]
             for i in alignIndices:
                 fout.write("\t".join(map(str,invertedBlocks.iloc[i,0:-2])) + "\n")
     fout.close()
@@ -757,7 +783,7 @@ if __name__ == "__main__":
     if len(sys.argv) not in [2,3]:
         sys.exit("Usage: SynSearch <path_to_coords_file> <number_of_CPU_cores>")
     if len(sys.argv) == 2:
-        fileLocation = sys.argv[1]   #"/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/tests/nucmer_out/tair_ler/out_max_r.coords"
+        fileLocation = sys.argv[1]   
         nCores = 1
     elif len(sys.argv) == 3:
         fileLocation = sys.argv[1]
@@ -765,7 +791,7 @@ if __name__ == "__main__":
         
 #    chromo = sys.argv[2]
 #    cwdPath = sys.argv[3]
-    cwdPath = os.getcwd()+"/"
+    cwdPath = os.getcwd()+ os.sep
     coords = pd.read_table(fileLocation, header = None) 
     coords.columns  =   ["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr"]
     aChromo = set(coords["aChr"])
