@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Spyder Editor
@@ -75,7 +75,7 @@ def scaffoldOrder(cwdPath, queryPath, coordsFilePath, scafSizeCutOff, alignSizeC
 if __name__ == "__main__":
     if len(sys.argv)!=3:
         sys.exit("Usage: scaffoldOrder <queryGenome> <coordsFile>")
-    cwdPath = os.getcwd()+"/"
+    cwdPath = os.getcwd()+os.sep
     queryPath = cwdPath + sys.argv[1]
     coordsFilePath = cwdPath + sys.argv[2]
     

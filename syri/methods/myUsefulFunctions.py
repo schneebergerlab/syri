@@ -12,6 +12,8 @@ from functools import reduce
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+from os import remove
+from itertools import cycle
 
 def unlist(nestedList):
     """Take a nested-list as input and return a 1d list of all elements in it"""
@@ -50,3 +52,10 @@ def extractSeq(filePath, seqID, start = 0, end = -1):
     querySeq.seq = querySeq.seq[start:end+1]
     SeqIO.write(querySeq,seqID+"_"+str(start)+"_"+str(end)+".fasta","fasta")
 #    return str(querySeq[seqID][start:end+1])
+
+def fileRemove(fName):
+    try:
+        remove(fName)
+    except OSError as e:
+        if e.errno != 2:    ## 2 is the error number when no such file or directory is present https://docs.python.org/2/library/errno.html
+            raise
