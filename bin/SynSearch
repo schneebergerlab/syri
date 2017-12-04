@@ -63,213 +63,9 @@ def SynSearch(chromo, threshold, coords, cwdPath):
 #    print("Finding Inversions")
 ##########################################################################
     
-    invertedCoordsOri, profitable, bestInvPath,invData, synInInv = getInversions(coords,chromo, threshold, synData, synPath)
+    invertedCoordsOri, profitable, bestInvPath, invData, synInInv = getInversions(coords,chromo, threshold, synData, synPath)
     
-    """
-    startTime = time()
-    invertedCoordsOri = coords.loc[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == -1)]
-    invertedCoords = invertedCoordsOri.copy()    
-    minCoords = np.min(np.min(invertedCoords[["bStart","bEnd"]]))
-    maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
-    
-    invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart 
-    invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
 
-    nrow = pd.Series(range(invertedCoords.shape[0]))
-    invTree = nrow.apply( lambda x : invertedCoords.iloc[x:,].apply(TS, axis = 1, args = (invertedCoords.iloc[x], threshold)))
-    del(invertedCoords)
-    
-    #######################################################################
-    ###### Create list of inverted alignments
-    #######################################################################
-
-    nrow = invTree.shape[0]
-    
-    invBlocks = [alingmentBlock(i, np.where(invTree.iloc[i,] == True)[0], invertedCoordsOri.iloc[i]) for i in range(nrow)]
-    
-    for block in invBlocks:
-        i = 0
-        while(i < len(block.children)):
-            block.children = list(set(block.children) - set(invBlocks[block.children[i]].children))
-            i+=1
-        block.children.sort()
-        
-        for child in block.children:
-            invBlocks[child].addParent(block.id)
-    
-    #########################################################################
-    ###### Finding profitable inversions (group of inverted blocks)
-    #########################################################################
-#    print("finding possible inversions")
-    
-    shortest = []
-    invG = getConnectivityGraph(invBlocks)        
-    if len(invG.es) > 0:        
-        for i in range(len(invBlocks)):
-            shortest.append(getAllLongestPaths(invG,i,range(len(invBlocks))))
-            
-    ## Get revenue of shortest paths, score of adding the inversion
-    
-    ##### NEED TO CHANGE THIS TO GIVE LOWER SCORE TO OVERLAPPING INVERSIONS
-    ## THIS MAYBE CONTAIN SOME BUGS!!!
-    revenue = []
-    for i in shortest:
-        values = []
-        for j in i:
-            if len(j) == 1:
-                values.append(invBlocks[j[0]].score)
-            else:              
-                score = 0
-                startA = [invertedCoordsOri.iat[j[0],0]]
-                endA = [invertedCoordsOri.iat[j[0],1]]
-                startB = [invertedCoordsOri.iat[j[0],3]]
-                endB = [invertedCoordsOri.iat[j[0],2]]
-                iden = [invertedCoordsOri.iat[j[0],6]]
-                for k in j[1:]:
-                    isMore = True if invertedCoordsOri.iat[k,6] > iden[-1] else False
-                    if invertedCoordsOri.iat[k,0] < endA[-1]:
-                        if isMore:
-                            endA[-1] = invertedCoordsOri.iat[k,0]
-                            startA.append(invertedCoordsOri.iat[k,0])
-                            endA.append(invertedCoordsOri.iat[k,1])
-                        else:
-                            startA.append(endA[-1])
-                            endA.append(invertedCoordsOri.iat[k,1])
-                    else:
-                        startA.append(invertedCoordsOri.iat[k,0])
-                        endA.append(invertedCoordsOri.iat[k,1])
-                    
-                    if invertedCoordsOri.iat[k,2] > startB[-1]:
-                        if isMore:
-                            startB[-1] = invertedCoordsOri.iat[k,2]
-                            startB.append(invertedCoordsOri.iat[k,3])
-                            endB.append(invertedCoordsOri.iat[k,2])
-                        else:
-                            endB.append(startB[-1])
-                            startB.append(invertedCoordsOri.iat[k,3])
-                    else:
-                        startB.append(invertedCoordsOri.iat[k,3])
-                        endB.append(invertedCoordsOri.iat[k,2])
-                    iden.append(invertedCoordsOri.iat[k,6])
-                if len(startA) == len(endA) == len(startB) == len(endB) == len(iden):
-                    for i in range(len(iden)):
-                        score += iden[i]*((endA[i] - startA[i]) + (endB[i] - startB[i]))
-                values.append(score)
-        revenue = revenue + [values]
-    
-    ## Get syntenic neighbouring blocks of inversions
-    neighbourSyn = dict()
-    for i in range(invertedCoordsOri.shape[0]):
-        index = invertedCoordsOri.index.values[i]
-        upSyn = np.where(synData.index.values < index)[0]
-        downSyn = np.where(synData.index.values > index)[0]
-        
-        upBlock  = -1
-        downBlock = len(synData)    
-        for j in upSyn[::-1]:
-            if SynAndOverlap(invertedCoordsOri.loc[index], synData.iloc[j], threshold):
-                upBlock = j
-                break
-        
-        for j in downSyn:
-            if SynAndOverlap(synData.iloc[j], invertedCoordsOri.loc[index], threshold):
-                downBlock = j
-                break
-        neighbourSyn[i] = [upBlock, downBlock]
-    
-    ## Calculate score of individual synblock
-    synBlockScore = [(i.aLen + i.bLen)*i.iden for index,i in synData.iterrows()]
-    
-    ## Calculate cost adding an inversion, i.e sum of all synblocks which need to be removed to accomodate teh synblocks
-    
-    cost = []
-    synLength = len(synPath)
-    for i in shortest:
-        values = []   
-        for j in i:
-            leftSyn, rightSyn = getNeighbours(neighbourSyn, j)
-            synCost = sum([synBlockScore[synIndex] for synIndex in range(leftSyn+1,rightSyn)])
-            leftEnd = synData.iat[leftSyn, 1] if leftSyn > -1 else 0
-            rightEnd = synData.iat[rightSyn,0] if rightSyn < synLength else invertedCoordsOri.iat[j[-1],1]
-            if rightEnd - leftEnd > 1000:
-                values.append(synCost)
-            else:
-                overlapLength = (leftEnd - invertedCoordsOri.iat[j[0], 0]) + (invertedCoordsOri.iat[j[-1],1] - rightEnd)
-                if overlapLength < ((rightEnd - leftEnd)/2):
-                    values.append(synCost + sys.maxsize)
-                else:
-                    values.append(synCost)
-        cost = cost + [values]
-    ## Calculate profit (or loss) associated with the addition of an inversion
-    profit = []
-    for i in range(len(revenue)):
-        profit = profit + [[revenue[i][j] - cost[i][j]for j in range(len(revenue[i]))]]
-    
-    ## Create list of all profitable inversions
-    
-    ##invPos are 0-indexed positions of inverted alignments in the invertedCoordsOri object
-    profitable = [inversion(cost[i][j], revenue[i][j],
-                             getNeighbours(neighbourSyn, shortest[i][j]),shortest[i][j])
-                             for i in range(len(profit)) for j in range(len(profit[i]))\
-                                 if profit[i][j] > (0.1*cost[i][j])]     ##Select only those inversions for which the profit is more than  10% of the cost
-    #####################################################################
-    #### Find optimal set of inversions from all profitable inversions
-    #####################################################################
-    profitInvs = [p.profit for p in profitable]
-    if len(profitInvs) > 0:  
-        vcount = len(profitable)+2
-        profG =  Graph().as_directed()
-        profG.add_vertices(vcount)
-        iAStart = []
-        iAEnd = []
-        iBStart = []
-        iBEnd = []
-        
-        for i in profitable:
-            iAStart.append(invertedCoordsOri.iat[i.invPos[0], 0])
-            iAEnd.append(invertedCoordsOri.iat[i.invPos[-1], 1])
-            iBStart.append(invertedCoordsOri.iat[i.invPos[-1], 3])
-            iBEnd.append(invertedCoordsOri.iat[i.invPos[0], 2])
-        
-        nonOverLapA = [np.where(iAStart > i - threshold)[0] for i in iAEnd] 
-        nonOverLapB = [np.where(iBStart > i - threshold)[0] for i in iBEnd]
-        for i in range(len(profitable)):
-            childNodes = np.intersect1d(nonOverLapA[i], nonOverLapB[i]) + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes 
-            profG.add_edges(zip([i+1]*len(childNodes), childNodes))
-            profG.es[-len(childNodes):]["weight"] = profitable[i].profit
-            profG.vs[i+1]["child"] = list(childNodes)
-            profG.vs[i+1]["score"] = profitable[i].profit
-    
-        profG.vs[[0,vcount-1]]["score"] = 0
-        
-        noInEdge = np.where(np.array(profG.vs[1:-1].indegree()) == 0)[0] + 1
-        noOutEdge = np.where(np.array(profG.vs[1:-1].outdegree()) == 0)[0] + 1
-        
-        for i in noInEdge:
-            profG.add_edge(0,i)
-            profG.es[-1:]["weight"] = 0
-        profG.vs[0]["child"] = noInEdge
-        for i in noOutEdge:
-            profG.add_edge(i,vcount - 1)
-            profG.es[-1:]["weight"] = profitable[i-1].profit         
-            profG.vs[i]["child"] = vcount-1
-        
-        
-        print("time to generate invGraph: ", time() - startTime)
-        
-        bestInvPath = bestInv(profG)
-    else:
-        bestInvPath = []
-
-    invBlocksIndex = unlist([profitable[i-1].invPos for i in bestInvPath])
-    invData = invertedCoordsOri.iloc[invBlocksIndex]
-    invNeighbours  = [profitable[i-1].neighbours for i in bestInvPath]
-    synInInv = unlist([list(range(i[0]+1, i[1])) for i in invNeighbours])
-    synInInvIndices = getValues(synData.index, synInInv)
-        
-        
-   """
-    
     ##########################################################
     #### Identify Translocation and duplications
     ##########################################################
@@ -535,9 +331,9 @@ def SynSearch(chromo, threshold, coords, cwdPath):
 
 ########################################################################################################################
 def getCTX(coords, cwdPath, uniChromo):
-    annoCoords = readAnnoCoords(cwdPath, uniChromo)    
-    ctxBlocks = coords.loc[coords['aChr'] != coords['bChr']].copy()
-    ctxData = ctxBlocks.copy()
+    annoCoords = readAnnoCoords(cwdPath, uniChromo)
+    ctxData = coords.loc[coords['aChr'] != coords['bChr']].copy()
+#    ctxData = ctxBlocks.copy()
     ctxData.index = range(len(ctxData))
     invCTXIndex = ctxData.index[ctxData.bDir == -1]
     ctxData.loc[invCTXIndex,"bStart"] = ctxData.loc[invCTXIndex].bStart + ctxData.loc[invCTXIndex].bEnd
@@ -548,7 +344,7 @@ def getCTX(coords, cwdPath, uniChromo):
     ctxData.sort_values(by= ["bChr","bStart","bEnd","aChr","aStart","aEnd"], inplace = True)
     ctxData["bIndex"] = range(ctxData.shape[0])    
     ctxData.sort_values("aIndex", inplace = True)
-    ctxBlocks = ctxData.copy()
+#    ctxBlocks = ctxData.copy()
     
     orderedBlocks = ctxData[ctxData.bDir == 1]
     invertedBlocks = ctxData[ctxData.bDir == -1]

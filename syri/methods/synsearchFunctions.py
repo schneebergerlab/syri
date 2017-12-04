@@ -283,7 +283,6 @@ def getInversions(coords,chromo, threshold, synData, synPath):
     invNeighbours  = [profitable[i-1].neighbours for i in bestInvPath]
     synInInv = unlist([list(range(i[0]+1, i[1])) for i in invNeighbours])
 #    synInInvIndices = getValues(synData.index, synInInv)
-    
     return(invertedCoordsOri, profitable, bestInvPath,invData, synInInv)
         
        
@@ -334,29 +333,6 @@ def getTransSynOrientation(inPlaceData, transData, threshold, ctx = False):
         
             upBlock = max(upSyn) if len(upSyn) > 0 else -1
             downBlock = min(downSyn) if len(downSyn) > 0 else len(inPlaceBlocks)
-            
-            transPositions[i] = [upBlock, downBlock]
-        
-#        
-#        for i in range(transRowCount):
-#    #        print(i)
-#            index = transData.index.values[i]
-#            upSyn = np.where(inPlaceBlocks.index.values < index)[0]
-#            downSyn = np.where(inPlaceBlocks.index.values > index)[0]
-#        
-#            upBlock  = -1
-#            downBlock = len(inPlaceBlocks)
-#            for j in upSyn[::-1]:
-#                #print(index, j)
-#                if SynAndOverlap(transData.loc[index], inPlaceBlocks.iloc[j], threshold):           ## MAYBE BUGGY WHEN Inverted block appears before an ordered block
-#                    upBlock = j
-#                    break
-#        
-#            for j in downSyn:
-#            #print(index, j)
-#                if SynAndOverlap(inPlaceBlocks.iloc[j], transData.loc[index], threshold):
-#                    downBlock = j
-#                    break
             transPositions[i] = [upBlock, downBlock]
         return transPositions
     if ctx:
@@ -1318,7 +1294,7 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
     allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
     allBlocks["class"] = "syn"
         
-    tempInvBlocks = pd.DataFrame(tempInvBlocks,columns =["aStart","aEnd","bStart","bEnd"])
+    tempInvBlocks = pd.DataFrame(tempInvBlocks,columns =["aStart","aEnd","bStart","bEnd"], dtype= object)
     tempInvBlocks["class"] = "inv"
     
     tempDupData = dupData[["aStart","aEnd","bStart","bEnd"]].copy()
@@ -1333,7 +1309,9 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
     tempTLData = TLData[["aStart","aEnd","bStart","bEnd"]].copy()
     tempTLData["class"] = "TL"
     
-    allBlocks = allBlocks.append([tempInvBlocks, tempInvDupData, tempInvTLData, tempTLData, tempDupData])
+    for i in [tempInvBlocks, tempInvDupData, tempInvTLData, tempTLData, tempDupData]:
+        if len(i) > 0:
+            allBlocks = allBlocks.append(i)
     allBlocks.index = range(allBlocks.shape[0])
     
     
@@ -1476,10 +1454,13 @@ def readAnnoCoords(cwdPath, uniChromo):
         data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
         print(data.shape)
         annoCoords = annoCoords.append(data)
-        
-    annoCoords.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace=True)
-    return(annoCoords)
     
+    annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"],inplace = True)
+    annoCoords["bIndex"] = range(len(annoCoords))
+    annoCoords.sort_values(by = ["aChr","aStart","aEnd","bChr","bStart","bEnd"],inplace = True)
+    annoCoords.index = range(len(annoCoords))
+    annoCoords["aIndex"] = range(len(annoCoords))
+    return(annoCoords)
             
 #%%
 
