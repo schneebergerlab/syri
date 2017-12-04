@@ -1436,7 +1436,7 @@ def mergeOutputFiles(uniChromo,path):
     fSyn = open(path+"synOut.txt","w")
     fInv = open(path+"invOut.txt","w")
     fTL = open(path+"TLOut.txt","w")
-    fInvTL = open(path+"invTLout.txt","w")
+    fInvTL = open(path+"invTLOut.txt","w")
     fDup = open(path+"dupOut.txt","w")
     fInvDup = open(path+"invDupOut.txt","w")
     
@@ -1451,47 +1451,36 @@ def mergeOutputFiles(uniChromo,path):
         f.close()
 
 def readAnnoCoords(cwdPath, uniChromo):
-    annoCoords = pd.DataFrame()
-    synData = pd.read_table(cwdPath+"synOut.txt",header = None, dtype = object)
-    synData = synData.loc[synData[0] != "#"]
-    synData = synData[[0,1,2,3]].astype(dtype = "int64")
-    synData.columns = ["aStart","aEnd","bStart","bEnd"]
-    synData['aChr'] = chromo
-    synData['bChr'] = chromo
+    annoCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype= object)
+    synData = []
+    fin = open(cwdPath+"synOut.txt","r")
+    for line in fin:
+        line = line.strip().split("\t")
+        if line[0] == "#":
+            chromo = line[1]
+            continue
+        synData.append(list(map(int,line[:4]))+[chromo,chromo])
+    fin.close()
+    synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
+    print(synData.shape)
     annoCoords = annoCoords.append(synData)
     
-    for i in ["invOut.txt", "TLOut.txt", "invOut.txt", "dupOut.txt", "invDupOut.txt"]:
-        data = pd.read_table(cwdPath+i, header = None, dtype = object)
+    for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt"]:    
+        data = []
+        fin = open(cwdPath+i,"r")
+        for line in fin:
+            line = line.strip().split("\t")
+            if line[0] == "#":
+                data.append(list(map(int,getValues(line,[2,3,6,7]))) + [chromo,chromo])
+        fin.close()
+        data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
+        print(data.shape)
+        annoCoords = annoCoords.append(data)
         
-        
-    
-    
-    
-    
-    for chromo in uniChromo:
-        synData = pd.read_table(cwdPath+chromo+"_synOut.txt", header = None, dtype = object)
-        synData = synData.loc[synData[0] != "#"]
-        synData = synData[[0,1,2,3]].astype(dtype = "int64")
-        synData.columns = ["aStart","aEnd","bStart","bEnd"]
-        synData['aChr'] = chromo
-        synData['bChr'] = chromo
-        annoCoords = annoCoords.append(synData)
-        
-        for fileType in ["_invOut.txt", "_TLOut.txt", "_invTLOut.txt", "_dupOut.txt", "_invDupOut.txt"]:
-            data = pd.read_table(cwdPath+chromo+fileType, header = None, dtype = object)
-            data = data.loc[data[0] == "#"]
-            data = data[[1,2,4,5]].astype(dtype = "int64")
-            data.columns = ["aStart","aEnd","bStart","bEnd"]
-            data['aChr'] = chromo
-            data['bChr'] = chromo
-            annoCoords = annoCoords.append(data)
-    annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"],inplace = True)
-    annoCoords["bIndex"] = range(len(annoCoords))
-    annoCoords.sort_values(by = ["aChr","aStart","aEnd","bChr","bStart","bEnd"],inplace = True)
-    annoCoords.index = range(len(annoCoords))
-    annoCoords["aIndex"] = range(len(annoCoords))
+    annoCoords.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace=True)
     return(annoCoords)
     
+            
 #%%
 
 class alingmentBlock:
