@@ -350,13 +350,19 @@ def getCTX(coords, cwdPath, uniChromo):
     invertedBlocks = ctxData[ctxData.bDir == -1]
     
     ## Create connectivity tree for directed blocks
-    transBlocksNeighbours = getTransSynOrientation(annoCoords, orderedBlocks, threshold, ctx = True)
-    outOrderedBlocks = makeBlocksTree(annoCoords, orderedBlocks, threshold, transBlocksNeighbours, ctx = True)
+#    transBlocksNeighbours = getTransSynOrientation(annoCoords, orderedBlocks, threshold, ctx = True)
+    outOrderedBlocks = makeBlocksTree(annoCoords, orderedBlocks, threshold, ctx = True)
 
-    invTransBlocksNeighbours = getTransSynOrientation(annoCoords, invertedBlocks, threshold, ctx = True)
+#    invTransBlocksNeighbours = getTransSynOrientation(annoCoords, invertedBlocks, threshold, ctx = True)
        
-    outInvertedBlocks = makeBlocksTree(annoCoords, invertedBlocks, threshold, invTransBlocksNeighbours, ctx = True)
+    outInvertedBlocks = makeBlocksTree(annoCoords, invertedBlocks, threshold, ctx = True)
  
+    
+"""
+DEBUG FROM HERE
+"""
+    
+    
     
     ## find all translocations which don't have large gaps between its alignments
     ## and are not overlappign with the syntenic blocks

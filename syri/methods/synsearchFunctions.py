@@ -335,9 +335,10 @@ def getTransSynOrientation(inPlaceData, transData, threshold, ctx = False):
             downBlock = min(downSyn) if len(downSyn) > 0 else len(inPlaceBlocks)
             transPositions[i] = [upBlock, downBlock]
         return transPositions
-    if ctx:
-        inPlaceBlocks.sort_values(["aIndex"], inplace = True)
 
+    if ctx:
+        
+        inPlaceBlocks.sort_values(["aIndex"], inplace = True)
         transRowIndex = transData.index.values
         transPositions = dict()
         ## identify neighbours on reference genome
@@ -350,8 +351,10 @@ def getTransSynOrientation(inPlaceData, transData, threshold, ctx = False):
                                 np.intersect1d(
                                         np.where(inPlaceBlocks.aEnd >= transData.at[i,"aStart"])[0],
                                         np.where(inPlaceBlocks.aChr == transData.at[i,"aChr"])[0]))
+            
             upBlock = -1
             downBlock = len(inPlaceBlocks)
+            
             for j in upSyn[::-1]:
                 if (transData.at[i,"aStart"] - inPlaceBlocks.at[j,"aStart"]) > threshold and (transData.at[i,"aEnd"] - inPlaceBlocks.at[j,"aEnd"]) > threshold:
                     upBlock = j
@@ -365,7 +368,8 @@ def getTransSynOrientation(inPlaceData, transData, threshold, ctx = False):
             transPositions[i] = [inPlaceBlocks.at[upBlock,"aIndex"]] if upBlock != -1 else [-1]
             transPositions[i].append(inPlaceBlocks.at[downBlock,"aIndex"]) if downBlock != len(inPlaceBlocks) else transPositions[i].append(len(inPlaceBlocks))
             
-            
+        
+        ## identify neighbours on query genome
         inPlaceBlocks.sort_values("bIndex", inplace = True)
         for i in transRowIndex:
             bUpSyn = getValues(inPlaceBlocks.index.values,
@@ -740,7 +744,7 @@ def makeTransGroupList(transBlocksData, start, end, threshold):
         return []
 #%%
 
-def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours, ctx = False):
+def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours = [], ctx = False):
     """Compute whether two alignments can be part of one translation block. For this:
         the alignments should not be separated by any inPlaceBlock on both ends and
         they should be syntenic with respect to each other.
@@ -768,6 +772,8 @@ def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours, 
         print("CTX status must be a boolean")
         sys.exit()
     if not ctx:
+        if len(transBlocksNeighbours) == 0:
+            sys.exit("ERROR: MISSING transBlocksNeighbours")
         orderedBlocksLen = len(blocksData)
         outOrderedBlocks = np.zeros((orderedBlocksLen,orderedBlocksLen), dtype = object)
         outOrderedBlocks[np.tril_indices(outOrderedBlocks.shape[0],-1)] = np.nan
@@ -795,10 +801,11 @@ def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours, 
                 index_2 = indices[j]
                 if blocksData.at[index_2,"aChr"] != iData.aChr or blocksData.at[index_2, "bChr"] != iData.bChr:
                     continue
-                                
-                if blocksData.at[index, "bDir"] == 1:
+                if blocksData.at[index,"bDir"] != blocksData.at[index_2,"bDir"]:
+                    sys.exit("ERROR: bDir not matching")
+                if blocksData.at[index, "bDir"] == 1:   ##When input contains ordered blocks
                     outOrderedBlocks[i][j] = SynAndOverlap(blocksData.loc[index_2], blocksData.loc[index], threshold)
-                elif blocksData.at[index, "bDir"] == -1:
+                elif blocksData.at[index, "bDir"] == -1:    ##When input contains inverted blocks
                     iData = blocksData.loc[index]
                     jData = blocksData.loc[index_2]
                     if (jData.aStart - iData.aStart) > threshold and (jData.aEnd - iData.aEnd) > threshold and (iData.bStart - jData.bStart) > threshold and (iData.bEnd - jData.bEnd) > threshold:
@@ -1429,7 +1436,7 @@ def mergeOutputFiles(uniChromo,path):
         f.close()
 
 def readAnnoCoords(cwdPath, uniChromo):
-    annoCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype= object)
+    annoCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
     synData = []
     fin = open(cwdPath+"synOut.txt","r")
     for line in fin:
@@ -1439,7 +1446,7 @@ def readAnnoCoords(cwdPath, uniChromo):
             continue
         synData.append(list(map(int,line[:4]))+[chromo,chromo])
     fin.close()
-    synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
+    synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"])
     print(synData.shape)
     annoCoords = annoCoords.append(synData)
     
@@ -1449,12 +1456,13 @@ def readAnnoCoords(cwdPath, uniChromo):
         for line in fin:
             line = line.strip().split("\t")
             if line[0] == "#":
-                data.append(list(map(int,getValues(line,[2,3,6,7]))) + [chromo,chromo])
+                data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
         fin.close()
         data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
         print(data.shape)
         annoCoords = annoCoords.append(data)
     
+    annoCoords[["aStart","aEnd","bStart","bEnd"]] = annoCoords[["aStart","aEnd","bStart","bEnd"]].astype("int64")
     annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"],inplace = True)
     annoCoords["bIndex"] = range(len(annoCoords))
     annoCoords.sort_values(by = ["aChr","aStart","aEnd","bChr","bStart","bEnd"],inplace = True)
