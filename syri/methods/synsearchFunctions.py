@@ -22,24 +22,7 @@ import datetime
 
 
 np.random.seed(1)
-def bestInv(profG):
-    vcount = profG.vcount()
-    for i in range(vcount):
-        parents = profG.neighbors(i,IN)
-        if len(parents) > 0:
-            scores = [profG.vs[j]["score"] for j in parents]
-            profG.vs[i]["parent"] = parents[scores.index(max(scores))]
-            profG.vs[i]["score"] = profG.vs[i]["score"] + max(scores)
-    nodeScores = profG.vs["score"]
-#    print(nodeScores)
-    node = profG.vs[nodeScores.index(max(nodeScores))]
-    bestInvPath = []
-    while(node["parent"]):
-        bestInvPath.append(node.index)
-        node = profG.vs[node["parent"]]
 
-    bestInvPath.append(node.index)
-    return(bestInvPath[::-1])
 
 def SynAndOverlap(jData, iData, threshold):
     """Compute whether two alignments are syntenic to each other.
@@ -85,7 +68,37 @@ def getSynPath(blocks):
     return(synPath[::-1])
     
 def getInversions(coords,chromo, threshold, synData, synPath):
+    
+    class inversion:
+        def __init__(self, cost, revenue, neighbours, invPos):
+            self.cost = cost
+            self.revenue = revenue
+            self.profit = revenue - cost
+            self.neighbours = list(neighbours)
+            self.invPos = invPos
+    
+    def bestInv(profG):
+        vcount = profG.vcount()
+        for i in range(vcount):
+            parents = profG.neighbors(i,IN)
+            if len(parents) > 0:
+                scores = [profG.vs[j]["score"] for j in parents]
+                profG.vs[i]["parent"] = parents[scores.index(max(scores))]
+                profG.vs[i]["score"] = profG.vs[i]["score"] + max(scores)
+        nodeScores = profG.vs["score"]
+    #    print(nodeScores)
+        node = profG.vs[nodeScores.index(max(nodeScores))]
+        bestInvPath = []
+        while(node["parent"]):
+            bestInvPath.append(node.index)
+            node = profG.vs[node["parent"]]
+    
+        bestInvPath.append(node.index)
+        return(bestInvPath[::-1])
 
+    def getNeighbours(neighbourSyn, j):
+        return(min(neighbourSyn[j[0]]+neighbourSyn[j[-1]]), max(neighbourSyn[j[0]]+neighbourSyn[j[-1]]))
+    
     invertedCoordsOri = coords.loc[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == -1)]
     invertedCoords = invertedCoordsOri.copy()    
 #    minCoords = np.min(np.min(invertedCoords[["bStart","bEnd"]]))
@@ -285,13 +298,7 @@ def getInversions(coords,chromo, threshold, synData, synPath):
 #    synInInvIndices = getValues(synData.index, synInInv)
     return(invertedCoordsOri, profitable, bestInvPath,invData, synInInv)
         
-       
-    
-
-
-def getNeighbours(neighbourSyn, j):
-    return(min(neighbourSyn[j[0]]+neighbourSyn[j[-1]]), max(neighbourSyn[j[0]]+neighbourSyn[j[-1]]))
-    
+           
 def getRedundantIndex(inPlaceBlocks, outPlaceBlocks, threshold):
     nrow = outPlaceBlocks.shape[0]
     redundant = []
@@ -680,7 +687,7 @@ def getTransBlocks(transScores, shortTrans, transData, inPlaceBlocks, threshold,
                 for bBlock in bBlocks:
                     bBlockStart = inPlaceBlocks.at[bBlock,"bStart"]
                     bBlockEnd = inPlaceBlocks.at[bBlock,"bEnd"]
-                    if bStart - bBlockStart < threshold and bEnd - bBlockEnd < thrreshold:
+                    if bStart - bBlockStart < threshold and bEnd - bBlockEnd < threshold:
                         bStart = bEnd
                         break
                     elif bBlockStart < bStart and bBlockEnd < bEnd:
@@ -744,7 +751,7 @@ def makeTransGroupList(transBlocksData, start, end, threshold):
         return []
 #%%
 
-def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours = [], ctx = False):
+def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours = None, ctx = False):
     """Compute whether two alignments can be part of one translation block. For this:
         the alignments should not be separated by any inPlaceBlock on both ends and
         they should be syntenic with respect to each other.
@@ -772,7 +779,7 @@ def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours =
         print("CTX status must be a boolean")
         sys.exit()
     if not ctx:
-        if len(transBlocksNeighbours) == 0:
+        if transBlocksNeighbours == None:
             sys.exit("ERROR: MISSING transBlocksNeighbours")
         orderedBlocksLen = len(blocksData)
         outOrderedBlocks = np.zeros((orderedBlocksLen,orderedBlocksLen), dtype = object)
@@ -797,7 +804,6 @@ def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours =
             index = indices[i]
             iData = blocksData.loc[index]
             for j in range(i+1, len(indices)):
-
                 index_2 = indices[j]
                 if blocksData.at[index_2,"aChr"] != iData.aChr or blocksData.at[index_2, "bChr"] != iData.bChr:
                     continue
@@ -886,12 +892,18 @@ def getAllLongestPaths(graph,sNode, eNode,by="weight"):
         pred[i] = None
         
     dist[sNode] = 0
-
+    
+    changes = 1
     for i in range(len(allNodes)-1):
+        if changes == 0:
+            break
+        changes = 0
         for e in graph.es:
             if dist[e.source] + e[by] < dist[e.target]:
-                    dist[e.target] = dist[e.source] + e[by]
-                    pred[e.target] = e.source
+                changes = 1
+                dist[e.target] = dist[e.source] + e[by]
+                pred[e.target] = e.source
+    
     for e in graph.es:
         if dist[e.source] + e[by] < dist[e.target]:
             sys.exit("Negative weight cycle identified")
@@ -1487,13 +1499,6 @@ class alingmentBlock:
         self.bestParentID = parentID
         self.score = self.score + maxScore
 
-class inversion:
-    def __init__(self, cost, revenue, neighbours, invPos):
-        self.cost = cost
-        self.revenue = revenue
-        self.profit = revenue - cost
-        self.neighbours = list(neighbours)
-        self.invPos = invPos
 
 class transGroups:
     def __init__(self, leftEnd, rightEnd, index, threshold):

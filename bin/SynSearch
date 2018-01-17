@@ -76,6 +76,8 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     inPlaceIndices = sorted(list(synData.index.values) + list(invData.index.values))
     
     inPlaceBlocks = chromBlocks[chromBlocks.index.isin(sorted(list(synData.index.values)))].copy()
+    
+    
     for i in bestInvPath:
         invPos = profitable[i-1].invPos
         invBlockData = invertedCoordsOri.iloc[invPos]
@@ -84,9 +86,13 @@ def SynSearch(chromo, threshold, coords, cwdPath):
         invCoord.append(invCoord[3] - invCoord[2])
         invCoord.append(sum((invBlockData.aLen+invBlockData.bLen)*invBlockData.iden)/(invCoord[-2] + invCoord[-1]))
         invCoord.extend([1,-1,chromo,chromo])
+        print(i)
         for j in range(profitable[i-1].neighbours[0]+1,profitable[i-1].neighbours[1]):
             inPlaceBlocks = inPlaceBlocks[inPlaceBlocks.index != synData.iloc[j].name]
-            inPlaceIndices.remove(synData.iloc[j].name)
+            try:
+                inPlaceIndices.remove(synData.iloc[j].name)
+            except:
+                pass
         inPlaceBlocks = inPlaceBlocks.append(pd.Series(invCoord, index = inPlaceBlocks.columns), ignore_index = True)
         
     inPlaceBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
@@ -330,7 +336,7 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     fout.close()
 
 ########################################################################################################################
-def getCTX(coords, cwdPath, uniChromo):
+def getCTX(coords, cwdPath, uniChromo, threshold):
     annoCoords = readAnnoCoords(cwdPath, uniChromo)
     ctxData = coords.loc[coords['aChr'] != coords['bChr']].copy()
 #    ctxData = ctxBlocks.copy()
@@ -358,15 +364,15 @@ def getCTX(coords, cwdPath, uniChromo):
     outInvertedBlocks = makeBlocksTree(annoCoords, invertedBlocks, threshold, ctx = True)
  
     
-"""
-DEBUG FROM HERE
-"""
+    """
+    DEBUG FROM HERE
+    """
     
     
     
     ## find all translocations which don't have large gaps between its alignments
     ## and are not overlappign with the syntenic blocks
-    orderedBlocksTree = outOrderedBlocks   
+    orderedBlocksTree = outOrderedBlocks.copy()
     orderedBlocksList = makeBlocksList(orderedBlocksTree, orderedBlocks)
     outOG = getConnectivityGraph(orderedBlocksList)
     
@@ -374,6 +380,7 @@ DEBUG FROM HERE
     shortestOutOG = []
     if len(outOG.es) > 0:
         for i in range(len(orderedBlocksList)):
+            print(i)
             eNode = [i]
             eNode.extend(list(np.where(orderedBlocksTree.iloc[i] == True)[0]))
             shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,"weight"))
@@ -543,18 +550,6 @@ if __name__ == "__main__":
     with Pool(processes = nCores) as pool:
         pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
     mergeOutputFiles(uniChromo,cwdPath)
-#    ctxBlocks = getCTX(coords, cwdPath, uniChromo)
-    
-    
-    
-    
-#    ctxBlocks.to_csv(cwdPath+"ctxOut.txt", sep="\t",index=False) 
-        
-#    for chromo in uniChromo:
-#        procs.append(multiprocessing.Process(target=SynSearch, args=(chromo,threshold,coords,cwdPath,)))
-##    SynSearch(chromo, threshold, coords)
-#    for p in procs:
-#        p.start()
-#    for p in procs:
-#        p.join()
+    ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold)
+
     print("End of program")
