@@ -376,7 +376,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
     orderedBlocksList = makeBlocksList(orderedBlocksTree, orderedBlocks)
     outOG = getConnectivityGraph(orderedBlocksList)
     
-    ## find all shortest paths, i.e. all possible inversions
+    ## find all possible translocations
     shortestOutOG = []
     if len(outOG.es) > 0:
         for i in range(len(orderedBlocksList)):
