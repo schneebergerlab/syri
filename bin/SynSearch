@@ -337,6 +337,56 @@ def SynSearch(chromo, threshold, coords, cwdPath):
 
 ########################################################################################################################
 def getCTX(coords, cwdPath, uniChromo, threshold):
+    def getDupCTX(indices, allTransBlocksData, transClasses):
+        dupGenomes = {}
+        for index in indices:
+            if index in transClasses["translocation"] or index in transClasses["invTranslocation"]:
+                dupGenomes[index] = ""
+                continue
+            found = False
+            tempTransBlock = allTransBlocksData[index]
+            if not tempTransBlock.aUni:
+                dupGenomes[index] = "B"
+                continue
+            elif not tempTransBlock.bUni:
+                dupGenomes[index] = "A"
+                continue
+            elif tempTransBlock.genomeAUni:
+                dupGenomes[index] = "A"
+                continue
+            elif tempTransBlock.genomeBUni:
+                dupGenomes[index] = "B"
+                continue
+            for i in tempTransBlock.meAlist:
+                if i in transClasses["translocation"] or i in transClasses["invTranslocation"]:
+                    found = True
+                    dupGenomes[index] = "B"
+                    break
+            if not found:
+                dupGenomes[index] = "A"
+        return(dupGenomes)
+    
+    def printCTX(cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks ,transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks):
+        transClasses = getTransClasses(clusterSolutionBlocks, ctxBlocksData)
+        indices = sorted(unlist(list(transClasses.values())))
+        keys = [key for index in indices for key in list(transClasses.keys()) if index in transClasses[key]]
+        blocksClasses = dict(zip(indices,keys))
+        dupGenomes = getDupCTX(indices, ctxBlocksData, transClasses)
+        
+        fout = open(cwdPath+"ctxOut.txt","w")
+        for index in indices:
+            if ctxBlocksData[index].dir == 1:
+                alignIndices = transBlocks[ctxTransIndexOrder[index]]
+                fout.write("#\t" + "\t".join(map(str,ctxTransBlocks.iloc[index])) + "\t" + blocksClasses[index]+ "\t" +  dupGenomes[index]+"\n")
+                for i in alignIndices:
+                    fout.write("\t".join(map(str,orderedBlocks.iloc[i,0:-2]))+"\n")            
+            elif ctxBlocksData[index].dir == -1:
+                alignIndices = invTransBlocks[ctxTransIndexOrder[index]]
+                fout.write("#\t" + "\t".join(map(str,ctxTransBlocks.iloc[index]))+ "\t" + blocksClasses[index] + "\t" +  dupGenomes[index]+ "\n")
+                for i in alignIndices:
+                    fout.write("\t".join(map(str,invertedBlocks.iloc[i,0:-2])) + "\n")
+        fout.close()
+        
     annoCoords = readAnnoCoords(cwdPath, uniChromo)
     ctxData = coords.loc[coords['aChr'] != coords['bChr']].copy()
 #    ctxData = ctxBlocks.copy()
@@ -362,13 +412,6 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
 #    invTransBlocksNeighbours = getTransSynOrientation(annoCoords, invertedBlocks, threshold, ctx = True)
        
     outInvertedBlocks = makeBlocksTree(annoCoords, invertedBlocks, threshold, ctx = True)
- 
-    
-    """
-    DEBUG FROM HERE
-    """
-    
-    
     
     ## find all translocations which don't have large gaps between its alignments
     ## and are not overlappign with the syntenic blocks
@@ -487,8 +530,8 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
 
     
     clusterSolutions = []
-    for i in range(len(ctxCluster)):
-#    for i in range(10):
+#    for i in range(len(ctxCluster)):
+    for i in range(20):
         print(i)
         tempCluster = ctxCluster[i].copy()
         if len(tempCluster) == 0:
@@ -499,26 +542,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
     clusterBlocks = unlist(clusterSolutionBlocks)
     
-    transClasses = getTransClasses(clusterSolutionBlocks, ctxBlocksData)
-    
-    indices = sorted(unlist(list(transClasses.values())))
-    keys = [key for index in indices for key in list(transClasses.keys()) if index in transClasses[key]]
-    blocksClasses = dict(zip(indices,keys))
-    
-    fout = open(cwdPath+"ctxOut.txt","w")
-    
-    for index in indices:
-        if ctxBlocksData[index].dir == 1:
-            alignIndices = transBlocks[ctxTransIndexOrder[index]]
-            fout.write("#\t" + "\t".join(map(str,ctxTransBlocks.iloc[index])) + "\t" + blocksClasses[index]+ "\n")
-            for i in alignIndices:
-                fout.write("\t".join(map(str,orderedBlocks.iloc[i,0:-2]))+"\n")            
-        elif ctxBlocksData[index].dir == -1:
-            alignIndices = invTransBlocks[ctxTransIndexOrder[index]]
-            fout.write("#\t" + "\t".join(map(str,ctxTransBlocks.iloc[index]))+ "\t" + blocksClasses[index] +"\n")
-            for i in alignIndices:
-                fout.write("\t".join(map(str,invertedBlocks.iloc[i,0:-2])) + "\n")
-    fout.close()
+    printCTX(cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks ,transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks)
     return 0
     
    

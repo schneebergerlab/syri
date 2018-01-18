@@ -1,0 +1,6 @@
+##[0.3.1] 18-01-2018
+### Added
+- Duplicated genome information
+
+### Fixed
+- Bug causing identification of sub-optimal inversions

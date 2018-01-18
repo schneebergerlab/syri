@@ -1308,6 +1308,8 @@ def getDupGenome(dupData, allTransBlocksData, transClasses):
     dupData["dupGenomes"] = pd.Series(dupGenomes, index = dupData.index)
     return(dupData)
 
+
+        
 def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData):
     
     allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
