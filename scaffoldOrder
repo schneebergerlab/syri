@@ -9,8 +9,8 @@ This is a temporary script file.
 #%%
 import pandas as pd
 import numpy as np
-from syri.methods.synsearchFunctions import orderFromMummerplot, getscafDict
-from syri.methods.myUsefulFunctions import getValues
+from func.synsearchFunctions import orderFromMummerplot, getscafDict
+from func.myUsefulFunctions import getValues
 from Bio.SeqIO import parse, write
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord

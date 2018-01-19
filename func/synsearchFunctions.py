@@ -5,7 +5,7 @@ Created on Mon Jun 19 15:54:53 2017
 @author: goel
 """
 import numpy as np
-from syri.methods.myUsefulFunctions import *
+from func.myUsefulFunctions import *
 import sys
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -405,57 +405,7 @@ def getTransSynOrientation(inPlaceData, transData, threshold, ctx = False):
         return transPositions
     
         
-def getTranslocationScore(translocations, transData, ctx = False):
-    """Function to score the proposed translocation block based on the number of
-        basepairs it explains and the gaps between alignments of the block
-    """
-    if not isinstance(ctx, bool):
-        print("CTX status must be a boolean")
-        sys.exit()
-    if not ctx:
-        transScores = []
-        for blocks in translocations:
-            blocksScores = []
-            for block in blocks:
-                aScore = transData.iat[block[0],4]
-                bScore = transData.iat[block[0],5]
-                aGap = 0
-                bGap = 0
-                if len(block) > 1:
-                    for i in range(1, len(block)):
-                        aScore += transData.iat[block[i],4]
-                        bScore += transData.iat[block[i],5]
-                        aGap += max(0,transData.iat[block[i],0] - transData.iat[block[i-1],1])
-                        bGap += max(0,transData.iat[block[i],2] - transData.iat[block[i-1],3])
-                    blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
-                    blocksScores.append(blockScore)
-                else:
-                    blocksScores.append(1)
-            transScores.append(blocksScores)
-        return transScores
-    if ctx:
-        transScores = []
-        for blocks in translocations:
-    #        print(len(blocks))
-            blocksScores = []
-            for block in blocks:
-                indices = getValues(transData.index.values,block)
-                aScore = transData.at[indices[0],"aLen"]
-                bScore = transData.at[indices[0],"bLen"]
-                aGap = 0
-                bGap = 0
-                if len(block) > 1:
-                    for i in range(1, len(block)):
-                        aScore += transData.at[indices[i],"aLen"]
-                        bScore += transData.at[indices[i],"bLen"]
-                        aGap += max(0,transData.at[indices[i],"aStart"] - transData.at[indices[i-1],"aEnd"])
-                        bGap += max(0,transData.at[indices[i],"bStart"] - transData.at[indices[i-1],"bEnd"]) if transData.at[indices[i],"bDir"] == 1 else max(0, transData.at[indices[i-1],"bStart"] - transData.at[indices[i],"bEnd"]) 
-                    blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
-                    blocksScores.append(blockScore)
-                else:
-                    blocksScores.append(1)
-            transScores.append(blocksScores)
-        return transScores
+
 #%%
 
 def mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks, ctx = False):
@@ -533,179 +483,322 @@ def mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks,
 def findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd):
     aBlocks = list(np.intersect1d(np.where(inPlaceBlocks.aStart.values < aEnd)[0],\
                                       np.where(inPlaceBlocks.aEnd.values > aStart)[0]))
-    
     bBlocks = list(np.intersect1d(np.where(inPlaceBlocks.bStart.values < bEnd)[0],\
                                       np.where(inPlaceBlocks.bEnd.values > bStart)[0]))
-      
-#    tempList1 = [list(inPlaceBlocks.bStart.values < bEnd), list(inPlaceBlocks.bEnd.values > bStart)
-#                ,list(inPlaceBlocks.bDir.values == 1)] 
-#    tempList2 = [list(inPlaceBlocks.bEnd.values < bEnd), list(inPlaceBlocks.bStart.values > bStart)
-#                ,list(inPlaceBlocks.bDir.values == -1)]
-#    bBlocks = []
-#    for i in range(len(tempList1[0])):
-#        if (tempList1[0][i] and tempList1[1][i] and tempList1[2][i]) or (tempList2[0][i] and tempList2[1][i] and tempList2[2][i]):
-#            bBlocks.append(i)
     return(aBlocks, bBlocks)
     
     
-def getTransBlocks(transScores, shortTrans, transData, inPlaceBlocks, threshold, ctx = False):
-    """This method filters possible translocation blocks to select those which have a posivitive gap based score
-       (output of `getTransLocationsScore`) and those which dont overlap significantly with the inPlaceBlocks.
-       
-       Parameters
-       ----------
-       transScores: list, 
-           output of getTransLocationScores, scores of all shortest blocks
-       shortTrans: list,
-           list of best blocks between everypair of blocks
-       orderedBlocks: DataFrame,
-           all translocated alignment blocks
-       inPlaceBlocks: DataFrame, 
-           all syntenic alignment blocks
-       threshold: int, 
-           cut-off value.
-    
-       Returns
-       --------
-       outBlocks: list,
-           selected shortTrans blocks
-    """
-    positiveTransScores = [np.where(np.array(i) >= 0)[0] for i in transScores]
-    transBlocks = [getValues(shortTrans[i], positiveTransScores[i]) for i in range(len(shortTrans))]
-    transBlocks = [i for j in transBlocks for i in j]
-    outBlocks = []
-    if not isinstance(ctx,bool):
+def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, ctx = False):
+    if not isinstance(ctx, bool):
         print("CTX status must be a boolean")
         sys.exit()
-    if not ctx:
-        for block in transBlocks:
-            blockAlength = 0
-            blockBlength = 0
-            blockAUni = 0
-            blockBUni = 0
+    def makeBlocksList(blocksTree, blocksData):
+        nrow = blocksTree.shape[0]
+        blocksList = [alingmentBlock(i, np.where(blocksTree.iloc[i] == True)[0],blocksData.iloc[i]) for i in range(nrow)]
+        for block in blocksList:
+            i = 0
+            while(i < len(block.children)):
+                block.children = list(set(block.children) - set(blocksList[block.children[i]].children))
+                i+=1
+            block.children.sort()
             
-            for almnt in block:
-                aStart = transData.iat[almnt,0]
-                aEnd = transData.iat[almnt,1]
-                if transData.iat[almnt,8] == 1:
-                    bStart = transData.iat[almnt,2]
-                    bEnd = transData.iat[almnt,3]
-                else:
-                    bStart = transData.iat[almnt,3]
-                    bEnd = transData.iat[almnt,2]      
-                blockAlength += transData.iat[almnt,4]
-                blockBlength += transData.iat[almnt,5]
-                
-                aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd)
+            for child in block.children:
+                blocksList[child].addParent(block.id)
+        return blocksList
     
-                for aBlock in aBlocks:
-                    if inPlaceBlocks.iat[aBlock,0] - aStart < threshold and aEnd - inPlaceBlocks.iat[aBlock,1] < threshold:
-                        aStart = aEnd
-                        break
-                    elif inPlaceBlocks.iat[aBlock,0] < aStart and inPlaceBlocks.iat[aBlock,1] < aEnd:
-                        aStart = inPlaceBlocks.iat[aBlock,1]
+    def getConnectivityGraph(blocksList):
+        outOG = Graph().as_directed()
+        outOG.add_vertices(len(blocksList))
+        if len(blocksList) == 0:
+            return outOG
+        ## Add edges and edge weight
+        for i in blocksList:
+            if len(i.children) > 0:
+                outOG.add_edges(zip([i.id]*len(i.children), i.children))
+                outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
+        return outOG
+    
+    def getAllLongestPaths(graph,sNode, eNode,by="weight"):
+        """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
+        directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
+        are negative, so shortest path from sNode to eNode corresponds to the longest path.
+           
+            Parameters
+            ----------
+            graph: directeed igraph Graph(),
+                Directed acyclic graph containing all the nodes and edges in the graph.
+               
+            sNode: int, 
+                index of the start node in the graph.
+           
+            eNode: int list,
+                list of all end nodes. longest path from start node to end nodes will be
+                calculated
+            
+            by: igraph edge weight
+            
+            Returns
+            -------
+            list of len(eNodes) longest paths from sNodes to eNodes
+            
+        """
+        pathList = []
+        dist = {}
+        pred = {}
+        
+        allNodes = graph.vs.indices
+        for i in allNodes:
+            dist[i] = float("inf")
+            pred[i] = None
+            
+        dist[sNode] = 0
+        changes = 1
+        
+        for i in range(len(allNodes)-1):
+            if changes == 0:
+                break
+            changes = 0
+            for e in graph.es:
+                if dist[e.source] + e[by] < dist[e.target]:
+                    changes = 1
+                    dist[e.target] = dist[e.source] + e[by]
+                    pred[e.target] = e.source
+        
+        for e in graph.es:
+            if dist[e.source] + e[by] < dist[e.target]:
+                sys.exit("Negative weight cycle identified")
+        
+        for key in eNode:
+            if dist[key] != float("inf"):
+                path = []
+                while key!=sNode:
+                    path.append(key)
+                    key = pred[key]
+                path.append(sNode)
+                pathList.append(path[::-1])
+        return(pathList)
+        
+    def getTranslocationScore(translocations, transData, ctx):
+        """Function to score the proposed translocation block based on the number of
+            basepairs it explains and the gaps between alignments of the block
+        """
+        if not isinstance(ctx, bool):
+            print("CTX status must be a boolean")
+            sys.exit()
+        if not ctx:
+            transScores = []
+            for blocks in translocations:
+                blocksScores = []
+                for block in blocks:
+                    aScore = transData.iat[block[0],4]
+                    bScore = transData.iat[block[0],5]
+                    aGap = 0
+                    bGap = 0
+                    if len(block) > 1:
+                        for i in range(1, len(block)):
+                            aScore += transData.iat[block[i],4]
+                            bScore += transData.iat[block[i],5]
+                            aGap += max(0,transData.iat[block[i],0] - transData.iat[block[i-1],1])
+                            bGap += max(0,transData.iat[block[i],2] - transData.iat[block[i-1],3])
+                        blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
+                        blocksScores.append(blockScore)
                     else:
-                        blockAUni += inPlaceBlocks.iat[aBlock,0] - aStart
-                        if inPlaceBlocks.iat[aBlock,1] < aEnd:
+                        blocksScores.append(1)
+                transScores.append(blocksScores)
+            return transScores
+        if ctx:
+            transScores = []
+            for blocks in translocations:
+        #        print(len(blocks))
+                blocksScores = []
+                for block in blocks:
+                    indices = getValues(transData.index.values,block)
+                    aScore = transData.at[indices[0],"aLen"]
+                    bScore = transData.at[indices[0],"bLen"]
+                    aGap = 0
+                    bGap = 0
+                    if len(block) > 1:
+                        for i in range(1, len(block)):
+                            aScore += transData.at[indices[i],"aLen"]
+                            bScore += transData.at[indices[i],"bLen"]
+                            aGap += max(0,transData.at[indices[i],"aStart"] - transData.at[indices[i-1],"aEnd"])
+                            bGap += max(0,transData.at[indices[i],"bStart"] - transData.at[indices[i-1],"bEnd"]) if transData.at[indices[i],"bDir"] == 1 else max(0, transData.at[indices[i-1],"bStart"] - transData.at[indices[i],"bEnd"]) 
+                        blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
+                        blocksScores.append(blockScore)
+                    else:
+                        blocksScores.append(1)
+                transScores.append(blocksScores)
+            return transScores
+    
+    def getTransBlocks(transScores, shortTrans, transData, inPlaceBlocks, threshold, ctx):
+        """This method filters possible translocation blocks to select those which have a posivitive gap based score
+           (output of `getTransLocationsScore`) and those which dont overlap significantly with the inPlaceBlocks.
+           
+           Parameters
+           ----------
+           transScores: list, 
+               output of getTransLocationScores, scores of all shortest blocks
+           shortTrans: list,
+               list of best blocks between everypair of blocks
+           orderedBlocks: DataFrame,
+               all translocated alignment blocks
+           inPlaceBlocks: DataFrame, 
+               all syntenic alignment blocks
+           threshold: int, 
+               cut-off value.
+        
+           Returns
+           --------
+           outBlocks: list,
+               selected shortTrans blocks
+        """
+        positiveTransScores = [np.where(np.array(i) >= 0)[0] for i in transScores]
+        transBlocks = [getValues(shortTrans[i], positiveTransScores[i]) for i in range(len(shortTrans))]
+        transBlocks = [i for j in transBlocks for i in j]
+        outBlocks = []
+        if not isinstance(ctx,bool):
+            print("CTX status must be a boolean")
+            sys.exit()
+        if not ctx:
+            for block in transBlocks:
+                blockAlength = 0
+                blockBlength = 0
+                blockAUni = 0
+                blockBUni = 0
+                
+                for almnt in block:
+                    aStart = transData.iat[almnt,0]
+                    aEnd = transData.iat[almnt,1]
+                    if transData.iat[almnt,8] == 1:
+                        bStart = transData.iat[almnt,2]
+                        bEnd = transData.iat[almnt,3]
+                    else:
+                        bStart = transData.iat[almnt,3]
+                        bEnd = transData.iat[almnt,2]      
+                    blockAlength += transData.iat[almnt,4]
+                    blockBlength += transData.iat[almnt,5]
+                    
+                    aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd)
+        
+                    for aBlock in aBlocks:
+                        if inPlaceBlocks.iat[aBlock,0] - aStart < threshold and aEnd - inPlaceBlocks.iat[aBlock,1] < threshold:
+                            aStart = aEnd
+                            break
+                        elif inPlaceBlocks.iat[aBlock,0] < aStart and inPlaceBlocks.iat[aBlock,1] < aEnd:
                             aStart = inPlaceBlocks.iat[aBlock,1]
                         else:
-                            aStart = aEnd
-                            break
-                blockAUni += aEnd - aStart
-                
-                
-                for bBlock in bBlocks:
-                    bBlockEnd = inPlaceBlocks.iat[bBlock,3]
-                    bBlockStart = inPlaceBlocks.iat[bBlock,2]
-                    if bBlockStart - bStart < threshold and bEnd - bBlockEnd < threshold:
-                        bStart = bEnd
-                        break
-                    elif bBlockStart < bStart and bBlockEnd < bEnd:
-                        bStart = bBlockEnd
-                    else:
-                        blockBUni += bBlockStart - bStart
-                        if bBlockEnd < bEnd:
-                            bStart = bBlockEnd
-                        else:
+                            blockAUni += inPlaceBlocks.iat[aBlock,0] - aStart
+                            if inPlaceBlocks.iat[aBlock,1] < aEnd:
+                                aStart = inPlaceBlocks.iat[aBlock,1]
+                            else:
+                                aStart = aEnd
+                                break
+                    blockAUni += aEnd - aStart
+                    
+                    
+                    for bBlock in bBlocks:
+                        bBlockEnd = inPlaceBlocks.iat[bBlock,3]
+                        bBlockStart = inPlaceBlocks.iat[bBlock,2]
+                        if bBlockStart - bStart < threshold and bEnd - bBlockEnd < threshold:
                             bStart = bEnd
                             break
-                blockBUni += bEnd - bStart
-    #Trans block is selected IFF either the unique region on any genome is larger than 1kb
-    # or length of unique region on a genome is larger than 0.5 times the length of
-    # the overlapping region on that genome
-            if blockAUni > 1000 or blockBUni > 1000 or blockAUni > 0.5*blockAlength or blockBUni > 0.5*blockBlength:
-                outBlocks.append(block)
-        return(outBlocks)
-    ##########
-    ## With CTX
-    ##########
-    if ctx:
-        for block in transBlocks:
-            blockAlength = 0
-            blockBlength = 0
-            blockAUni = 0
-            blockBUni = 0
-            
-            for almnt in block:
-                index = transData.index.values[almnt]
-                aStart = transData.at[index,"aStart"]
-                aEnd = transData.at[index,"aEnd"]
-                bStart = transData.at[index,"bStart"]
-                bEnd = transData.at[index,"bEnd"]
+                        elif bBlockStart < bStart and bBlockEnd < bEnd:
+                            bStart = bBlockEnd
+                        else:
+                            blockBUni += bBlockStart - bStart
+                            if bBlockEnd < bEnd:
+                                bStart = bBlockEnd
+                            else:
+                                bStart = bEnd
+                                break
+                    blockBUni += bEnd - bStart
+        #Trans block is selected IFF either the unique region on any genome is larger than 1kb
+        # or length of unique region on a genome is larger than 0.5 times the length of
+        # the overlapping region on that genome
+                if blockAUni > 1000 or blockBUni > 1000 or blockAUni > 0.5*blockAlength or blockBUni > 0.5*blockBlength:
+                    outBlocks.append(block)
+            return(outBlocks)
+        ##########
+        ## With CTX
+        ##########
+        if ctx:
+            for block in transBlocks:
+                blockAlength = 0
+                blockBlength = 0
+                blockAUni = 0
+                blockBUni = 0
                 
-                if bEnd < bStart:
-                    print("CTX Input: bStart must be less than bEnd")
-                    sys.exit()
- 
-                blockAlength += transData.at[index,"aLen"]
-                blockBlength += transData.at[index,"bLen"]
-                
-#                aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd)
-                aBlocks = list(np.intersect1d(np.where(inPlaceBlocks.aStart.values < aEnd)[0], np.where(inPlaceBlocks.aEnd.values > aStart)[0]))
-                aBlocks = list(np.intersect1d(aBlocks, np.where(inPlaceBlocks.aChr == transData.at[index,"aChr"])[0]))
-                aBlocks = getValues(inPlaceBlocks.index.values,aBlocks)
-    
-                for aBlock in aBlocks:
-                    if inPlaceBlocks.at[aBlock,"aStart"] - aStart < threshold and aEnd - inPlaceBlocks.at[aBlock,"aEnd"] < threshold:
-                        aStart = aEnd
-                        break
-                    elif inPlaceBlocks.at[aBlock,"aStart"] < aStart and inPlaceBlocks.at[aBlock,"aEnd"] < aEnd:
-                        aStart = inPlaceBlocks.at[aBlock,"aEnd"]
-                    else:
-                        blockAUni += inPlaceBlocks.at[aBlock,"aStart"] - aStart
-                        if inPlaceBlocks.at[aBlock,"aEnd"] < aEnd:
+                for almnt in block:
+                    index = transData.index.values[almnt]
+                    aStart = transData.at[index,"aStart"]
+                    aEnd = transData.at[index,"aEnd"]
+                    bStart = transData.at[index,"bStart"]
+                    bEnd = transData.at[index,"bEnd"]
+                    
+                    if bEnd < bStart:
+                        print("CTX Input: bStart must be less than bEnd")
+                        sys.exit()
+     
+                    blockAlength += transData.at[index,"aLen"]
+                    blockBlength += transData.at[index,"bLen"]
+                    
+    #                aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd)
+                    aBlocks = list(np.intersect1d(np.where(inPlaceBlocks.aStart.values < aEnd)[0], np.where(inPlaceBlocks.aEnd.values > aStart)[0]))
+                    aBlocks = list(np.intersect1d(aBlocks, np.where(inPlaceBlocks.aChr == transData.at[index,"aChr"])[0]))
+                    aBlocks = getValues(inPlaceBlocks.index.values,aBlocks)
+        
+                    for aBlock in aBlocks:
+                        if inPlaceBlocks.at[aBlock,"aStart"] - aStart < threshold and aEnd - inPlaceBlocks.at[aBlock,"aEnd"] < threshold:
+                            aStart = aEnd
+                            break
+                        elif inPlaceBlocks.at[aBlock,"aStart"] < aStart and inPlaceBlocks.at[aBlock,"aEnd"] < aEnd:
                             aStart = inPlaceBlocks.at[aBlock,"aEnd"]
                         else:
-                            aStart = aEnd
-                            break
-                blockAUni += aEnd - aStart
-                
-                bBlocks = list(np.intersect1d(np.where(inPlaceBlocks.bStart.values < bEnd)[0], np.where(inPlaceBlocks.bEnd.values > bStart)[0]))
-                bBlocks = list(np.intersect1d(bBlocks, np.where(inPlaceBlocks.bChr == transData.at[index,"bChr"])[0]))
-                bBlocks = getValues(inPlaceBlocks.index.values, bBlocks)
-                
-                for bBlock in bBlocks:
-                    bBlockStart = inPlaceBlocks.at[bBlock,"bStart"]
-                    bBlockEnd = inPlaceBlocks.at[bBlock,"bEnd"]
-                    if bStart - bBlockStart < threshold and bEnd - bBlockEnd < threshold:
-                        bStart = bEnd
-                        break
-                    elif bBlockStart < bStart and bBlockEnd < bEnd:
-                        bStart = bBlockEnd
-                    else:
-                        blockBUni += bBlockStart - bStart
-                        if bBlockEnd < bEnd:
-                            bStart = bBlockEnd
-                        else:
+                            blockAUni += inPlaceBlocks.at[aBlock,"aStart"] - aStart
+                            if inPlaceBlocks.at[aBlock,"aEnd"] < aEnd:
+                                aStart = inPlaceBlocks.at[aBlock,"aEnd"]
+                            else:
+                                aStart = aEnd
+                                break
+                    blockAUni += aEnd - aStart
+                    
+                    bBlocks = list(np.intersect1d(np.where(inPlaceBlocks.bStart.values < bEnd)[0], np.where(inPlaceBlocks.bEnd.values > bStart)[0]))
+                    bBlocks = list(np.intersect1d(bBlocks, np.where(inPlaceBlocks.bChr == transData.at[index,"bChr"])[0]))
+                    bBlocks = getValues(inPlaceBlocks.index.values, bBlocks)
+                    
+                    for bBlock in bBlocks:
+                        bBlockStart = inPlaceBlocks.at[bBlock,"bStart"]
+                        bBlockEnd = inPlaceBlocks.at[bBlock,"bEnd"]
+                        if bStart - bBlockStart < threshold and bEnd - bBlockEnd < threshold:
                             bStart = bEnd
                             break
-                blockBUni += bEnd - bStart
-    #Trans block is selected IFF either the unique region on any genome is larger than 1kb
-    # or length of unique region on a genome is larger than 0.5 times the length of
-    # the overlapping region on that genome
-            if blockAUni > 1000 or blockBUni > 1000 or blockAUni > 0.5*blockAlength or blockBUni > 0.5*blockBlength:
-                outBlocks.append(block)
-        return(outBlocks)
+                        elif bBlockStart < bStart and bBlockEnd < bEnd:
+                            bStart = bBlockEnd
+                        else:
+                            blockBUni += bBlockStart - bStart
+                            if bBlockEnd < bEnd:
+                                bStart = bBlockEnd
+                            else:
+                                bStart = bEnd
+                                break
+                    blockBUni += bEnd - bStart
+        #Trans block is selected IFF either the unique region on any genome is larger than 1kb
+        # or length of unique region on a genome is larger than 0.5 times the length of
+        # the overlapping region on that genome
+                if blockAUni > 1000 or blockBUni > 1000 or blockAUni > 0.5*blockAlength or blockBUni > 0.5*blockBlength:
+                    outBlocks.append(block)
+            return(outBlocks)
+    
+    orderedBlocksList = makeBlocksList(outOrderedBlocks, orderedBlocks)
+    outOG = getConnectivityGraph(orderedBlocksList)
+    shortestOutOG = []
+    for i in range(len(orderedBlocksList)):
+        eNode = [i]
+        eNode.extend(list(np.where(outOrderedBlocks.iloc[i] == True)[0]))
+        shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,"weight"))      
+    transScores = getTranslocationScore(shortestOutOG, orderedBlocks, ctx)
+    transBlocks = getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold, ctx)
+    return(transBlocks)
         
 	#%%			
 def getTransOverlapGroups(transBlocks, orderedBlocks, threshold):
@@ -826,97 +919,12 @@ def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours =
                 
    #%%     
 			
-def makeBlocksList(blocksTree, blocksData):
-    nrow = blocksTree.shape[0]
-#    print("blocksTree.shape : ", blocksTree.shape, "blocksData.shape: ", blocksData.shape)
-    blocksList = [alingmentBlock(i, np.where(blocksTree.iloc[i] == True)[0],blocksData.iloc[i]) for i in range(nrow)]
 
-    for block in blocksList:
-        i = 0
-        while(i < len(block.children)):
-            block.children = list(set(block.children) - set(blocksList[block.children[i]].children))
-            i+=1
-        block.children.sort()
-        
-        for child in block.children:
-            blocksList[child].addParent(block.id)
-    return blocksList
     
     
-def getConnectivityGraph(blocksList):
-    outOG = Graph().as_directed()
-    outOG.add_vertices(len(blocksList))
-    if len(blocksList) == 0:
-        return outOG
-#    maxScore = max([i.score for i in blocksList])
-    ## Add edges and edge weight
-    for i in blocksList:
-        if len(i.children) > 0:
-            outOG.add_edges(zip([i.id]*len(i.children), i.children))
-#            outOG.es[-len(i.children):]["weight"] =  [maxScore - i.score + 1]*len(i.children)               ##Trick to get positive score, and then use the in-built get_shortest_path algorithm 
-            outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
-    return outOG
 
-def getAllLongestPaths(graph,sNode, eNode,by="weight"):
-    """Uses Bellman-Ford Algorithm to find the longest path from node "sNode" in the 
-    directed acyclic graph "graph" to all nodes in the list "eNode".
-       
-        Parameters
-        ----------
-        graph: directeed igraph Graph(),
-            Directed acyclic graph containing all the nodes and edges in the graph.
-           
-        sNode: int, 
-            index of the start node in the graph.
-       
-        eNode: int list,
-            list of all end nodes. longest path from start node to end nodes will be
-            calculated
-        
-        by: igraph edge weight
-        
-        Returns
-        -------
-        list of len(eNodes) longest paths from sNodes to eNodes
-        
-    """
-    
-    pathList = []
-    
-    dist = {}
-    pred = {}
-    
-    allNodes = graph.vs.indices
-    for i in allNodes:
-        dist[i] = float("inf")
-        pred[i] = None
-        
-    dist[sNode] = 0
-    
-    changes = 1
-    for i in range(len(allNodes)-1):
-        if changes == 0:
-            break
-        changes = 0
-        for e in graph.es:
-            if dist[e.source] + e[by] < dist[e.target]:
-                changes = 1
-                dist[e.target] = dist[e.source] + e[by]
-                pred[e.target] = e.source
-    
-    for e in graph.es:
-        if dist[e.source] + e[by] < dist[e.target]:
-            sys.exit("Negative weight cycle identified")
-    
-    for key in eNode:
-        if dist[key] != float("inf"):
-            path = []
-            while key!=sNode:
-                path.append(key)
-                key = pred[key]
-            path.append(sNode)
-            pathList.append(path[::-1])
-    return(pathList)
+
+
             
 def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
 	nodeStack = []
