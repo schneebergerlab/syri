@@ -11,4 +11,9 @@
 /testScript/
 
 # Python build files
-/build/ 
+/build/
+
+#.gitignore
+.gitignore
+
+__init__.py 
