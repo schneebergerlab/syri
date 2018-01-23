@@ -71,7 +71,6 @@ def SynSearch(chromo, threshold, coords, cwdPath):
         invCoord.append(invCoord[3] - invCoord[2])
         invCoord.append(sum((invBlockData.aLen+invBlockData.bLen)*invBlockData.iden)/(invCoord[-2] + invCoord[-1]))
         invCoord.extend([1,-1,chromo,chromo])
-        print(i)
         for j in range(profitable[i-1].neighbours[0]+1,profitable[i-1].neighbours[1]):
             inPlaceBlocks = inPlaceBlocks[inPlaceBlocks.index != synData.iloc[j].name]
             try:
@@ -469,8 +468,6 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
     
     clusterSolutions = []
     for i in range(len(ctxCluster)):
-#    for i in range(20):
-        print(i)
         tempCluster = ctxCluster[i].copy()
         if len(tempCluster) == 0:
             continue

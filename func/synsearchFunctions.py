@@ -487,7 +487,81 @@ def findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd):
                                       np.where(inPlaceBlocks.bEnd.values > bStart)[0]))
     return(aBlocks, bBlocks)
     
+
+def getConnectivityGraph(blocksList):
+    outOG = Graph().as_directed()
+    outOG.add_vertices(len(blocksList))
+    if len(blocksList) == 0:
+        return outOG
+    ## Add edges and edge weight
+    for i in blocksList:
+        if len(i.children) > 0:
+            outOG.add_edges(zip([i.id]*len(i.children), i.children))
+            outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
+    return outOG
+
+def getAllLongestPaths(graph,sNode, eNode,by="weight"):
+    """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
+    directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
+    are negative, so shortest path from sNode to eNode corresponds to the longest path.
+       
+        Parameters
+        ----------
+        graph: directeed igraph Graph(),
+            Directed acyclic graph containing all the nodes and edges in the graph.
+           
+        sNode: int, 
+            index of the start node in the graph.
+       
+        eNode: int list,
+            list of all end nodes. longest path from start node to end nodes will be
+            calculated
+        
+        by: igraph edge weight
+        
+        Returns
+        -------
+        list of len(eNodes) longest paths from sNodes to eNodes
+        
+    """
+    pathList = []
+    dist = {}
+    pred = {}
     
+    allNodes = graph.vs.indices
+    for i in allNodes:
+        dist[i] = float("inf")
+        pred[i] = None
+        
+    dist[sNode] = 0
+    changes = 1
+    
+    for i in range(len(allNodes)-1):
+        if changes == 0:
+            break
+        changes = 0
+        for e in graph.es:
+            if dist[e.source] + e[by] < dist[e.target]:
+                changes = 1
+                dist[e.target] = dist[e.source] + e[by]
+                pred[e.target] = e.source
+    
+    for e in graph.es:
+        if dist[e.source] + e[by] < dist[e.target]:
+            sys.exit("Negative weight cycle identified")
+    
+    for key in eNode:
+        if dist[key] != float("inf"):
+            path = []
+            while key!=sNode:
+                path.append(key)
+                key = pred[key]
+            path.append(sNode)
+            pathList.append(path[::-1])
+    return(pathList)
+
+
+
 def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, ctx = False):
     if not isinstance(ctx, bool):
         print("CTX status must be a boolean")
@@ -505,78 +579,6 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
             for child in block.children:
                 blocksList[child].addParent(block.id)
         return blocksList
-    
-    def getConnectivityGraph(blocksList):
-        outOG = Graph().as_directed()
-        outOG.add_vertices(len(blocksList))
-        if len(blocksList) == 0:
-            return outOG
-        ## Add edges and edge weight
-        for i in blocksList:
-            if len(i.children) > 0:
-                outOG.add_edges(zip([i.id]*len(i.children), i.children))
-                outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
-        return outOG
-    
-    def getAllLongestPaths(graph,sNode, eNode,by="weight"):
-        """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
-        directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
-        are negative, so shortest path from sNode to eNode corresponds to the longest path.
-           
-            Parameters
-            ----------
-            graph: directeed igraph Graph(),
-                Directed acyclic graph containing all the nodes and edges in the graph.
-               
-            sNode: int, 
-                index of the start node in the graph.
-           
-            eNode: int list,
-                list of all end nodes. longest path from start node to end nodes will be
-                calculated
-            
-            by: igraph edge weight
-            
-            Returns
-            -------
-            list of len(eNodes) longest paths from sNodes to eNodes
-            
-        """
-        pathList = []
-        dist = {}
-        pred = {}
-        
-        allNodes = graph.vs.indices
-        for i in allNodes:
-            dist[i] = float("inf")
-            pred[i] = None
-            
-        dist[sNode] = 0
-        changes = 1
-        
-        for i in range(len(allNodes)-1):
-            if changes == 0:
-                break
-            changes = 0
-            for e in graph.es:
-                if dist[e.source] + e[by] < dist[e.target]:
-                    changes = 1
-                    dist[e.target] = dist[e.source] + e[by]
-                    pred[e.target] = e.source
-        
-        for e in graph.es:
-            if dist[e.source] + e[by] < dist[e.target]:
-                sys.exit("Negative weight cycle identified")
-        
-        for key in eNode:
-            if dist[key] != float("inf"):
-                path = []
-                while key!=sNode:
-                    path.append(key)
-                    key = pred[key]
-                path.append(sNode)
-                pathList.append(path[::-1])
-        return(pathList)
         
     def getTranslocationScore(translocations, transData, ctx):
         """Function to score the proposed translocation block based on the number of
@@ -953,7 +955,6 @@ def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
 
 
 def getBestClusterSubset(cluster, transBlocksData):
-#    print(cluster)
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
     if len(cluster) < 50:
         output = bruteSubsetSelector(cluster, transBlocksData, seedBlocks)
@@ -968,7 +969,6 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
     skipList = [seedBlocks]
     for i in cluster:
         startTime = time.time()
-#        print(i, len(posComb))
         if hasattr(transBlocksData[i], "meTo"):
             newPosComb = []
             newSkipList = []
@@ -990,7 +990,6 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
             newPosComb = []
             newSkipList = []
             for j in range(len(posComb)):
-#                print(j, transBlocksData[i].meAlist)
                 check1 = not any(a in posComb[j] for a in transBlocksData[i].meAlist)
                 check2 = not any(a in posComb[j] for a in transBlocksData[i].meBlist)
                 if ( check1 or check2) and i not in skipList[j]:
@@ -1030,13 +1029,11 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
             skipList.extend(newSkipList)
         timeTaken = time.time() - startTime
         remainingIterations = len(cluster) - cluster.index(i)
-#        print(timeTaken)
         if (timeTaken > 10 and timeTaken*(1.5**remainingIterations) > 600):
             print("Cluster is too big for Brute Force\nTime taken for last iteration ",
                   timeTaken, " iterations remaining ",remainingIterations)
             return "Failed"
                 
-#	print("exit", posComb)
 
     if [] in posComb:
         posComb.remove([])
@@ -1045,7 +1042,6 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
     bestScore = getScore(posComb[0], transBlocksData)
     bestComb = posComb[0]
     for i in range(1, len(posComb)):
-#        print(i)
         outBlocks = posComb[i]
         bestScore, bestComb = updateBestComb(bestScore, bestComb, outBlocks, transBlocksData)
     return( bestScore, bestComb)
@@ -1056,7 +1052,6 @@ def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):
     bestScore = 0
     bestComb = []
     for i in range(iterCount):
-#        print(i)
         tempCluster = cluster.copy()
         length = len(tempCluster)
         outBlocks =  seedBlocks.copy()
@@ -1469,7 +1464,6 @@ def readAnnoCoords(cwdPath, uniChromo):
         synData.append(list(map(int,line[:4]))+[chromo,chromo])
     fin.close()
     synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"])
-    print(synData.shape)
     annoCoords = annoCoords.append(synData)
     
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt"]:    
@@ -1481,7 +1475,6 @@ def readAnnoCoords(cwdPath, uniChromo):
                 data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
         fin.close()
         data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
-        print(data.shape)
         annoCoords = annoCoords.append(data)
     
     annoCoords[["aStart","aEnd","bStart","bEnd"]] = annoCoords[["aStart","aEnd","bStart","bEnd"]].astype("int64")
