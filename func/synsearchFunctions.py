@@ -1311,7 +1311,161 @@ def getDupGenome(dupData, allTransBlocksData, transClasses):
     dupData["dupGenomes"] = pd.Series(dupGenomes, index = dupData.index)
     return(dupData)
 
+def outSyn(cwdPath):
+    reCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
+    ctxAnnoDict = {"duplication":"dupCtx",
+                   "invDuplication":"invDupCtx",
+                   "translocation":"TLCtx",
+                   "invTranslocation":"invTLCtx"}
+    reCoords =  pd.DataFrame()
+        
+    synData = []
+    with open(cwdPath+"synOut.txt","r") as fin:
+        for line in fin:
+            line = line.strip().split("\t")
+            if line[0] == "#":
+                chromo = line[1]
+                continue
+            if len(line) == 4:
+                synData.append(list(map(int,line[:4]))+[chromo,chromo])
+            elif len(line) == 5:
+                synData.append(list(map(int,line[:4]))+[chromo,chromo] + [line[4]])
+#    fin.close()
+    synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","isinInv"])
+    synData["class"] = "syn"
+       
+    for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt","ctxOut.txt"]:    
+        data = []
+        with open(cwdPath+i,"r") as fin: 
+            if i != "ctxOut.txt":
+                for line in fin:
+                    line = line.strip().split("\t")
+                    if line[0] == "#":
+                        data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
+                data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
+                data["class"] = i.split("Out.txt")[0]
+                if len(data)>0:
+                    reCoords = reCoords.append(data)
+            else:
+                for line in fin:
+                    line = line.strip().split("\t")
+                    if line[0] == "#":
+                        data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5],ctxAnnoDict[line[8]]])
+                data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","class"], dtype=object)
+                if len(data)>0:
+                    reCoords = reCoords.append(data)
+                
+    allBlocks = synData[["aStart","aEnd","bStart","bEnd","aChr","bChr","class"]].append(reCoords)
+    allBlocks.index = range(allBlocks.shape[0])
+    allBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace= True)
+    synLocs = {np.where(allBlocks.index.values == i)[0][0]:i for i in range(synData.shape[0])}
 
+    allBlocks.index = range(allBlocks.shape[0])
+
+    aClusters = []
+    currentCluster = []
+    for index, row in allBlocks.iterrows():    
+        if len(currentCluster) == 0:
+            if row["class"] != "syn":
+                continue
+            elif row["class"] == "syn":
+                curChr = row["aChr"]
+                currentCluster.append(index)
+        elif row["class"] == "syn":
+            if row["aChr"] == curChr:
+                currentCluster.append(index)
+            else:
+                aClusters.append(currentCluster)
+                currentCluster = [index]
+                curChr = row["aChr"]
+        
+        elif row["class"] in ["TL", "inv","invTL","TLCtx","invTLCtx"]:
+            aClusters.append(currentCluster)
+            currentCluster = []
+            curChr = ""
+        else:
+            if row["aEnd"] < allBlocks.loc[currentCluster[-1]]["aEnd"] + threshold:
+                continue
+            else:
+                allClasses = allBlocks["class"][index:]
+                if len(np.where(allClasses=="syn")[0]) > 0:
+                    nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
+                    if max(row["aStart"],allBlocks.loc[currentCluster[-1]]["aEnd"]) > allBlocks.loc[nextSyn]["aStart"] - threshold:
+                        continue
+                    else:
+                        aClusters.append(currentCluster)
+                        currentCluster = []
+                else:
+                    aClusters.append(currentCluster)
+                    currentCluster = []
+    aClusters.append(currentCluster)
+                    
+    allBlocks.sort_values(["bChr","bStart","bEnd","bChr","aStart","aEnd"],inplace = True)
+    bClusters = []
+    currentCluster = []
+    for index, row in allBlocks.iterrows():
+        if len(currentCluster) == 0:
+            if row["class"] != "syn":
+                continue
+            elif row["class"] == "syn":
+                curChr = row["bChr"]
+                currentCluster.append(index)
+        elif row["class"] == "syn":
+            if row["aChr"] == curChr:
+                currentCluster.append(index)
+            else:
+                bClusters.append(currentCluster)
+                currentCluster = [index]
+                curChr = row["bChr"]
+        elif row["class"] in ["TL", "inv","invTL","TLCtx","invTLCtx"]:
+            bClusters.append(currentCluster)
+            currentCluster = []
+            curChr = ""
+        else:
+            if row["bEnd"] < allBlocks.loc[currentCluster[-1]]["bEnd"] + threshold:
+                continue
+            else:
+                allClasses = allBlocks["class"][index:]
+                if len(np.where(allClasses=="syn")[0]) > 0:
+                    nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
+                    if max(row["bStart"], allBlocks.loc[currentCluster[-1]]["bEnd"]) > allBlocks.loc[nextSyn]["bStart"] - threshold:
+                        continue
+                    else:
+                        bClusters.append(currentCluster)
+                        currentCluster = []
+                else:
+                    bClusters.append(currentCluster)
+                    currentCluster = []
+    bClusters.append(currentCluster)
+    allBlocks.sort_values(["aChr","aStart","aEnd","bChr", "bStart","bEnd"],inplace = True)
+   
+    outClusters = []
+    aIndex = 0 
+    bIndex = 0
+    currentCluster = []
+    for i in unlist(aClusters):
+        if i in aClusters[aIndex] and i in bClusters[bIndex]:
+            currentCluster.append(i)
+        else:
+            if i not in aClusters[aIndex]:
+                aIndex+=1
+            if i not in bClusters[bIndex]:
+                bIndex+=1
+            outClusters.append(currentCluster)
+            currentCluster = [i]
+    outClusters.append(currentCluster)
+    
+    with open(cwdPath+"synOut.txt","w") as fout:
+        for i in outClusters:
+            fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"],"\n"])))
+            for j in i:
+                fout.write("\t".join(map(str,allBlocks.loc[j][:-1])))
+                if synData.loc[synLocs[j]]["isinInv"] == "Syn_in_Inv":
+                    fout.write("\tSyn_in_Inv\n")
+                else:
+                    fout.write("\n")   
+    return None
+    
         
 def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData):
     
@@ -1337,7 +1491,6 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
         if len(i) > 0:
             allBlocks = allBlocks.append(i)
     allBlocks.index = range(allBlocks.shape[0])
-    
     
     """
     Take data of all blocks and create groups of syntenic blocks from syntenic alignments
@@ -1682,29 +1835,46 @@ class transBlock:
 ### SV identification functions
 #################################################################
         
-def readSVData(cwdPath, uniChromo, ctxout):
+def readSVData(cwdPath):
     annoCoords = pd.DataFrame()
-    for chromo in uniChromo:
-        for fileType in ["syn","inv", "TL", "invTL"]:
-            fileData = pd.read_table(cwdPath+chromo+"_"+fileType+"Out.txt", header = None, dtype = object)
-            annoIndices = np.where(fileData[0] =="#")[0]
-            coordsData = fileData.loc[fileData[0] !="#"].copy()
-            coordsData = coordsData[[0,1,2,3]].astype(dtype = "int64")
-            annoIndices = np.append(annoIndices,len(fileData))
-            repCount = annoIndices[1:] - annoIndices[:-1] - 1
-            reps = np.repeat(range(len(annoIndices)-1), repCount)
-            coordsData["group"] = reps
-            coordsData["aChr"] = chromo
-            coordsData["bChr"] = chromo
-            coordsData["state"] = fileType
-            annoCoords = annoCoords.append(coordsData.copy())
+    for fileType in ["syn","inv","TL","invTL"]:
+        try:
+            fileData = pd.read_table(cwdPath+fileType+"Out.txt", header = None, dtype = object)
+        except pd.io.common.EmptyDataError:
+            print(fileType, "Out.txt is empty. Skipping analysing it.")
+            continue
+        except Exception as e:
+            print("ERROR: while trying to read ", fileType, "Out.txt", e)
+            continue
+            
+        annoIndices = np.where(fileData[0] =="#")[0]
+        annoIndices = np.append(annoIndices,len(fileData))
+        repCount = annoIndices[1:] - annoIndices[:-1] - 1
+        
+        annoData = fileData.loc[fileData[0] == "#"].copy()
+        coordsData = fileData.loc[fileData[0] !="#"].copy()
+        coordsData = coordsData[[0,1,2,3]].astype(dtype = "int64")
+        
+        reps = []
+        for i in annoData[1].unique():
+            reps.extend(list(range(len(np.where(annoData[1] == i)[0]))))
+        reps = np.repeat(reps, repCount)
+        
+        coordsData["group"] = reps
+        coordsData["aChr"] = list(np.repeat(annoData[1],repCount))
+        coordsData["bChr"] = list(np.repeat(annoData[5],repCount))
+        coordsData["state"] = fileType
+        annoCoords = annoCoords.append(coordsData.copy())
                                    
-    fileData = pd.read_table(cwdPath+ctxout, header = None, names = list(range(11)), dtype = object, sep ="\t")
+    fileData = pd.read_table(cwdPath+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
     annoIndices = np.where(fileData[0] =="#")[0]
     states = list(fileData[9].loc[annoIndices])
     coordsData = fileData.loc[fileData[0] !="#"].copy()
     annoIndices = np.append(annoIndices,len(fileData))
     repCount = annoIndices[1:] - annoIndices[:-1] - 1
+    
+    
+    
     reps = np.repeat(range(len(annoIndices)-1), repCount)
     stateReps = np.repeat(states, repCount)
     
@@ -2075,19 +2245,27 @@ def getSV(cwdPath, allAlignments):
 
 
 
-def getNotAligned(cwdPath, uniChromo, ctxout):    
+def getNotAligned(cwdPath):    
     annoCoords = pd.DataFrame()
-    for chromo in uniChromo:
-        for fileType in ["syn","inv", "TL", "invTL","dup", "invDup"]:
-            fileData = pd.read_table(cwdPath+chromo+"_"+fileType+"Out.txt", header = None, dtype = object)
-            coordsData = fileData.loc[fileData[0] == "#"].copy()
-            coordsData = coordsData[[1,2,4,5]].astype(dtype="int64")
-            coordsData["aChr"] = chromo
-            coordsData["bChr"] = chromo
-            coordsData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
-            annoCoords = annoCoords.append(coordsData.copy())
+    for fileType in ["syn","inv", "TL", "invTL","dup", "invDup"]:
+        try:
+            fileData = pd.read_table(cwdPath+fileType+"Out.txt", header = None, dtype = object)  
+        except pd.io.common.EmptyDataError:
+            print(fileType, "Out.txt is empty. Skipping analysing it.")
+            continue
+        except Exception as e:
+            print("ERROR: while trying to read ", fileType, "Out.txt", e)
+            continue
+        
+        
+        
+#        fileData = pd.read_table(cwdPath+fileType+"Out.txt", header = None, dtype = object)
+        coordsData = fileData.loc[fileData[0] == "#",[2,3,6,7,1,5]].copy()
+        coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
+        coordsData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
+        annoCoords = annoCoords.append(coordsData.copy())
 
-    fileData = pd.read_table(cwdPath+ctxout, header = None, names = list(range(11)), dtype = object, sep ="\t")
+    fileData = pd.read_table(cwdPath+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
     coordsData = fileData.loc[fileData[0] == "#"]
     coordsData = coordsData[[1,2,3,4,7,8]].copy()
     coordsData[[1,2,3,4]] = coordsData[[1,2,3,4]].astype(dtype="int64")
@@ -2099,31 +2277,31 @@ def getNotAligned(cwdPath, uniChromo, ctxout):
   
     fout = open(cwdPath + "notAligned.txt","w")
     
-    fout.write("#Reference Genome\n")
+#    fout.write("#Reference Genome\n")
     df = annoCoords[["aStart","aEnd","aChr"]].copy()
     df.sort_values(["aChr", "aStart", "aEnd"], inplace = True)
-    for chrom in uniChromo:
+    for chrom in sorted(annoCoords.aChr.unique()):
         chromData = df.loc[df.aChr == chrom]
         maxEnd = chromData.iloc[0,1]
         for row in chromData.itertuples(index = False):
             if row.aStart > maxEnd+1:
-                fout.write("\t".join([str(maxEnd+1),
+                fout.write("\t".join(["R",str(maxEnd+1),
                                       str(row.aStart - 1),
                                       chrom]) + "\n")
             if row.aEnd > maxEnd:
                 maxEnd = row.aEnd
     
-    fout.write("\n")
+#    fout.write("\n")
     
-    fout.write("#Query Genome\n")
+#    fout.write("#Query Genome\n")
     df = annoCoords[["bStart","bEnd","bChr"]].copy()
     df.sort_values(["bChr", "bStart", "bEnd"], inplace = True)
-    for chrom in uniChromo:
+    for chrom in sorted(annoCoords.bChr.unique()):
         chromData = df.loc[df.bChr == chrom]
         maxEnd = chromData.iloc[0,1]
         for row in chromData.itertuples(index = False):
             if row.bStart > maxEnd+1:
-                fout.write("\t".join([str(maxEnd+1),
+                fout.write("\t".join(["Q",str(maxEnd+1),
                                       str(row.bStart - 1),
                                       chrom]) + "\n")
             if row.bEnd > maxEnd:

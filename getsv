@@ -11,28 +11,24 @@ import pandas as pd
 from func.synsearchFunctions import readSVData, getSV, getNotAligned
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        sys.exit("Usage: getSVs <path_to_coords_file>")
+    if len(sys.argv) == 1:
+        print("Using", os.getcwd(), "as working directory")
     if len(sys.argv) == 2:
-        fileLocation = sys.argv[1]   
+        try:
+            os.chdir(sys.argv[1])
+        except:
+            sys.exit("Error in setting", sys.argv[1], "as the working directory")
+    cwdPath = os.getcwd()+ os.sep
+    listDir = os.listdir()
+    fileLists = ["synOut.txt","invOut.txt", "TLOut.txt", "invTLOut.txt","ctxOut.txt"]
+    for file in fileLists:
+        if file not in listDir:
+            sys.exit(file + "is not present in the directory. Exiting")
 #        fileLocation = "/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_ler_Chr/out_m_i90_l100.coords"
     
-    cwdPath = os.getcwd()+os.sep
-#    cwdPath = "/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_ler_Chr/"
-    coords = pd.read_table(fileLocation, header = None) 
-    coords.columns  =   ["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr"]
-    aChromo = set(coords["aChr"])
-    bChromo = set(coords["bChr"])
-    uniChromo = list(aChromo if len(aChromo) < len(bChromo) else bChromo)
-    uniChromo.sort()
-    ctxout = "ctxOut.txt"
-    
-    if ctxout not in os.listdir(cwdPath):
-        print("No ctx Out file in directory. Exiting.")
-        sys.exit()
-    allAlignments = readSVData(cwdPath, uniChromo, ctxout)
+    allAlignments = readSVData(cwdPath)
     mumSNPIn = allAlignments[["aStart","aEnd","bStart","bEnd","aChr","bChr"]].copy()
     mumSNPIn.to_csv(cwdPath+"mumSNPIn.txt",sep="\t",header = False, index = False)
     getSV(cwdPath, allAlignments)
     
-    getNotAligned(cwdPath, uniChromo, ctxout)
+    getNotAligned(cwdPath)
