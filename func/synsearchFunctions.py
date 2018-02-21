@@ -1311,7 +1311,7 @@ def getDupGenome(dupData, allTransBlocksData, transClasses):
     dupData["dupGenomes"] = pd.Series(dupGenomes, index = dupData.index)
     return(dupData)
 
-def outSyn(cwdPath):
+def outSyn(cwdPath, threshold):
     reCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
     ctxAnnoDict = {"duplication":"dupCtx",
                    "invDuplication":"invDupCtx",
@@ -1457,9 +1457,9 @@ def outSyn(cwdPath):
     
     with open(cwdPath+"synOut.txt","w") as fout:
         for i in outClusters:
-            fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"],"\n"])))
+            fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"],"\n"])))
             for j in i:
-                fout.write("\t".join(map(str,allBlocks.loc[j][:-1])))
+                fout.write("\t".join(map(str,allBlocks.loc[j][0:4])))
                 if synData.loc[synLocs[j]]["isinInv"] == "Syn_in_Inv":
                     fout.write("\tSyn_in_Inv\n")
                 else:
@@ -2267,8 +2267,8 @@ def getNotAligned(cwdPath):
 
     fileData = pd.read_table(cwdPath+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
     coordsData = fileData.loc[fileData[0] == "#"]
-    coordsData = coordsData[[1,2,3,4,7,8]].copy()
-    coordsData[[1,2,3,4]] = coordsData[[1,2,3,4]].astype(dtype="int64")
+    coordsData = coordsData[[2,3,6,7,1,5]].copy()
+    coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
     coordsData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
     
     annoCoords = annoCoords.append(coordsData.copy())
