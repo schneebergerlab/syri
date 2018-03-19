@@ -1331,7 +1331,12 @@ def outSyn(cwdPath, threshold):
             elif len(line) == 5:
                 synData.append(list(map(int,line[:4]))+[chromo,chromo] + [line[4]])
 #    fin.close()
-    synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","isinInv"])
+    if max([len(i) for i in synData]) == 7:
+        synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","isinInv"])
+    else:
+        synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"])
+        synData["isinInv"] = ""
+        
     synData["class"] = "syn"
        
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt","ctxOut.txt"]:    
@@ -1841,7 +1846,7 @@ def readSVData(cwdPath):
         try:
             fileData = pd.read_table(cwdPath+fileType+"Out.txt", header = None, dtype = object)
         except pd.io.common.EmptyDataError:
-            print(fileType, "Out.txt is empty. Skipping analysing it.")
+            print(fileType+"Out.txt is empty. Skipping analysing it.")
             continue
         except Exception as e:
             print("ERROR: while trying to read ", fileType, "Out.txt", e)
@@ -1865,39 +1870,41 @@ def readSVData(cwdPath):
         coordsData["bChr"] = list(np.repeat(annoData[5],repCount))
         coordsData["state"] = fileType
         annoCoords = annoCoords.append(coordsData.copy())
-                                   
-    fileData = pd.read_table(cwdPath+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
-    annoIndices = np.where(fileData[0] =="#")[0]
-    states = list(fileData[9].loc[annoIndices])
-    coordsData = fileData.loc[fileData[0] !="#"].copy()
-    annoIndices = np.append(annoIndices,len(fileData))
-    repCount = annoIndices[1:] - annoIndices[:-1] - 1
-    
-    
-    
-    reps = np.repeat(range(len(annoIndices)-1), repCount)
-    stateReps = np.repeat(states, repCount)
-    
-    coordsData1 = coordsData[[0,1,2,3]].astype(dtype = "int64")
-    coordsData1["aChr"] = coordsData[9]
-    coordsData1["bChr"] = coordsData[10]
-    coordsData1["group"] = reps
-    coordsData1["state"] = stateReps
-    coordsData1 = coordsData1[[0,1,2,3,"group","aChr","bChr","state"]]
-    coordsData1 = coordsData1.loc[coordsData1["state"].isin(["translocation","invTranslocation"])]
-    coordsData1.loc[coordsData1.state == "translocation","state"] = "ctx"
-    coordsData1.loc[coordsData1.state == "invTranslocation","state"] = "invCtx"
-    annoCoords = annoCoords.append(coordsData1)
+                                
+    try:
+        fileData = pd.read_table(cwdPath+"ctxOut.txt", header = None, dtype = object)
+        annoIndices = np.where(fileData[0] =="#")[0]
+        states = np.array(fileData[8].loc[annoIndices], dtype = "str")
+        aChr = np.array(fileData[1].loc[annoIndices], dtype = "str")
+        bChr = np.array(fileData[5].loc[annoIndices], dtype = "str")
+        coordsData = fileData.loc[fileData[0] !="#"].copy()
+        annoIndices = np.append(annoIndices,len(fileData))
+        repCount = annoIndices[1:] - annoIndices[:-1] - 1
+            
+        reps = np.repeat(range(len(annoIndices)-1), repCount)
+        stateReps = np.repeat(states, repCount)
+        aChrReps = np.repeat(aChr, repCount)
+        bChrReps = np.repeat(bChr, repCount)
+        
+        coordsData1 = coordsData[[0,1,2,3]].astype(dtype = "int64")
+        coordsData1["aChr"] = aChrReps
+        coordsData1["bChr"] = bChrReps
+        coordsData1["group"] = reps
+        coordsData1["state"] = stateReps
+        coordsData1 = coordsData1[[0,1,2,3,"group","aChr","bChr","state"]]
+        coordsData1 = coordsData1.loc[coordsData1["state"].isin(["translocation","invTranslocation"])]
+        coordsData1.loc[coordsData1.state == "translocation","state"] = "ctx"
+        coordsData1.loc[coordsData1.state == "invTranslocation","state"] = "invCtx"
+        annoCoords = annoCoords.append(coordsData1)
+    except pd.io.common.EmptyDataError:
+        print("ctxOut.txt is empty. Skipping analysing it.")
+    except Exception as e:
+        print("ERROR: while trying to read ctxOut.txt", e)
+        
     annoCoords.columns = ["aStart","aEnd","bStart","bEnd","group","aChr","bChr","state"]
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
     annoCoords.index = range(len(annoCoords))
-    invIndices = annoCoords.state == "invCtx"
-    annoCoords.loc[invIndices, "bStart"] = annoCoords.bStart + annoCoords.bEnd
-    annoCoords.loc[invIndices, "bEnd"] = annoCoords.bStart - annoCoords.bEnd
-    annoCoords.loc[invIndices, "bStart"] = annoCoords.bStart - annoCoords.bEnd
     return annoCoords
-
-
 
 
 
