@@ -11,7 +11,8 @@ import pandas as pd
 import numpy as np
 from igraph import *
 from func.myUsefulFunctions import *
-from func.synsearchFunctions import *
+#from func.synsearchFunctions import *
+from pyxFiles.synsearchFunctions import *
 from collections import Counter
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
@@ -27,10 +28,9 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     print(chromo, coordsData.shape)
     nrow = coordsData.shape[0]    
     print("Identifying Synteny for chromosome", chromo, str(datetime.now()))
-#    df = coordsData.apply( lambda X : coordsData.apply(TS, axis = 1, args = (X, threshold)), axis = 1)
+    df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)    
     
-    
-    df = coordsData.apply( lambda X : coordsData.loc[X.name:].apply(TS, axis = 1, args = (X, threshold)), axis = 1)
+#    df = coordsData.apply( lambda X : coordsData.loc[X.name:].apply(TS, axis = 1, args = (X, threshold)), axis = 1)
     nrow = df.shape[0]
     blocks = [alingmentBlock(i, np.where(df.iloc[i,] == True)[0], coordsData.iloc[i]) for i in range(nrow)]
     for block in blocks:
@@ -55,7 +55,7 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     ##########################################################################
     print("Identifying Inversions for chromosome", chromo, str(datetime.now()))
 
-    invertedCoordsOri, profitable, bestInvPath, invData, synInInv = getInversions(coords,chromo, threshold, synData, synPath)
+    invertedCoordsOri, profitable, bestInvPath, invData, synInInv, badSyn = getInversions(coords,chromo, threshold, synData, synPath)
     
 
     ##########################################################
@@ -77,12 +77,16 @@ def SynSearch(chromo, threshold, coords, cwdPath):
         invCoord.append(sum((invBlockData.aLen+invBlockData.bLen)*invBlockData.iden)/(invCoord[-2] + invCoord[-1]))
         invCoord.extend([1,-1,chromo,chromo])
         for j in range(profitable[i-1].neighbours[0]+1,profitable[i-1].neighbours[1]):
+            print(i,j)
+            print(len(inPlaceBlocks))
+            print(Counter(inPlaceBlocks.index != synData.iloc[j].name))
             inPlaceBlocks = inPlaceBlocks[inPlaceBlocks.index != synData.iloc[j].name]
+            print(len(inPlaceBlocks))
             try:
                 inPlaceIndices.remove(synData.iloc[j].name)
             except:
                 pass
-        inPlaceBlocks = inPlaceBlocks.append(pd.Series(invCoord, index = inPlaceBlocks.columns), ignore_index = True)
+        inPlaceBlocks = inPlaceBlocks.append(pd.Series(invCoord, index = inPlaceBlocks.columns, name = invPos[0]))
         
     inPlaceBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
     inPlaceBlocks.index = range(inPlaceBlocks.shape[0])
@@ -97,7 +101,9 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     
     ## Create connectivity tree for directed blocks
     transBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, orderedBlocks, threshold)
-    outOrderedBlocks = makeBlocksTree(inPlaceBlocks, orderedBlocks, threshold, transBlocksNeighbours)
+    outOrderedBlocks = pd.DataFrame(makeBlocksTree(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold, transBlocksNeighbours[0].values, transBlocksNeighbours[1].values))
+    
+#    outOrderedBlocks = makeBlocksTree(inPlaceBlocks, orderedBlocks, threshold, transBlocksNeighbours)
 
     ## Create connectivity tree for inverted blocks
     invertedCoords = invertedBlocks.copy()
@@ -109,7 +115,8 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
     invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart 
     invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
-    outInvertedBlocks = makeBlocksTree(inPlaceBlocks, invertedCoords, threshold, invTransBlocksNeighbours)
+    outInvertedBlocks = pd.DataFrame(makeBlocksTree(invertedCoords.aStart.values, invertedCoords.aEnd.values, invertedCoords.bStart.values, invertedCoords.bEnd.values, invertedCoords.bDir.values, invertedCoords.aChr.values, invertedCoords.bChr.values, invertedCoords.index.values, threshold, invTransBlocksNeighbours[0].values, invTransBlocksNeighbours[1].values))
+#    outInvertedBlocks = makeBlocksTree(inPlaceBlocks, invertedCoords, threshold, invTransBlocksNeighbours)
     
     #### find all translocations which don't have large gaps between its alignments
     #### and are not overlappign with the syntenic blocks
@@ -214,7 +221,7 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     ## Grouping Syn blocks : This grouping is effectively wrong as it does not include
     ## ctx information. But, is still used to keep old functions working. Final synblock
     ## identification is done after ctx identification.
-    allBlocks, outClusters = groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData)
+    allBlocks, outClusters = groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn)
     
 ########################################################################################################################
     fout = open(cwdPath+chromo+"_synOut.txt","w")
@@ -471,8 +478,8 @@ if __name__ == "__main__":
     with Pool(processes = nCores) as pool:
         pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
     mergeOutputFiles(uniChromo,cwdPath)
-    ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold)
-    outSyn(cwdPath, threshold)
+#    ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold)
+#    outSyn(cwdPath, threshold)
 
     print("End of program")
     

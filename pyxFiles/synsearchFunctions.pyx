@@ -19,7 +19,7 @@ from igraph import *
 from collections import Counter
 from scipy.stats import *
 import datetime
-
+cimport numpy as np
 
 np.random.seed(1)
 
@@ -51,10 +51,25 @@ def SynAndOverlap(jData, iData, threshold):
             return True
     return False
 
-def TS(jData, iData, threshold):
-    if (jData.aStart - iData.aStart) > threshold and (jData.aEnd - iData.aEnd) > threshold and (jData.bStart - iData.bStart) > threshold and (jData.bEnd - iData.bEnd) > threshold:
-            return True
-    return False
+#def TS(jData, iData, threshold):
+#    if (jData.aStart - iData.aStart) > threshold and (jData.aEnd - iData.aEnd) > threshold and (jData.bStart - iData.bStart) > threshold and (jData.bEnd - iData.bEnd) > threshold:
+#            return True
+#    return False
+
+cpdef apply_TS(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.int threshold):
+    assert(aStart.dtype == np.int and aEnd.dtype == np.int and bStart.dtype == np.int and bEnd.dtype == np.int)
+    cdef Py_ssize_t i, j,  n = len(aStart)
+    print(n)
+    assert(n == len(aEnd) == len(bStart) == len(bEnd))
+#    cdef np.ndarray[double, ndim =2] res = np.empty(n).reshape([10,10])
+#    print(res)
+    cdef np.ndarray[object, ndim =2 ] df =  np.array([[np.nan]*n]*n, dtype=object)
+#    print(df)
+    for i in range(n):
+        for j in range(i+1,n):
+            df[i][j] =  True if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold else False
+    return df
+
 
 def getSynPath(blocks):
     cdef list synPath = []
@@ -66,7 +81,9 @@ def getSynPath(blocks):
     synPath.append(lastBlock)
     return(synPath[::-1])
 
-cdef getInvBlocks(invTree, invertedCoordsOri):
+#%%
+
+cpdef getInvBlocks(invTree, invertedCoordsOri):
     cdef int nrow, i, child
     nrow = invTree.shape[0]
     invBlocks = [alingmentBlock(i, np.where(invTree.iloc[i,] == True)[0], invertedCoordsOri.iloc[i]) for i in range(nrow)]
@@ -82,7 +99,7 @@ cdef getInvBlocks(invTree, invertedCoordsOri):
             invBlocks[child].addParent(block.id)
     return(invBlocks)
 
-cdef list getShortest(invBlocks):
+cpdef list getShortest(invBlocks):
     cdef:
         list shortest = []
         int i
@@ -93,7 +110,7 @@ cdef list getShortest(invBlocks):
             shortest.append(getAllLongestPaths(invG,i,j))
     return shortest
     
-cdef list getRevenue(invBlocks, shortest, invertedCoordsOri):
+cpdef list getRevenue(invBlocks, shortest, invertedCoordsOri):
     cdef:
         list revenue, i, j, values, startA, endA, startB, endB, iden
         int k, l
@@ -238,7 +255,9 @@ def getInversions(coords,chromo, threshold, synData, synPath):
     invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
 
     nrow = pd.Series(range(invertedCoords.shape[0]))
-    invTree = nrow.apply( lambda x : invertedCoords.iloc[x:,].apply(TS, axis = 1, args = (invertedCoords.iloc[x], threshold)))
+    invTree = pd.DataFrame(apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold), index = range(len(invertedCoords)), columns = invertedCoords.index.values)
+    
+#    invTree = nrow.apply( lambda x : invertedCoords.iloc[x:,].apply(TS, axis = 1, args = (invertedCoords.iloc[x], threshold)))
     #del(invertedCoords)
     
     #######################################################################
@@ -424,12 +443,26 @@ def getInversions(coords,chromo, threshold, synData, synPath):
 
     invBlocksIndex = unlist([profitable[i-1].invPos for i in bestInvPath])
     invData = invertedCoordsOri.iloc[invBlocksIndex]
-    invNeighbours  = [profitable[i-1].neighbours for i in bestInvPath]
-    synInInv = unlist([list(range(i[0]+1, i[1])) for i in invNeighbours])
-#    synInInvIndices = getValues(synData.index, synInInv)
-    return(invertedCoordsOri, profitable, bestInvPath,invData, synInInv)
-        
-           
+    
+    badSyn = []
+    synInInv = []
+    for i in bestInvPath:
+        invNeighbour = profitable[i-1].neighbours
+#        synInInv = list(range(invNeighbour[0]+1, invNeighbour[1]))
+        invPos = profitable[i-1].invPos
+        invCoord = [invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2]]
+        for j in range(invNeighbour[0]+1, invNeighbour[1]):
+            sd = synData.iloc[j][["aStart","aEnd","bStart","bEnd"]]
+            if (invCoord[0] - sd[0] < threshold) and (sd[1] - invCoord[1] < threshold) and (invCoord[2] - sd[2] < threshold) and (sd[3] - invCoord[2] < threshold):
+                synInInv.append(j)
+            else:
+                badSyn.append(j)
+    
+
+#    invNeighbours  = [profitable[i-1].neighbours for i in bestInvPath]
+#    synInInv = unlist([list(range(i[0]+1, i[1])) for i in invNeighbours])
+    return(invertedCoordsOri, profitable, bestInvPath,invData, synInInv, badSyn)
+               
 def getRedundantIndex(inPlaceBlocks, outPlaceBlocks, threshold):
     nrow = outPlaceBlocks.shape[0]
     redundant = []
@@ -468,74 +501,75 @@ def getTransSynOrientation(inPlaceData, transData, threshold, ctx = False):
                                       np.where(inPlaceBlocks.aEnd > (row.aEnd + threshold))[0],
                                       np.where(inPlaceBlocks.bStart > (row.bStart + threshold))[0],
                                       np.where(inPlaceBlocks.bEnd > (row.bEnd + threshold))[0])
-        
+            
             upBlock = max(upSyn) if len(upSyn) > 0 else -1
             downBlock = min(downSyn) if len(downSyn) > 0 else len(inPlaceBlocks)
             transPositions[i] = [upBlock, downBlock]
+        transPositions = pd.DataFrame(transPositions).transpose()
         return transPositions
 
-    if ctx:
-        
-        inPlaceBlocks.sort_values(["aIndex"], inplace = True)
-        transRowIndex = transData.index.values
-        transPositions = dict()
-        ## identify neighbours on reference genome
-        for i in transRowIndex:
-            upSyn = getValues(inPlaceBlocks.index.values,
-                              np.intersect1d(
-                                      np.where(inPlaceBlocks.aStart <= transData.at[i,"aEnd"])[0],
-                                      np.where(inPlaceBlocks.aChr == transData.at[i,"aChr"])[0]))
-            downSyn = getValues(inPlaceBlocks.index.values,
-                                np.intersect1d(
-                                        np.where(inPlaceBlocks.aEnd >= transData.at[i,"aStart"])[0],
-                                        np.where(inPlaceBlocks.aChr == transData.at[i,"aChr"])[0]))
-            
-            upBlock = -1
-            downBlock = len(inPlaceBlocks)
-            
-            for j in upSyn[::-1]:
-                if (transData.at[i,"aStart"] - inPlaceBlocks.at[j,"aStart"]) > threshold and (transData.at[i,"aEnd"] - inPlaceBlocks.at[j,"aEnd"]) > threshold:
-                    upBlock = j
-                    break
-            
-            for j in downSyn:
-                if (inPlaceBlocks.at[j,"aStart"] - transData.at[i,"aStart"]) > threshold and (inPlaceBlocks.at[j,"aEnd"] - transData.at[i,"aEnd"]) > threshold:
-                    downBlock = j 
-                    break
-            
-            transPositions[i] = [inPlaceBlocks.at[upBlock,"aIndex"]] if upBlock != -1 else [-1]
-            transPositions[i].append(inPlaceBlocks.at[downBlock,"aIndex"]) if downBlock != len(inPlaceBlocks) else transPositions[i].append(len(inPlaceBlocks))
-            
-        
-        ## identify neighbours on query genome
-        inPlaceBlocks.sort_values("bIndex", inplace = True)
-        for i in transRowIndex:
-            bUpSyn = getValues(inPlaceBlocks.index.values,
-                               np.intersect1d(
-                                       np.where(inPlaceBlocks.bStart <= transData.at[i,"bEnd"])[0],
-                                       np.where(inPlaceBlocks.bChr == transData.at[i,"bChr"])[0]))
-            bDownSyn = getValues(inPlaceBlocks.index.values,
-                                 np.intersect1d(
-                                         np.where(inPlaceBlocks.bEnd >= transData.at[i,"bStart"])[0],
-                                         np.where(inPlaceBlocks.bChr == transData.at[i, "bChr"])[0]))
-
-            bUpBlock = -1
-            bDownBlock = len(inPlaceBlocks)
-            
-            for j in bUpSyn[::-1]:
-                if (transData.at[i,"bStart"] - inPlaceBlocks.at[j,"bStart"]) > threshold and (transData.at[i,"bEnd"] - inPlaceBlocks.at[j,"bEnd"]) > threshold:
-                    bUpBlock = j
-                    break
-            
-            for j in bDownSyn:
-                if (inPlaceBlocks.at[j,"bStart"] - transData.at[i,"bStart"]) > threshold and (inPlaceBlocks.at[j,"bEnd"] - transData.at[i,"bEnd"]) > threshold:
-                    bDownBlock = j 
-                    break 
-            transPositions[i].append(inPlaceBlocks.at[bUpBlock,"bIndex"]) if bUpBlock != -1 else transPositions[i].append(-1)
-            transPositions[i].append(inPlaceBlocks.at[bDownBlock,"bIndex"]) if bDownBlock != len(inPlaceBlocks) else transPositions[i].append(len(inPlaceBlocks))
-        return transPositions
-    
-        
+#    if ctx:
+#        
+#        inPlaceBlocks.sort_values(["aIndex"], inplace = True)
+#        transRowIndex = transData.index.values
+#        transPositions = dict()
+#        ## identify neighbours on reference genome
+#        for i in transRowIndex:
+#            upSyn = getValues(inPlaceBlocks.index.values,
+#                              np.intersect1d(
+#                                      np.where(inPlaceBlocks.aStart <= transData.at[i,"aEnd"])[0],
+#                                      np.where(inPlaceBlocks.aChr == transData.at[i,"aChr"])[0]))
+#            downSyn = getValues(inPlaceBlocks.index.values,
+#                                np.intersect1d(
+#                                        np.where(inPlaceBlocks.aEnd >= transData.at[i,"aStart"])[0],
+#                                        np.where(inPlaceBlocks.aChr == transData.at[i,"aChr"])[0]))
+#            
+#            upBlock = -1
+#            downBlock = len(inPlaceBlocks)
+#            
+#            for j in upSyn[::-1]:
+#                if (transData.at[i,"aStart"] - inPlaceBlocks.at[j,"aStart"]) > threshold and (transData.at[i,"aEnd"] - inPlaceBlocks.at[j,"aEnd"]) > threshold:
+#                    upBlock = j
+#                    break
+#            
+#            for j in downSyn:
+#                if (inPlaceBlocks.at[j,"aStart"] - transData.at[i,"aStart"]) > threshold and (inPlaceBlocks.at[j,"aEnd"] - transData.at[i,"aEnd"]) > threshold:
+#                    downBlock = j 
+#                    break
+#            
+#            transPositions[i] = [inPlaceBlocks.at[upBlock,"aIndex"]] if upBlock != -1 else [-1]
+#            transPositions[i].append(inPlaceBlocks.at[downBlock,"aIndex"]) if downBlock != len(inPlaceBlocks) else transPositions[i].append(len(inPlaceBlocks))
+#            
+#        
+#        ## identify neighbours on query genome
+#        inPlaceBlocks.sort_values("bIndex", inplace = True)
+#        for i in transRowIndex:
+#            bUpSyn = getValues(inPlaceBlocks.index.values,
+#                               np.intersect1d(
+#                                       np.where(inPlaceBlocks.bStart <= transData.at[i,"bEnd"])[0],
+#                                       np.where(inPlaceBlocks.bChr == transData.at[i,"bChr"])[0]))
+#            bDownSyn = getValues(inPlaceBlocks.index.values,
+#                                 np.intersect1d(
+#                                         np.where(inPlaceBlocks.bEnd >= transData.at[i,"bStart"])[0],
+#                                         np.where(inPlaceBlocks.bChr == transData.at[i, "bChr"])[0]))
+#
+#            bUpBlock = -1
+#            bDownBlock = len(inPlaceBlocks)
+#            
+#            for j in bUpSyn[::-1]:
+#                if (transData.at[i,"bStart"] - inPlaceBlocks.at[j,"bStart"]) > threshold and (transData.at[i,"bEnd"] - inPlaceBlocks.at[j,"bEnd"]) > threshold:
+#                    bUpBlock = j
+#                    break
+#            
+#            for j in bDownSyn:
+#                if (inPlaceBlocks.at[j,"bStart"] - transData.at[i,"bStart"]) > threshold and (inPlaceBlocks.at[j,"bEnd"] - transData.at[i,"bEnd"]) > threshold:
+#                    bDownBlock = j 
+#                    break 
+#            transPositions[i].append(inPlaceBlocks.at[bUpBlock,"bIndex"]) if bUpBlock != -1 else transPositions[i].append(-1)
+#            transPositions[i].append(inPlaceBlocks.at[bDownBlock,"bIndex"]) if bDownBlock != len(inPlaceBlocks) else transPositions[i].append(len(inPlaceBlocks))
+#        return transPositions
+#    
+#        
 
 #%%
 
@@ -691,7 +725,35 @@ def getAllLongestPaths(graph,sNode, eNode,by="weight"):
             pathList.append(path[::-1])
     return(pathList)
 
-
+cpdef np.ndarray getTranslocationScore(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray aLen, np.ndarray bLen, np.ndarray translocations):
+    """Function to score the proposed translocation block based on the number of
+        basepairs it explains and the gaps between alignments of the block
+    """
+#    print(len(translocations))
+    cdef Py_ssize_t i,j,k, n = len(translocations)
+    cdef int l
+    cdef np.float blockScore, aScore, bScore, aGap, bGap
+    cdef np.ndarray transScores = np.array([-1]*n, dtype = object), blocksScores
+    for i in range(n):
+        l = len(translocations[i])
+        blocksScores = np.array([-1]*l, dtype = object)
+        for j in range(l):
+            aScore = np.float(aLen[translocations[i][j][0]])
+            bScore = np.float(bLen[translocations[i][j][0]])
+            aGap = np.float(0)
+            bGap = np.float(0)
+            if len(translocations[i][j]) > 1:
+                for k in range(1, len(translocations[i][j])):
+                    aScore += np.float(aLen[translocations[i][j][k]])
+                    bScore += np.float(bLen[translocations[i][j][k]])
+                    aGap += np.float(max(0, aStart[translocations[i][j][k]] - aEnd[translocations[i][j][k-1]]))
+                    bGap += np.float(max(0, bStart[translocations[i][j][k]] - bEnd[translocations[i][j][k-1]]))
+                blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
+                blocksScores[j] = blockScore
+            else:
+                blocksScores[j] = 1
+        transScores[i] = blocksScores
+    return transScores
 
 def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, ctx = False):
     if not isinstance(ctx, bool):
@@ -710,58 +772,59 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
             for child in block.children:
                 blocksList[child].addParent(block.id)
         return blocksList
-        
-    def getTranslocationScore(translocations, transData, ctx):
-        """Function to score the proposed translocation block based on the number of
-            basepairs it explains and the gaps between alignments of the block
-        """
-        if not isinstance(ctx, bool):
-            print("CTX status must be a boolean")
-            sys.exit()
-        if not ctx:
-            transScores = []
-            for blocks in translocations:
-                blocksScores = []
-                for block in blocks:
-                    aScore = transData.iat[block[0],4]
-                    bScore = transData.iat[block[0],5]
-                    aGap = 0
-                    bGap = 0
-                    if len(block) > 1:
-                        for i in range(1, len(block)):
-                            aScore += transData.iat[block[i],4]
-                            bScore += transData.iat[block[i],5]
-                            aGap += max(0,transData.iat[block[i],0] - transData.iat[block[i-1],1])
-                            bGap += max(0,transData.iat[block[i],2] - transData.iat[block[i-1],3])
-                        blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
-                        blocksScores.append(blockScore)
-                    else:
-                        blocksScores.append(1)
-                transScores.append(blocksScores)
-            return transScores
-        if ctx:
-            transScores = []
-            for blocks in translocations:
-                blocksScores = []
-                for block in blocks:
-                    indices = getValues(transData.index.values,block)
-                    aScore = transData.at[indices[0],"aLen"]
-                    bScore = transData.at[indices[0],"bLen"]
-                    aGap = 0
-                    bGap = 0
-                    if len(block) > 1:
-                        for i in range(1, len(block)):
-                            aScore += transData.at[indices[i],"aLen"]
-                            bScore += transData.at[indices[i],"bLen"]
-                            aGap += max(0,transData.at[indices[i],"aStart"] - transData.at[indices[i-1],"aEnd"])
-                            bGap += max(0,transData.at[indices[i],"bStart"] - transData.at[indices[i-1],"bEnd"]) if transData.at[indices[i],"bDir"] == 1 else max(0, transData.at[indices[i-1],"bStart"] - transData.at[indices[i],"bEnd"]) 
-                        blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
-                        blocksScores.append(blockScore)
-                    else:
-                        blocksScores.append(1)
-                transScores.append(blocksScores)
-            return transScores
     
+        
+#    def getTranslocationScore(translocations, transData, ctx):
+#        """Function to score the proposed translocation block based on the number of
+#            basepairs it explains and the gaps between alignments of the block
+#        """
+#        if not isinstance(ctx, bool):
+#            print("CTX status must be a boolean")
+#            sys.exit()
+#        if not ctx:
+#            transScores = []
+#            for blocks in translocations:
+#                blocksScores = []
+#                for block in blocks:
+#                    aScore = transData.iat[block[0],4]
+#                    bScore = transData.iat[block[0],5]
+#                    aGap = 0
+#                    bGap = 0
+#                    if len(block) > 1:
+#                        for i in range(1, len(block)):
+#                            aScore += transData.iat[block[i],4]
+#                            bScore += transData.iat[block[i],5]
+#                            aGap += max(0,transData.iat[block[i],0] - transData.iat[block[i-1],1])
+#                            bGap += max(0,transData.iat[block[i],2] - transData.iat[block[i-1],3])
+#                        blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
+#                        blocksScores.append(blockScore)
+#                    else:
+#                        blocksScores.append(1)
+#                transScores.append(blocksScores)
+#            return transScores
+#        if ctx:
+#            transScores = []
+#            for blocks in translocations:
+#                blocksScores = []
+#                for block in blocks:
+#                    indices = getValues(transData.index.values,block)
+#                    aScore = transData.at[indices[0],"aLen"]
+#                    bScore = transData.at[indices[0],"bLen"]
+#                    aGap = 0
+#                    bGap = 0
+#                    if len(block) > 1:
+#                        for i in range(1, len(block)):
+#                            aScore += transData.at[indices[i],"aLen"]
+#                            bScore += transData.at[indices[i],"bLen"]
+#                            aGap += max(0,transData.at[indices[i],"aStart"] - transData.at[indices[i-1],"aEnd"])
+#                            bGap += max(0,transData.at[indices[i],"bStart"] - transData.at[indices[i-1],"bEnd"]) if transData.at[indices[i],"bDir"] == 1 else max(0, transData.at[indices[i-1],"bStart"] - transData.at[indices[i],"bEnd"]) 
+#                        blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
+#                        blocksScores.append(blockScore)
+#                    else:
+#                        blocksScores.append(1)
+#                transScores.append(blocksScores)
+#            return transScores
+#    
     def getTransBlocks(transScores, shortTrans, transData, inPlaceBlocks, threshold, ctx):
         """This method filters possible translocation blocks to select those which have a posivitive gap based score
            (output of `getTransLocationsScore`) and those which dont overlap significantly with the inPlaceBlocks.
@@ -927,8 +990,10 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
     for i in range(len(orderedBlocksList)):
         eNode = [i]
         eNode.extend(list(np.where(outOrderedBlocks.iloc[i] == True)[0]))
-        shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,"weight"))      
-    transScores = getTranslocationScore(shortestOutOG, orderedBlocks, ctx)
+        shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,"weight"))   
+    shortestOutOG = np.array(shortestOutOG)
+    transScores = getTranslocationScore(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, shortestOutOG)
+#    transScores = getTranslocationScore(shortestOutOG, orderedBlocks, ctx)
     transBlocks = getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold, ctx)
     return(transBlocks)
         
@@ -976,79 +1041,115 @@ def makeTransGroupList(transBlocksData, start, end, threshold):
         return []
 #%%
 
-def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours = None, ctx = False):
+cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold, np.ndarray left, np.ndarray right):
     """Compute whether two alignments can be part of one translation block. For this:
         the alignments should not be separated by any inPlaceBlock on both ends and
         they should be syntenic with respect to each other.
        
-       Parameters
-       ----------
-       inPlaceBlocks: pandas DataFrame, 
-           dataframe containing coordinates and other information for all inPlaceBlocks
-       blocksData: pandas DataFrame,
-           dataframe containing coordinates of alignments which are needed to be connected.
-           Requires that `alignment_start` < `alingment_end` 
-       threshold: int, 
-           cut-off value.
-       transBlocksNeighbours: list,
-           list containing indices of inPlaceBlocks neighbours of each alignment. Output
-           of getTransSynOrientation.
-    
        Returns
        --------
        outOrderedBlocks: pandas DataFrame,
            Dataframe of type Object. Lower half is NA, upper half contains whether two
            alignments can be connected (True) or not (False).
     """
-    if not isinstance(ctx, bool):
-        print("CTX status must be a boolean")
-        sys.exit()
-    if not ctx:
-        if transBlocksNeighbours == None:
-            sys.exit("ERROR: MISSING transBlocksNeighbours")
-        orderedBlocksLen = len(blocksData)
-        outOrderedBlocks = np.zeros((orderedBlocksLen,orderedBlocksLen), dtype = object)
-        outOrderedBlocks[np.tril_indices(outOrderedBlocks.shape[0],-1)] = np.nan
-        outOrderedBlocks[np.triu_indices(outOrderedBlocks.shape[0],0)] = np.False_
-        for i in range(orderedBlocksLen):
-            for j in range(i+1, orderedBlocksLen):
-                if len(np.intersect1d(range(transBlocksNeighbours[i][0]+1,transBlocksNeighbours[i][1]),\
-                    range(transBlocksNeighbours[j][0]+1,transBlocksNeighbours[j][1]))) == 0:
-                    continue
-                outOrderedBlocks[i][j] = SynAndOverlap(blocksData.iloc[j],blocksData.iloc[i], threshold)
-        outOrderedBlocks = pd.DataFrame(outOrderedBlocks)
-        return outOrderedBlocks
     
-    if ctx:
-        indices = blocksData.index.values
-        orderedBlocksLen = len(indices)
-        outOrderedBlocks = np.zeros((orderedBlocksLen, orderedBlocksLen), dtype = object)
-        outOrderedBlocks[np.tril_indices(outOrderedBlocks.shape[0],-1)] = np.nan
-        outOrderedBlocks[np.triu_indices(outOrderedBlocks.shape[0],0)] = np.False_
-        for i in range(len(indices)):
-            index = indices[i]
-            iData = blocksData.loc[index]
-            for j in range(i+1, len(indices)):
-                index_2 = indices[j]
-                if blocksData.at[index_2,"aChr"] != iData.aChr or blocksData.at[index_2, "bChr"] != iData.bChr:
-                    continue
-                if blocksData.at[index,"bDir"] != blocksData.at[index_2,"bDir"]:
-                    sys.exit("ERROR: bDir not matching")
-                if blocksData.at[index, "bDir"] == 1:   ##When input contains ordered blocks
-                    outOrderedBlocks[i][j] = SynAndOverlap(blocksData.loc[index_2], blocksData.loc[index], threshold)
-                elif blocksData.at[index, "bDir"] == -1:    ##When input contains inverted blocks
-                    iData = blocksData.loc[index]
-                    jData = blocksData.loc[index_2]
-                    if (jData.aStart - iData.aStart) > threshold and (jData.aEnd - iData.aEnd) > threshold and (iData.bStart - jData.bStart) > threshold and (iData.bEnd - jData.bEnd) > threshold:
-                        outOrderedBlocks[i][j] = True
+    assert(aStart.dtype==np.int and aEnd.dtype==np.int and bStart.dtype==np.int and bEnd.dtype==np.int and bDir.dtype==np.int and aChr.dtype==np.object and bChr.dtype==np.object and index.dtype==np.int and left.dtype==np.int and right.dtype==np.int)
+    cdef Py_ssize_t i,j, n = len(aStart)
+    assert(n == len(aEnd) == len(bStart) == len(bEnd) == len(index) == len(bDir) == len(aChr) == len(bChr) == len(left) == len(right))
+    cdef np.ndarray[object, ndim =2 ] outOrderedBlocks =  np.array([[np.nan]*n]*n, dtype=object)
+    cdef np.ndarray allRanges = np.array([range(left[i]+1,right[i]) for i in range(n)])
+    for i in range(n):
+        for j in range(i,n):
+            #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
+            if not any([k in allRanges[i] for k in allRanges[j]]):
+                    outOrderedBlocks[i][j] = False
+            elif bDir[i] == bDir[j]:             
+                if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
+                    outOrderedBlocks[i][j] = True
                 else:
-                    sys.exit("ERROR: ILLEGAL BDIR VALUE")
-        outOrderedBlocks = pd.DataFrame(outOrderedBlocks)
-        outOrderedBlocks.index = blocksData.index
-        outOrderedBlocks.columns = blocksData.index.values
-        return outOrderedBlocks
-                
-                
+                    outOrderedBlocks[i][j] = False
+            elif(aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bEnd[i]) > threshold and (bEnd[j] - bStart[i]) > threshold:
+                outOrderedBlocks[i][j] = True
+            else:
+                outOrderedBlocks[i][j] = False
+    return(outOrderedBlocks)
+#
+#
+#
+#
+#def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours = None, ctx = False):
+#    """Compute whether two alignments can be part of one translation block. For this:
+#        the alignments should not be separated by any inPlaceBlock on both ends and
+#        they should be syntenic with respect to each other.
+#       
+#       Parameters
+#       ----------
+#       inPlaceBlocks: pandas DataFrame, 
+#           dataframe containing coordinates and other information for all inPlaceBlocks
+#       blocksData: pandas DataFrame,
+#           dataframe containing coordinates of alignments which are needed to be connected.
+#           Requires that `alignment_start` < `alingment_end` 
+#       threshold: int, 
+#           cut-off value.
+#       transBlocksNeighbours: list,
+#           list containing indices of inPlaceBlocks neighbours of each alignment. Output
+#           of getTransSynOrientation.
+#    
+#       Returns
+#       --------
+#       outOrderedBlocks: pandas DataFrame,
+#           Dataframe of type Object. Lower half is NA, upper half contains whether two
+#           alignments can be connected (True) or not (False).
+#    """
+#    if not isinstance(ctx, bool):
+#        print("CTX status must be a boolean")
+#        sys.exit()
+#    if not ctx:
+#        if transBlocksNeighbours == None:
+#            sys.exit("ERROR: MISSING transBlocksNeighbours")
+#        orderedBlocksLen = len(blocksData)
+#        outOrderedBlocks = np.zeros((orderedBlocksLen,orderedBlocksLen), dtype = object)
+#        outOrderedBlocks[np.tril_indices(outOrderedBlocks.shape[0],-1)] = np.nan
+#        outOrderedBlocks[np.triu_indices(outOrderedBlocks.shape[0],0)] = np.False_
+#        for i in range(orderedBlocksLen):
+#            for j in range(i+1, orderedBlocksLen):
+#                if len(np.intersect1d(range(transBlocksNeighbours[i][0]+1,transBlocksNeighbours[i][1]),\
+#                    range(transBlocksNeighbours[j][0]+1,transBlocksNeighbours[j][1]))) == 0:
+#                    continue
+#                outOrderedBlocks[i][j] = SynAndOverlap(blocksData.iloc[j],blocksData.iloc[i], threshold)
+#        outOrderedBlocks = pd.DataFrame(outOrderedBlocks)
+#        return outOrderedBlocks
+#    
+#    if ctx:
+#        indices = blocksData.index.values
+#        orderedBlocksLen = len(indices)
+#        outOrderedBlocks = np.zeros((orderedBlocksLen, orderedBlocksLen), dtype = object)
+#        outOrderedBlocks[np.tril_indices(outOrderedBlocks.shape[0],-1)] = np.nan
+#        outOrderedBlocks[np.triu_indices(outOrderedBlocks.shape[0],0)] = np.False_
+#        for i in range(len(indices)):
+#            index = indices[i]
+#            iData = blocksData.loc[index]
+#            for j in range(i+1, len(indices)):
+#                index_2 = indices[j]
+#                if blocksData.at[index_2,"aChr"] != iData.aChr or blocksData.at[index_2, "bChr"] != iData.bChr:
+#                    continue
+#                if blocksData.at[index,"bDir"] != blocksData.at[index_2,"bDir"]:
+#                    sys.exit("ERROR: bDir not matching")
+#                if blocksData.at[index, "bDir"] == 1:   ##When input contains ordered blocks
+#                    outOrderedBlocks[i][j] = SynAndOverlap(blocksData.loc[index_2], blocksData.loc[index], threshold)
+#                elif blocksData.at[index, "bDir"] == -1:    ##When input contains inverted blocks
+#                    iData = blocksData.loc[index]
+#                    jData = blocksData.loc[index_2]
+#                    if (jData.aStart - iData.aStart) > threshold and (jData.aEnd - iData.aEnd) > threshold and (iData.bStart - jData.bStart) > threshold and (iData.bEnd - jData.bEnd) > threshold:
+#                        outOrderedBlocks[i][j] = True
+#                else:
+#                    sys.exit("ERROR: ILLEGAL BDIR VALUE")
+#        outOrderedBlocks = pd.DataFrame(outOrderedBlocks)
+#        outOrderedBlocks.index = blocksData.index
+#        outOrderedBlocks.columns = blocksData.index.values
+#        return outOrderedBlocks
+#                
+#                
    #%%     
             
 
@@ -1597,11 +1698,12 @@ def outSyn(cwdPath, threshold):
     return None
     
         
-def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData):
+def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn):
     
+    synData = synData.drop(synData.index.values[badSyn])
     allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
     allBlocks["class"] = "syn"
-        
+    
     tempInvBlocks = pd.DataFrame(tempInvBlocks,columns =["aStart","aEnd","bStart","bEnd"], dtype= object)
     tempInvBlocks["class"] = "inv"
     
@@ -1617,9 +1719,7 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
     tempTLData = TLData[["aStart","aEnd","bStart","bEnd"]].copy()
     tempTLData["class"] = "TL"
     
-    for i in [tempInvBlocks, tempInvDupData, tempInvTLData, tempTLData, tempDupData]:
-        if len(i) > 0:
-            allBlocks = allBlocks.append(i)
+    allBlocks = pd.concat([allBlocks,tempInvBlocks, tempInvDupData, tempInvTLData, tempTLData, tempDupData])
     allBlocks.index = range(allBlocks.shape[0])
     
     """
@@ -1627,7 +1727,7 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
     """
     
     allBlocks.sort_values(["aStart","aEnd","bStart","bEnd"],inplace = True)
-   
+    
     aClusters = []
     currentCluster = []
     for index, row in allBlocks.iterrows():        
@@ -1655,9 +1755,9 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
                     aClusters.append(currentCluster)
                     currentCluster = []
     aClusters.append(currentCluster)
-                    
+    
     allBlocks.sort_values(["bStart","bEnd","aStart","aEnd"],inplace = True)
-   
+    
     bClusters = []
     currentCluster = []
     for index, row in allBlocks.iterrows():
@@ -1687,7 +1787,7 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
                     currentCluster = []
     bClusters.append(currentCluster)
     allBlocks.sort_values(["aStart","aEnd","bStart","bEnd"],inplace = True)
-   
+    
     outClusters = []
     aIndex = 0 
     bIndex = 0
@@ -1704,6 +1804,116 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
             currentCluster = [i]
     outClusters.append(currentCluster)
     return (allBlocks, outClusters)
+#
+#
+#
+#def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData):
+#    
+#    allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
+#    allBlocks["class"] = "syn"
+#        
+#    tempInvBlocks = pd.DataFrame(tempInvBlocks,columns =["aStart","aEnd","bStart","bEnd"], dtype= object)
+#    tempInvBlocks["class"] = "inv"
+#    
+#    tempDupData = dupData[["aStart","aEnd","bStart","bEnd"]].copy()
+#    tempDupData["class"] = "dup"
+#    
+#    tempInvDupData = invDupData[["aStart","aEnd","bStart","bEnd"]].copy()
+#    tempInvDupData["class"] = "invDup"
+#    
+#    tempInvTLData = invTLData[["aStart","aEnd","bStart","bEnd"]].copy()
+#    tempInvTLData["class"] = "invTL"
+#    
+#    tempTLData = TLData[["aStart","aEnd","bStart","bEnd"]].copy()
+#    tempTLData["class"] = "TL"
+#    
+#    for i in [tempInvBlocks, tempInvDupData, tempInvTLData, tempTLData, tempDupData]:
+#        if len(i) > 0:
+#            allBlocks = allBlocks.append(i)
+#    allBlocks.index = range(allBlocks.shape[0])
+#    
+#    """
+#    Take data of all blocks and create groups of syntenic blocks from syntenic alignments
+#    """
+#    
+#    allBlocks.sort_values(["aStart","aEnd","bStart","bEnd"],inplace = True)
+#   
+#    aClusters = []
+#    currentCluster = []
+#    for index, row in allBlocks.iterrows():        
+#        if len(currentCluster) == 0 and row["class"] != "syn":
+#            continue
+#        
+#        if row["class"] == "syn":
+#            currentCluster.append(index)
+#        elif row["class"] in ["TL", "inv","invTL"]:
+#            aClusters.append(currentCluster)
+#            currentCluster = []
+#        else:
+#            if row["aEnd"] < allBlocks.loc[currentCluster[-1]]["aEnd"] + threshold:
+#                continue
+#            else:
+#                allClasses = allBlocks["class"][index:]
+#                if len(np.where(allClasses=="syn")[0]) > 0:
+#                    nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
+#                    if row["aStart"] > allBlocks.loc[nextSyn]["aStart"] - threshold:
+#                        continue
+#                    else:
+#                        aClusters.append(currentCluster)
+#                        currentCluster = []
+#                else:
+#                    aClusters.append(currentCluster)
+#                    currentCluster = []
+#    aClusters.append(currentCluster)
+#                    
+#    allBlocks.sort_values(["bStart","bEnd","aStart","aEnd"],inplace = True)
+#   
+#    bClusters = []
+#    currentCluster = []
+#    for index, row in allBlocks.iterrows():
+#        
+#        if len(currentCluster) == 0 and row["class"] != "syn":
+#            continue
+#        
+#        if row["class"] == "syn":
+#            currentCluster.append(index)
+#        elif row["class"] in ["TL", "inv","invTL"]:
+#            bClusters.append(currentCluster)
+#            currentCluster = []
+#        else:
+#            if row["bEnd"] < allBlocks.loc[currentCluster[-1]]["bEnd"] + threshold:
+#                continue
+#            else:
+#                allClasses = allBlocks["class"][index:]
+#                if len(np.where(allClasses=="syn")[0]) > 0:
+#                    nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
+#                    if row["bStart"] > allBlocks.loc[nextSyn]["bStart"] - threshold:
+#                        continue
+#                    else:
+#                        bClusters.append(currentCluster)
+#                        currentCluster = []
+#                else:
+#                    bClusters.append(currentCluster)
+#                    currentCluster = []
+#    bClusters.append(currentCluster)
+#    allBlocks.sort_values(["aStart","aEnd","bStart","bEnd"],inplace = True)
+#   
+#    outClusters = []
+#    aIndex = 0 
+#    bIndex = 0
+#    currentCluster = []
+#    for i in range(synData.shape[0]):
+#        if i in aClusters[aIndex] and i in bClusters[bIndex]:
+#            currentCluster.append(i)
+#        else:
+#            if i not in aClusters[aIndex]:
+#                aIndex+=1
+#            if i not in bClusters[bIndex]:
+#                bIndex+=1
+#            outClusters.append(currentCluster)
+#            currentCluster = [i]
+#    outClusters.append(currentCluster)
+#    return (allBlocks, outClusters)
 
 
 def mergeOutputFiles(uniChromo,path):
