@@ -1093,6 +1093,7 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
     outOG = getConnectivityGraph(orderedBlocksList)
     shortestOutOG = []
     for i in range(len(orderedBlocksList)):
+        print(i)
         eNode = [i]
         eNode.extend(list(np.where(outOrderedBlocks.iloc[i] == True)[0]))
         shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,"weight"))   
