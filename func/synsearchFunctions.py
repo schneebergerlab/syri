@@ -500,7 +500,7 @@ def getConnectivityGraph(blocksList):
             outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
     return outOG
 
-def getAllLongestPaths(graph,sNode, eNode,by="weight"):
+def getAllLongestPaths1(graph,sNode, eNode,by="weight"):
     """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
     directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
     are negative, so shortest path from sNode to eNode corresponds to the longest path.

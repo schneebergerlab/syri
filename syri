@@ -23,6 +23,7 @@ import os
 
 
 
+
 def SynSearch(chromo, threshold, coords, cwdPath):
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
     print(chromo, coordsData.shape)
@@ -329,7 +330,8 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
         fout.close()
         
         
-        
+    print("Reading Coords", str(datetime.now()))
+
     annoCoords = readAnnoCoords(cwdPath, uniChromo)
     ctxData = coords.loc[coords['aChr'] != coords['bChr']].copy()
     ctxData.index = range(len(ctxData))
@@ -349,16 +351,26 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
     invertedBlocks = ctxData[ctxData.bDir == -1]
     
     ## Create connectivity tree for directed blocks
-    outOrderedBlocks = makeBlocksTree(annoCoords, orderedBlocks, threshold, ctx = True)
     
-    ## Create connectivity tree for inverted blocks    
-    outInvertedBlocks = makeBlocksTree(annoCoords, invertedBlocks, threshold, ctx = True)
+    print("Making Tree", str(datetime.now()))
+
+    outOrderedBlocks = pd.DataFrame(makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold))
     
+#    outOrderedBlocks1 = makeBlocksTree(annoCoords, orderedBlocks.iloc[0:500], threshold, ctx = True)
+    
+    ## Create connectivity tree for inverted blocks
+    outInvertedBlocks = pd.DataFrame(makeBlocksTree_ctx(invertedBlocks.aStart.values, invertedBlocks.aEnd.values, invertedBlocks.bStart.values, invertedBlocks.bEnd.values, invertedBlocks.bDir.values, invertedBlocks.aChr.values, invertedBlocks.bChr.values, invertedBlocks.index.values, threshold))
+
+#    outInvertedBlocks1 = makeBlocksTree(annoCoords, invertedBlocks, threshold, ctx = True)
+    print("finding Blocks", str(datetime.now()))
+
     ## find all translocations which don't have large gaps between its alignments
     ## and are not overlappign with the syntenic blocks    
     transBlocks = findOrderedTranslocations(outOrderedBlocks, orderedBlocks, annoCoords, threshold, ctx = True)
 
     invTransBlocks = findOrderedTranslocations(outInvertedBlocks, invertedBlocks, annoCoords, threshold, ctx = True)
+
+    print("Preparing for cluster analysis", str(datetime.now()))
 
     ctxTransBlocks, ctxTransIndexOrder = mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks, ctx = True)
    
@@ -435,7 +447,8 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
                     ME_B.append(j)
             tempTransBlock.setMEList(ME_A, ME_B)
 
-    
+    print("Finding clusters", str(datetime.now()))
+
     clusterSolutions = []
     for i in range(len(ctxCluster)):
         tempCluster = ctxCluster[i].copy()
@@ -475,10 +488,10 @@ if __name__ == "__main__":
     threshold = 50
     procs = []
     print(uniChromo)
-    with Pool(processes = nCores) as pool:
-        pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
-    mergeOutputFiles(uniChromo,cwdPath)
-#    ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold)
+#    with Pool(processes = nCores) as pool:
+#        pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
+#    mergeOutputFiles(uniChromo,cwdPath)
+    ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold)
 #    outSyn(cwdPath, threshold)
 
     print("End of program")

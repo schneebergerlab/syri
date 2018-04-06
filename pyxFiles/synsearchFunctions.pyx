@@ -665,6 +665,7 @@ def getConnectivityGraph(blocksList):
             outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
     return outOG
 
+
 def getAllLongestPaths(graph,sNode, eNode,by="weight"):
     """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
     directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
@@ -725,6 +726,71 @@ def getAllLongestPaths(graph,sNode, eNode,by="weight"):
             pathList.append(path[::-1])
     return(pathList)
 
+#cpdef np.ndarray[np.int, ndim =2] getAllLongestPaths(graph,sNode, eNode,by="weight"):
+#    """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
+#    directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
+#    are negative, so shortest path from sNode to eNode corresponds to the longest path.
+#       
+#        Parameters
+#        ----------
+#        graph: directeed igraph Graph(),
+#            Directed acyclic graph containing all the nodes and edges in the graph.
+#           
+#        sNode: int, 
+#            index of the start node in the graph.
+#       
+#        eNode: int list,
+#            list of all end nodes. longest path from start node to end nodes will be
+#            calculated
+#        
+#        by: igraph edge weight
+#        
+#        Returns
+#        -------
+#        list of len(eNodes) longest paths from sNodes to eNodes
+#        
+#    """
+#    cdef np.ndarray pathList = np.array([],dtype=np.int)
+#    cdef np.ndarray[object, ndim=1] dist, pred, allNodes = np.array(graph.vs.indices,dtype=object)
+#    cdef np.int n = len(allNodes)
+#    assert(list(allNodes) == sorted(allNodes))
+#    dist = np.array([np.float('inf')]*n, dtype = object)
+#    pred = np.array([None]*n, dtype = object)
+#    
+#    allEdges = graph.es
+#    for i in allNodes:
+#        dist[i] = float("inf")
+#        pred[i] = None
+#        
+#    dist[sNode] = 0
+#    changes = 1
+#
+#    for i in range(len(allNodes)-1):
+#        if changes == 0:
+#            break
+#        changes = 0
+#        for e in graph.es:
+#            if dist[e.source] + e[by] < dist[e.target]:
+#                changes = 1
+#                dist[e.target] = dist[e.source] + e[by]
+#                pred[e.target] = e.source
+#    
+#    for e in graph.es:
+#        if dist[e.source] + e[by] < dist[e.target]:
+#            sys.exit("Negative weight cycle identified")
+#    for key in eNode:
+#        if dist[key] != float("inf"):
+#            path = []
+#            while key!=sNode:
+#                path.append(key)
+#                key = pred[key]
+#            path.append(sNode)
+#            pathList = np.append(pathList,path[::-1])
+#    return(pathList)
+
+
+
+
 cpdef np.ndarray getTranslocationScore(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray aLen, np.ndarray bLen, np.ndarray translocations):
     """Function to score the proposed translocation block based on the number of
         basepairs it explains and the gaps between alignments of the block
@@ -754,6 +820,45 @@ cpdef np.ndarray getTranslocationScore(np.ndarray aStart, np.ndarray aEnd, np.nd
                 blocksScores[j] = 1
         transScores[i] = blocksScores
     return transScores
+#
+#
+#%%cython
+#cimport numpy as np
+#import numpy as np
+cpdef np.ndarray getTranslocationScore_ctx(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray aLen, np.ndarray bLen, np.ndarray bDir, np.ndarray translocations):
+    """Function to score the proposed translocation block based on the number of
+        basepairs it explains and the gaps between alignments of the block
+    """
+#    print(len(translocations))
+    cdef Py_ssize_t i,j,k, n = len(translocations)
+    cdef int l
+    cdef np.float blockScore, aScore, bScore, aGap, bGap
+    cdef np.ndarray transScores = np.array([-1]*n, dtype = object), blocksScores
+    for i in range(n):
+        l = len(translocations[i])
+        blocksScores = np.array([-1]*l, dtype = object)
+        for j in range(l):
+            aScore = np.float(aLen[translocations[i][j][0]])
+            bScore = np.float(bLen[translocations[i][j][0]])
+            aGap = np.float(0)
+            bGap = np.float(0)
+            if len(translocations[i][j]) > 1:
+                for k in range(1, len(translocations[i][j])):
+                    aScore += np.float(aLen[translocations[i][j][k]])
+                    bScore += np.float(bLen[translocations[i][j][k]])
+                    aGap += np.float(max(0, aStart[translocations[i][j][k]] - aEnd[translocations[i][j][k-1]]))
+                    if bDir[k] == 1:
+                        bGap += np.float(max(0, bStart[translocations[i][j][k]] - bEnd[translocations[i][j][k-1]]))
+                    else:
+                        bGap += np.float(max(0, bStart[translocations[i][j][k-1]] - bEnd[translocations[i][j][k]]))
+                blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
+                blocksScores[j] = blockScore
+            else:
+                blocksScores[j] = 1
+        transScores[i] = blocksScores
+    return transScores
+
+
 
 def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, ctx = False):
     if not isinstance(ctx, bool):
@@ -992,7 +1097,11 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
         eNode.extend(list(np.where(outOrderedBlocks.iloc[i] == True)[0]))
         shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,"weight"))   
     shortestOutOG = np.array(shortestOutOG)
-    transScores = getTranslocationScore(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, shortestOutOG)
+    if not ctx:
+        transScores = getTranslocationScore(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, shortestOutOG)
+    elif ctx:
+        transScores = getTranslocationScore_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, orderedBlocks.bDir.values, shortestOutOG)
+        
 #    transScores = getTranslocationScore(shortestOutOG, orderedBlocks, ctx)
     transBlocks = getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold, ctx)
     return(transBlocks)
@@ -1061,18 +1170,82 @@ cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aE
     for i in range(n):
         for j in range(i,n):
             #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
-            if not any([k in allRanges[i] for k in allRanges[j]]):
+            if bDir[i] != bDir[j]:
+                sys.exit("ERROR: bDir not matching")
+            elif not any([k in allRanges[i] for k in allRanges[j]]):
                     outOrderedBlocks[i][j] = False
             elif bDir[i] == bDir[j]:             
                 if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
                     outOrderedBlocks[i][j] = True
                 else:
                     outOrderedBlocks[i][j] = False
-            elif(aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bEnd[i]) > threshold and (bEnd[j] - bStart[i]) > threshold:
-                outOrderedBlocks[i][j] = True
+#            elif(aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bEnd[i]) > threshold and (bEnd[j] - bStart[i]) > threshold:
+#                outOrderedBlocks[i][j] = True
             else:
                 outOrderedBlocks[i][j] = False
     return(outOrderedBlocks)
+    
+#%%cython
+#cimport numpy as np
+#import numpy as np
+#import sys
+cpdef np.ndarray[object, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold):
+    """Compute whether two alignments can be part of one translation block. For this:
+        the alignments should not be separated by any inPlaceBlock on both ends and
+        they should be syntenic with respect to each other.
+       
+       Returns
+       --------
+       outOrderedBlocks: pandas DataFrame,
+           Dataframe of type Object. Lower half is NA, upper half contains whether two
+           alignments can be connected (True) or not (False).
+    """
+    assert(aStart.dtype==np.int and aEnd.dtype==np.int and bStart.dtype==np.int and bEnd.dtype==np.int and bDir.dtype==np.int and aChr.dtype==np.object and bChr.dtype==np.object and index.dtype==np.int)
+    cdef Py_ssize_t i,j, n = len(aStart)
+    assert(n == len(aEnd) == len(bStart) == len(bEnd) == len(index) == len(bDir) == len(aChr) == len(bChr))
+    cdef np.ndarray[object, ndim =2 ] outOrderedBlocks =  np.array([[np.nan]*n]*n, dtype=object)
+    
+    for i in range(n):
+        for j in range(i,n):
+            if bDir[i] != bDir[j]:
+                sys.exit("ERROR: bDir not matching")
+            elif aChr[i] != aChr[j] or bChr[i] != bChr[j]:
+                outOrderedBlocks[i][j] = False
+            elif bDir[i] == 1:
+                if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
+                    outOrderedBlocks[i][j] = True
+                else:
+                    outOrderedBlocks[i][j] = False
+            elif bDir[i] == -1:
+                if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[i] - bStart[j]) > threshold and (bEnd[i] - bEnd[j]) > threshold:
+                    outOrderedBlocks[i][j] = True
+                else:
+                    outOrderedBlocks[i][j] = False
+            else:
+                sys.exit("ERROR: ILLEGAL BDIR VALUE")
+    return(outOrderedBlocks)
+    
+    
+#    
+#    
+#    cdef np.ndarray allRanges = np.array([range(left[i]+1,right[i]) for i in range(n)])
+#    for i in range(n):
+#        for j in range(i,n):
+#            #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
+#            if not any([k in allRanges[i] for k in allRanges[j]]):
+#                    outOrderedBlocks[i][j] = False
+#            elif bDir[i] == bDir[j]:             
+#                if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
+#                    outOrderedBlocks[i][j] = True
+#                else:
+#                    outOrderedBlocks[i][j] = False
+#            elif(aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bEnd[i]) > threshold and (bEnd[j] - bStart[i]) > threshold:
+#                outOrderedBlocks[i][j] = True
+#            else:
+#                outOrderedBlocks[i][j] = False
+#    return(outOrderedBlocks)   
+    
+    
 #
 #
 #
