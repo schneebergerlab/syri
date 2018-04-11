@@ -488,11 +488,11 @@ if __name__ == "__main__":
     threshold = 50
     procs = []
     print(uniChromo)
-#    with Pool(processes = nCores) as pool:
-#        pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
-#    mergeOutputFiles(uniChromo,cwdPath)
+    with Pool(processes = nCores) as pool:
+        pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
+    mergeOutputFiles(uniChromo,cwdPath)
     ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold)
-#    outSyn(cwdPath, threshold)
+    outSyn(cwdPath, threshold)
 
     print("End of program")
     

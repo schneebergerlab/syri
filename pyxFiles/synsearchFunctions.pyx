@@ -18,7 +18,7 @@ from operator import itemgetter
 from igraph import *
 from collections import Counter
 from scipy.stats import *
-import datetime
+from datetime import datetime
 cimport numpy as np
 
 np.random.seed(1)
@@ -835,6 +835,8 @@ cpdef np.ndarray getTranslocationScore_ctx(np.ndarray aStart, np.ndarray aEnd, n
     cdef np.float blockScore, aScore, bScore, aGap, bGap
     cdef np.ndarray transScores = np.array([-1]*n, dtype = object), blocksScores
     for i in range(n):
+        if i%200 == 0:
+            print(i, str(datetime.now()))
         l = len(translocations[i])
         blocksScores = np.array([-1]*l, dtype = object)
         for j in range(l):
@@ -1093,7 +1095,8 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
     outOG = getConnectivityGraph(orderedBlocksList)
     shortestOutOG = []
     for i in range(len(orderedBlocksList)):
-        print(i)
+        if i%500 == 0:
+            print(i, str(datetime.now()))
         eNode = [i]
         eNode.extend(list(np.where(outOrderedBlocks.iloc[i] == True)[0]))
         shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,"weight"))   
@@ -1101,10 +1104,14 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
     if not ctx:
         transScores = getTranslocationScore(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, shortestOutOG)
     elif ctx:
+        print("starting getTranslocationScore",str(datetime.now()))
         transScores = getTranslocationScore_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, orderedBlocks.bDir.values, shortestOutOG)
+        print("finished getTranslocationScore",str(datetime.now()))
         
 #    transScores = getTranslocationScore(shortestOutOG, orderedBlocks, ctx)
     transBlocks = getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold, ctx)
+    print("finished getTransBlocks",str(datetime.now()))
+
     return(transBlocks)
         
     #%%            
@@ -1717,7 +1724,7 @@ def getDupGenome(dupData, allTransBlocksData, transClasses):
     return(dupData)
 
 def outSyn(cwdPath, threshold):
-    reCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
+#    reCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
     ctxAnnoDict = {"duplication":"dupCtx",
                    "invDuplication":"invDupCtx",
                    "translocation":"TLCtx",
@@ -1736,7 +1743,12 @@ def outSyn(cwdPath, threshold):
             elif len(line) == 5:
                 synData.append(list(map(int,line[:4]))+[chromo,chromo] + [line[4]])
 #    fin.close()
-    synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","isinInv"])
+    
+    synData = pd.DataFrame(synData)
+    if len(synData.columns) == 6:
+        synData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
+    else:
+        synData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","isinInv"]
     synData["class"] = "syn"
        
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt","ctxOut.txt"]:    
@@ -1860,12 +1872,14 @@ def outSyn(cwdPath, threshold):
             currentCluster = [i]
     outClusters.append(currentCluster)
     
+    hasSynInInv = "isinInv" in synData.columns
+    
     with open(cwdPath+"synOut.txt","w") as fout:
         for i in outClusters:
             fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"],"\n"])))
             for j in i:
                 fout.write("\t".join(map(str,allBlocks.loc[j][0:4])))
-                if synData.loc[synLocs[j]]["isinInv"] == "Syn_in_Inv":
+                if hasSynInInv and synData.loc[synLocs[j]]["isinInv"] == "Syn_in_Inv":
                     fout.write("\tSyn_in_Inv\n")
                 else:
                     fout.write("\n")   

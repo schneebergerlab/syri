@@ -19,3 +19,4 @@
 #sharedObjects
 /pyxFiles/*.so
 /pyxFiles/.nsf00*
+/pyxFiles/*.pyc
