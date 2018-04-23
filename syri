@@ -486,7 +486,7 @@ if __name__ == "__main__":
     ## This is the number of non-overlapping BPs required to consider two overlapping
     ## alignments as different
     threshold = 50
-    procs = []
+#    procs = []
     print(uniChromo)
     with Pool(processes = nCores) as pool:
         pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 

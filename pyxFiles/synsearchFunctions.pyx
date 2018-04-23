@@ -635,8 +635,8 @@ def mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks,
             bDir = -1
             aChr = invertedBlocks.at[indices[0],"aChr"]
             bChr = invertedBlocks.at[indices[0],"bChr"]
-            
             transBlocksData.append([aStart, aEnd, bStart, bEnd, aDir, bDir, aChr, bChr])
+            
         transBlocksData = pd.DataFrame(transBlocksData, columns =  ["aStart","aEnd","bStart","bEnd","aDir","bDir", "aChr","bChr"])
         transBlocksData.index = list(range(len(transBlocks))) + list(range(len(invTransBlocks)))    
         transBlocksData.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
@@ -879,59 +879,7 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
             for child in block.children:
                 blocksList[child].addParent(block.id)
         return blocksList
-    
-        
-#    def getTranslocationScore(translocations, transData, ctx):
-#        """Function to score the proposed translocation block based on the number of
-#            basepairs it explains and the gaps between alignments of the block
-#        """
-#        if not isinstance(ctx, bool):
-#            print("CTX status must be a boolean")
-#            sys.exit()
-#        if not ctx:
-#            transScores = []
-#            for blocks in translocations:
-#                blocksScores = []
-#                for block in blocks:
-#                    aScore = transData.iat[block[0],4]
-#                    bScore = transData.iat[block[0],5]
-#                    aGap = 0
-#                    bGap = 0
-#                    if len(block) > 1:
-#                        for i in range(1, len(block)):
-#                            aScore += transData.iat[block[i],4]
-#                            bScore += transData.iat[block[i],5]
-#                            aGap += max(0,transData.iat[block[i],0] - transData.iat[block[i-1],1])
-#                            bGap += max(0,transData.iat[block[i],2] - transData.iat[block[i-1],3])
-#                        blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
-#                        blocksScores.append(blockScore)
-#                    else:
-#                        blocksScores.append(1)
-#                transScores.append(blocksScores)
-#            return transScores
-#        if ctx:
-#            transScores = []
-#            for blocks in translocations:
-#                blocksScores = []
-#                for block in blocks:
-#                    indices = getValues(transData.index.values,block)
-#                    aScore = transData.at[indices[0],"aLen"]
-#                    bScore = transData.at[indices[0],"bLen"]
-#                    aGap = 0
-#                    bGap = 0
-#                    if len(block) > 1:
-#                        for i in range(1, len(block)):
-#                            aScore += transData.at[indices[i],"aLen"]
-#                            bScore += transData.at[indices[i],"bLen"]
-#                            aGap += max(0,transData.at[indices[i],"aStart"] - transData.at[indices[i-1],"aEnd"])
-#                            bGap += max(0,transData.at[indices[i],"bStart"] - transData.at[indices[i-1],"bEnd"]) if transData.at[indices[i],"bDir"] == 1 else max(0, transData.at[indices[i-1],"bStart"] - transData.at[indices[i],"bEnd"]) 
-#                        blockScore = min(((aScore - aGap)/aScore),((bScore - bGap)/bScore))
-#                        blocksScores.append(blockScore)
-#                    else:
-#                        blocksScores.append(1)
-#                transScores.append(blocksScores)
-#            return transScores
-#    
+
     def getTransBlocks(transScores, shortTrans, transData, inPlaceBlocks, threshold, ctx):
         """This method filters possible translocation blocks to select those which have a posivitive gap based score
            (output of `getTransLocationsScore`) and those which dont overlap significantly with the inPlaceBlocks.
@@ -1071,7 +1019,7 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
                     for bBlock in bBlocks:
                         bBlockStart = inPlaceBlocks.at[bBlock,"bStart"]
                         bBlockEnd = inPlaceBlocks.at[bBlock,"bEnd"]
-                        if bStart - bBlockStart < threshold and bEnd - bBlockEnd < threshold:
+                        if bBlockStart -bStart < threshold and bEnd - bBlockEnd < threshold:
                             bStart = bEnd
                             break
                         elif bBlockStart < bStart and bBlockEnd < bEnd:
