@@ -16,50 +16,17 @@ from itertools import chain
 import time
 from operator import itemgetter
 from igraph import *
-from collections import Counter
+from collections import Counter, deque
 from scipy.stats import *
 from datetime import datetime
 cimport numpy as np
 
 np.random.seed(1)
 
-
-def SynAndOverlap(jData, iData, threshold):
-    """Compute whether two alignments are syntenic to each other.
-       
-       Parameters
-       ----------
-       jData: pandas Series, 
-           Series containing the information of the second (right) alignment
-           Required elements: `aStart, aEnd, bStart, bEnd, aDir, bDir`
-       iData: pandas Series,
-           Series containing the information of the first (left) alignment
-           Required elements: `aStart, aEnd, bStart, bEnd, aDir, bDir`
-       threshold: int, 
-           cut-off value.
-      
-       Returns
-       --------
-       Binary value
-           True if two alignments can be syntenic to each other, False otherwise
-    """
-    if jData.bDir == iData.bDir:
-        if (jData.aStart - iData.aStart) > threshold and (jData.aEnd - iData.aEnd) > threshold and (jData.bStart - iData.bStart) > threshold and (jData.bEnd - iData.bEnd) > threshold:
-            return True
-    else:
-        if (jData.aStart - iData.aStart) > threshold and (jData.aEnd - iData.aEnd) > threshold and (jData.bStart - iData.bEnd) > threshold and (jData.bEnd - iData.bStart) > threshold:
-            return True
-    return False
-
-#def TS(jData, iData, threshold):
-#    if (jData.aStart - iData.aStart) > threshold and (jData.aEnd - iData.aEnd) > threshold and (jData.bStart - iData.bStart) > threshold and (jData.bEnd - iData.bEnd) > threshold:
-#            return True
-#    return False
-
 cpdef apply_TS(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.int threshold):
     assert(aStart.dtype == np.int and aEnd.dtype == np.int and bStart.dtype == np.int and bEnd.dtype == np.int)
     cdef Py_ssize_t i, j,  n = len(aStart)
-    print(n)
+#    print(n)
     assert(n == len(aEnd) == len(bStart) == len(bEnd))
 #    cdef np.ndarray[double, ndim =2] res = np.empty(n).reshape([10,10])
 #    print(res)
@@ -104,13 +71,76 @@ cpdef list getShortest(invBlocks):
         list shortest = []
         int i
         list j = list(range(len(invBlocks)))
-    invG = getConnectivityGraph(invBlocks)        
+    invG = getConnectivityGraph(invBlocks)
+    source = np.array(invG.es['source'], dtype = np.int32)
+    target = np.array(invG.es['target'], dtype = np.int32)
+    weight = np.array(invG.es['weight'], dtype = np.float32)
+       
     if len(invG.es) > 0:        
         for i in j:
-            shortest.append(getAllLongestPaths(invG,i,j))
+            shortest.append(getAllLongestPaths(invG,i,j,source,target,weight))
     return shortest
-    
-cpdef list getRevenue(invBlocks, shortest, invertedCoordsOri):
+
+#
+#
+#%%cython
+#cimport numpy as np
+#import numpy as np   
+#
+#
+#cpdef list getRevenue(invBlocks, shortest, invertedCoordsOri):
+#    cdef:
+#        list revenue, i, j, values, startA, endA, startB, endB, iden
+#        int k, l
+#    revenue = []
+#    for i in shortest:
+#        values = []
+#        for j in i:
+#            if len(j) == 1:
+#                values.append(invBlocks[j[0]].score)
+#            else:              
+#                score = 0
+#                startA = [invertedCoordsOri.iat[j[0],0]]
+#                endA = [invertedCoordsOri.iat[j[0],1]]
+#                startB = [invertedCoordsOri.iat[j[0],3]]
+#                endB = [invertedCoordsOri.iat[j[0],2]]
+#                iden = [invertedCoordsOri.iat[j[0],6]]
+#                for k in j[1:]:
+#                    isMore = True if invertedCoordsOri.iat[k,6] > iden[-1] else False
+#                    if invertedCoordsOri.iat[k,0] < endA[-1]:
+#                        if isMore:
+#                            endA[-1] = invertedCoordsOri.iat[k,0]
+#                            startA.append(invertedCoordsOri.iat[k,0])
+#                            endA.append(invertedCoordsOri.iat[k,1])
+#                        else:
+#                            startA.append(endA[-1])
+#                            endA.append(invertedCoordsOri.iat[k,1])
+#                    else:
+#                        startA.append(invertedCoordsOri.iat[k,0])
+#                        endA.append(invertedCoordsOri.iat[k,1])
+#                    
+#                    if invertedCoordsOri.iat[k,2] > startB[-1]:
+#                        if isMore:
+#                            startB[-1] = invertedCoordsOri.iat[k,2]
+#                            startB.append(invertedCoordsOri.iat[k,3])
+#                            endB.append(invertedCoordsOri.iat[k,2])
+#                        else:
+#                            endB.append(startB[-1])
+#                            startB.append(invertedCoordsOri.iat[k,3])
+#                    else:
+#                        startB.append(invertedCoordsOri.iat[k,3])
+#                        endB.append(invertedCoordsOri.iat[k,2])
+#                    iden.append(invertedCoordsOri.iat[k,6])
+#                if len(startA) == len(endA) == len(startB) == len(endB) == len(iden):
+#                    for l in range(len(iden)):
+#                        score += iden[l]*((endA[l] - startA[l]) + (endB[l] - startB[l]))
+#                values.append(score)
+#        revenue = revenue + [values]
+#    return(revenue)
+#    
+################################################################################################
+
+cpdef list getRevenue(invBlocks, shortest, np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray iDen):
     cdef:
         list revenue, i, j, values, startA, endA, startB, endB, iden
         int k, l
@@ -122,37 +152,37 @@ cpdef list getRevenue(invBlocks, shortest, invertedCoordsOri):
                 values.append(invBlocks[j[0]].score)
             else:              
                 score = 0
-                startA = [invertedCoordsOri.iat[j[0],0]]
-                endA = [invertedCoordsOri.iat[j[0],1]]
-                startB = [invertedCoordsOri.iat[j[0],3]]
-                endB = [invertedCoordsOri.iat[j[0],2]]
-                iden = [invertedCoordsOri.iat[j[0],6]]
+                startA = [aStart[j[0]]]
+                endA = [aEnd[j[0]]]
+                startB = [bEnd[j[0]]]
+                endB = [bStart[j[0]]]
+                iden = [iDen[j[0]]]
                 for k in j[1:]:
-                    isMore = True if invertedCoordsOri.iat[k,6] > iden[-1] else False
-                    if invertedCoordsOri.iat[k,0] < endA[-1]:
+                    isMore = True if iDen[k] > iden[-1] else False
+                    if aStart[k] < endA[-1]:
                         if isMore:
-                            endA[-1] = invertedCoordsOri.iat[k,0]
-                            startA.append(invertedCoordsOri.iat[k,0])
-                            endA.append(invertedCoordsOri.iat[k,1])
+                            endA[-1] = aStart[k]
+                            startA.append(aStart[k])
+                            endA.append(aEnd[k])
                         else:
                             startA.append(endA[-1])
-                            endA.append(invertedCoordsOri.iat[k,1])
+                            endA.append(aEnd[k])
                     else:
-                        startA.append(invertedCoordsOri.iat[k,0])
-                        endA.append(invertedCoordsOri.iat[k,1])
+                        startA.append(aStart[k])
+                        endA.append(aEnd[k])
                     
-                    if invertedCoordsOri.iat[k,2] > startB[-1]:
+                    if bStart[k] > startB[-1]:
                         if isMore:
-                            startB[-1] = invertedCoordsOri.iat[k,2]
-                            startB.append(invertedCoordsOri.iat[k,3])
-                            endB.append(invertedCoordsOri.iat[k,2])
+                            startB[-1] = bStart[k]
+                            startB.append(bEnd[k])
+                            endB.append(bStart[k])
                         else:
                             endB.append(startB[-1])
-                            startB.append(invertedCoordsOri.iat[k,3])
+                            startB.append(bEnd[k])
                     else:
-                        startB.append(invertedCoordsOri.iat[k,3])
-                        endB.append(invertedCoordsOri.iat[k,2])
-                    iden.append(invertedCoordsOri.iat[k,6])
+                        startB.append(bEnd[k])
+                        endB.append(bStart[k])
+                    iden.append(iDen[k])
                 if len(startA) == len(endA) == len(startB) == len(endB) == len(iden):
                     for l in range(len(iden)):
                         score += iden[l]*((endA[l] - startA[l]) + (endB[l] - startB[l]))
@@ -160,31 +190,86 @@ cpdef list getRevenue(invBlocks, shortest, invertedCoordsOri):
         revenue = revenue + [values]
     return(revenue)
     
-cdef dict getNeighbourSyn(invertedCoordsOri, synData, int threshold):
+################################################################################################
+
+    
+#    
+#%%cython
+#cimport numpy as np
+#import numpy as np  
+#cpdef dict getNeighbourSyn(invertedCoordsOri, synData, int threshold):
+#    cdef:
+#        dict neighbourSyn = dict()
+#        int i, j, index, upBlock, downBlock
+#        list upSyn, downSyn
+#    for i in range(invertedCoordsOri.shape[0]):
+#        index = invertedCoordsOri.index.values[i]
+#        upSyn = np.where(synData.index.values < index)[0].tolist()
+#        downSyn = np.where(synData.index.values > index)[0].tolist()
+#        
+#        upBlock  = -1
+#        downBlock = len(synData)    
+#        for j in upSyn[::-1]:
+#            if SynAndOverlap(invertedCoordsOri.loc[index], synData.iloc[j], threshold):
+#                upBlock = j
+#                break
+#        
+#        for j in downSyn:
+#            if SynAndOverlap(synData.iloc[j], invertedCoordsOri.loc[index], threshold):
+#                downBlock = j
+#                break
+#        neighbourSyn[i] = [upBlock, downBlock]
+#    return(neighbourSyn)
+#    
+#######################################################################################
+    
+
+cpdef dict getNeighbourSyn(np.ndarray aStartInv, np.ndarray aEndInv, np.ndarray bStartInv, np.ndarray bEndInv, np.ndarray indexInv, np.ndarray bDirInv, np.ndarray aStartSyn, np.ndarray aEndSyn, np.ndarray bStartSyn, np.ndarray bEndSyn, np.ndarray indexSyn, np.ndarray bDirSyn, int threshold):
+   
     cdef:
+        cdef Py_ssize_t i, j, index
         dict neighbourSyn = dict()
-        int i, j, index, upBlock, downBlock
+        int upBlock, downBlock
         list upSyn, downSyn
-    for i in range(invertedCoordsOri.shape[0]):
-        index = invertedCoordsOri.index.values[i]
-        upSyn = np.where(synData.index.values < index)[0].tolist()
-        downSyn = np.where(synData.index.values > index)[0].tolist()
+    for i in range(len(indexInv)):
+        index = indexInv[i]
+        upSyn = np.where(indexSyn < index)[0].tolist()
+        downSyn = np.where(indexSyn > index)[0].tolist()
         
         upBlock  = -1
-        downBlock = len(synData)    
+        downBlock = len(indexSyn)   
         for j in upSyn[::-1]:
-            if SynAndOverlap(invertedCoordsOri.loc[index], synData.iloc[j], threshold):
-                upBlock = j
-                break
+#            print(aStartInv[i], aEndInv[i], bStartInv[i], bEndInv[i], bDirInv[i], aStartSyn[j], aEndSyn[j], bStartSyn[j], bEndSyn[j], bDirSyn[j])
+            if bDirSyn[j] == bDirInv[i]:
+                if (aStartInv[i] - aStartSyn[j]) > threshold and (aEndInv[i] - aEndSyn[j]) > threshold and (bStartInv[i] - bStartSyn[j]) > threshold and (bEndInv[i] - bEndSyn[j]) > threshold:
+                    upBlock = j
+                    break
+            else:
+                if (aStartInv[i] - aStartSyn[j]) > threshold and (aEndInv[i] - aEndSyn[j]) > threshold and (bEndInv[i] - bStartSyn[j]) > threshold and (bStartInv[i] - bEndSyn[j]) > threshold:
+                    upBlock = j
+                    break
+        
         
         for j in downSyn:
-            if SynAndOverlap(synData.iloc[j], invertedCoordsOri.loc[index], threshold):
-                downBlock = j
-                break
+            if bDirSyn[j] == bDirInv[i]:
+                if (aStartSyn[j] - aStartInv[i]) > threshold and (aEndSyn[j] - aEndInv[i]) > threshold and (bStartSyn[j] - bStartInv[i]) > threshold and (bEndSyn[j] - bEndInv[i]) > threshold:
+                    downBlock = j
+                    break
+            else:
+                if (aStartSyn[j] - aStartInv[i]) > threshold and (aEndSyn[j] - aEndInv[i]) > threshold and (bStartSyn[j] - bEndInv[i]) > threshold and (bEndSyn[j] - bStartInv[i]) > threshold:
+                    downBlock = j
+                    break
         neighbourSyn[i] = [upBlock, downBlock]
     return(neighbourSyn)
+    
+    
+    
+    
+    
+    
 
-cdef list getCost(list synPath, list shortest, dict neighbourSyn, list synBlockScore, synData, invertedCoordsOri):
+
+cpdef list getCost(list synPath, list shortest, dict neighbourSyn, list synBlockScore, synData, invertedCoordsOri):
     cdef:
         list cost, i, j, values
         int leftSyn, rightSyn, leftEnd, rightEnd, overlapLength
@@ -246,6 +331,7 @@ def getInversions(coords,chromo, threshold, synData, synPath):
         bestInvPath.append(node.index)
         return(bestInvPath[::-1])
         
+    
     invertedCoordsOri = coords.loc[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == -1)]
     invertedCoords = invertedCoordsOri.copy()    
 #    minCoords = np.min(np.min(invertedCoords[["bStart","bEnd"]]))
@@ -256,136 +342,47 @@ def getInversions(coords,chromo, threshold, synData, synPath):
 
     nrow = pd.Series(range(invertedCoords.shape[0]))
     invTree = pd.DataFrame(apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold), index = range(len(invertedCoords)), columns = invertedCoords.index.values)
-    
-#    invTree = nrow.apply( lambda x : invertedCoords.iloc[x:,].apply(TS, axis = 1, args = (invertedCoords.iloc[x], threshold)))
-    #del(invertedCoords)
+    print("found inv Tree", chromo, str(datetime.now()))   
     
     #######################################################################
     ###### Create list of inverted alignments
     #######################################################################
 
     invBlocks = getInvBlocks(invTree, invertedCoordsOri)
-    
+    print("found inv blocks", chromo, str(datetime.now()))   
+
     #########################################################################
     ###### Finding profitable inversions (group of inverted blocks)
     #########################################################################
-#    print("finding possible inversions")
          
     shortest = getShortest(invBlocks)
-    #invG = getConnectivityGraph(invBlocks)        
-    #if len(invG.es) > 0:        
-     #   for i in range(len(invBlocks)):
-      #      shortest.append(getAllLongestPaths(invG,i,range(len(invBlocks))))
-            
-    
-    ## Get revenue of shortest paths, score of adding the inversion
-    
-    ##### NEED TO CHANGE THIS TO GIVE LOWER SCORE TO OVERLAPPING INVERSIONS
-    ## THIS MAYBE CONTAIN SOME BUGS!!!
+    print("found shortest", chromo, str(datetime.now()))   
 
-
-      
-    revenue = getRevenue(invBlocks, shortest, invertedCoordsOri)
+#    revenue = getRevenue(invBlocks, shortest, invertedCoordsOri)
     
-   # for i in shortest:
-   #     values = []
-   #     for j in i:
-   #         if len(j) == 1:
-   #             values.append(invBlocks[j[0]].score)
-   #         else:              
-   #             score = 0
-   #             startA = [invertedCoordsOri.iat[j[0],0]]
-   #             endA = [invertedCoordsOri.iat[j[0],1]]
-   #             startB = [invertedCoordsOri.iat[j[0],3]]
-   #             endB = [invertedCoordsOri.iat[j[0],2]]
-   #             iden = [invertedCoordsOri.iat[j[0],6]]
-   #             for k in j[1:]:
-   #                 isMore = True if invertedCoordsOri.iat[k,6] > iden[-1] else False
-   #                 if invertedCoordsOri.iat[k,0] < endA[-1]:
-   #                     if isMore:
-   #                         endA[-1] = invertedCoordsOri.iat[k,0]
-   #                         startA.append(invertedCoordsOri.iat[k,0])
-   #                         endA.append(invertedCoordsOri.iat[k,1])
-   #                     else:
-   #                         startA.append(endA[-1])
-   #                         endA.append(invertedCoordsOri.iat[k,1])
-   #                 else:
-   #                     startA.append(invertedCoordsOri.iat[k,0])
-   #                     endA.append(invertedCoordsOri.iat[k,1])
-   #                 
-   #                 if invertedCoordsOri.iat[k,2] > startB[-1]:
-   #                     if isMore:
-   #                         startB[-1] = invertedCoordsOri.iat[k,2]
-   #                         startB.append(invertedCoordsOri.iat[k,3])
-   #                         endB.append(invertedCoordsOri.iat[k,2])
-   #                     else:
-   #                         endB.append(startB[-1])
-   #                         startB.append(invertedCoordsOri.iat[k,3])
-   #                 else:
-   #                     startB.append(invertedCoordsOri.iat[k,3])
-   #                     endB.append(invertedCoordsOri.iat[k,2])
-   #                 iden.append(invertedCoordsOri.iat[k,6])
-   #             if len(startA) == len(endA) == len(startB) == len(endB) == len(iden):
-   #                 for i in range(len(iden)):
-   #                     score += iden[i]*((endA[i] - startA[i]) + (endB[i] - startB[i]))
-   #             values.append(score)
-   #     revenue = revenue + [values]
-   # 
+    revenue = getRevenue(invBlocks, shortest, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values)
+    print("found revenue", chromo, str(datetime.now()))   
+
     ## Get syntenic neighbouring blocks of inversions
+
+
+#    neighbourSyn = getNeighbourSyn(invertedCoordsOri, synData, threshold)
     
+    neighbourSyn = getNeighbourSyn(invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.index.values, invertedCoordsOri.bDir.values, synData.aStart.values, synData.aEnd.values, synData.bStart.values, synData.bEnd.values, synData.index.values, synData.bDir.values, threshold)
+        
+    print("found neighbours", chromo, str(datetime.now()))
 
-    neighbourSyn = getNeighbourSyn(invertedCoordsOri, synData, threshold)
-
-
-   # for i in range(invertedCoordsOri.shape[0]):
-   #     index = invertedCoordsOri.index.values[i]
-   #     upSyn = np.where(synData.index.values < index)[0]
-   #     downSyn = np.where(synData.index.values > index)[0]
-   #     
-   #     upBlock  = -1
-   #     downBlock = len(synData)    
-   #     for j in upSyn[::-1]:
-   #         if SynAndOverlap(invertedCoordsOri.loc[index], synData.iloc[j], threshold):
-   #             upBlock = j
-   #             break
-   #     
-   #     for j in downSyn:
-   #         if SynAndOverlap(synData.iloc[j], invertedCoordsOri.loc[index], threshold):
-   #             downBlock = j
-   #             break
-   #     neighbourSyn[i] = [upBlock, downBlock]
-   # 
-    ## Calculate score of individual synblock
-    
     synBlockScore = [(i.aLen + i.bLen)*i.iden for index, i in synData.iterrows()]
     
     ## Calculate cost adding an inversion, i.e sum of all synblocks which need to be removed to accomodate teh synblocks
     cost = getCost(synPath, shortest, neighbourSyn, synBlockScore, synData, invertedCoordsOri)
-    
-   # synLength = len(synPath)
-   # for i in shortest:
-   #     values = []   
-   #     for j in i:
-   #         leftSyn, rightSyn = getNeighbours(neighbourSyn, j)
-   #         synCost = sum([synBlockScore[synIndex] for synIndex in range(leftSyn+1,rightSyn)])
-   #         leftEnd = synData.iat[leftSyn, 1] if leftSyn > -1 else 0
-   #         rightEnd = synData.iat[rightSyn,0] if rightSyn < synLength else invertedCoordsOri.iat[j[-1],1]
-   #         if rightEnd - leftEnd > 1000:
-   #             values.append(synCost)
-   #         else:
-   #             overlapLength = (leftEnd - invertedCoordsOri.iat[j[0], 0]) + (invertedCoordsOri.iat[j[-1],1] - rightEnd)
-   #             if overlapLength < ((rightEnd - leftEnd)/2):
-   #                 values.append(synCost + sys.maxsize)
-   #             else:
-   #                 values.append(synCost)
-   #     cost = cost + [values]
-   # 
-    
+    print("found cost", chromo, str(datetime.now()))
     
     ## Calculate profit (or loss) associated with the addition of an inversion
     profit = []
     for i in range(len(revenue)):
         profit = profit + [[revenue[i][j] - cost[i][j] for j in range(len(revenue[i]))]]
+    print("found profit", chromo, str(datetime.now()))
     
     ## Create list of all profitable inversions
     
@@ -394,6 +391,7 @@ def getInversions(coords,chromo, threshold, synData, synPath):
                              getNeighbours(neighbourSyn, shortest[i][j]),shortest[i][j])
                              for i in range(len(profit)) for j in range(len(profit[i]))\
                                  if profit[i][j] > (0.1*cost[i][j])]     ##Select only those inversions for which the profit is more than  10% of the cost
+    print("found profitable ", chromo, str(datetime.now()))
     #####################################################################
     #### Find optimal set of inversions from all profitable inversions
     #####################################################################
@@ -402,11 +400,10 @@ def getInversions(coords,chromo, threshold, synData, synPath):
         vcount = len(profitable)+2
         profG =  Graph().as_directed()
         profG.add_vertices(vcount)
-        iAStart = []
-        iAEnd = []
-        iBStart = []
-        iBEnd = []
-        
+        iAStart = deque()
+        iAEnd = deque()
+        iBStart = deque()
+        iBEnd = deque()
         for i in profitable:
             iAStart.append(invertedCoordsOri.iat[i.invPos[0], 0])
             iAEnd.append(invertedCoordsOri.iat[i.invPos[-1], 1])
@@ -415,13 +412,38 @@ def getInversions(coords,chromo, threshold, synData, synPath):
         
         nonOverLapA = [np.where(iAStart > i - threshold)[0] for i in iAEnd] 
         nonOverLapB = [np.where(iBStart > i - threshold)[0] for i in iBEnd]
-        for i in range(len(profitable)):
-            childNodes = np.intersect1d(nonOverLapA[i], nonOverLapB[i]) + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes 
-            profG.add_edges(zip([i+1]*len(childNodes), childNodes))
-            profG.es[-len(childNodes):]["weight"] = profitable[i].profit
-            profG.vs[i+1]["child"] = list(childNodes)
-            profG.vs[i+1]["score"] = profitable[i].profit
+        
+        
+#        j = 0
+#        for i in range(len(profitable)):
+#            j+=1
+#            print(j)
+#            childNodes = np.intersect1d(nonOverLapA[i], nonOverLapB[i]) + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes 
+#            profG.add_edges(zip([i+1]*len(childNodes), childNodes))
+#            profG.es[-len(childNodes):]["weight"] = profitable[i].profit
+#            profG.vs[i+1]["child"] = list(childNodes)
+#            profG.vs[i+1]["score"] = profitable[i].profit
     
+        edgeList = deque()
+        esWeight = deque()
+        chNodes = deque()
+        vsScore = deque()
+        
+        j = 0 
+        for i in range(len(profitable)):
+            j+=1
+#            print(j)
+            childNodes = np.intersect1d(nonOverLapA[i], nonOverLapB[i]) + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes 
+            edgeList.extend(list(zip([i+1]*len(childNodes), childNodes)))
+            esWeight.extend([profitable[i].profit]*len(childNodes))
+            chNodes.append(list(childNodes))
+            vsScore.append(profitable[i].profit)
+            
+        profG.add_edges(list(edgeList))
+        profG.es["weight"] = list(esWeight)
+        profG.vs[range(1,len(profG.vs))]["child"] = list(chNodes)
+        profG.vs[range(1,len(profG.vs))]["score"] = list(vsScore)
+                
         profG.vs[[0,vcount-1]]["score"] = 0
         
         noInEdge = np.where(np.array(profG.vs[1:-1].indegree()) == 0)[0] + 1
@@ -440,6 +462,8 @@ def getInversions(coords,chromo, threshold, synData, synPath):
         bestInvPath = bestInv(profG)
     else:
         bestInvPath = []
+    
+    print("found bestInvPath", chromo, str(datetime.now()))
 
     invBlocksIndex = unlist([profitable[i-1].invPos for i in bestInvPath])
     invData = invertedCoordsOri.iloc[invBlocksIndex]
@@ -653,20 +677,119 @@ def findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd):
     return(aBlocks, bBlocks)
     
 
+
+
+#def getConnectivityGraph(blocksList):
+#    outOG = Graph().as_directed()
+#    outOG.add_vertices(len(blocksList))
+#    if len(blocksList) == 0:
+#        return outOG
+#    ## Add edges and edge weight
+#    count = 0
+#    for i in blocksList:
+#        count+=1
+#        if count == 5000:
+#            break
+#        if len(i.children) > 0:
+#            outOG.add_edges(zip([i.id]*len(i.children), i.children))
+#            outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
+#    return outOG
+
+
 def getConnectivityGraph(blocksList):
     outOG = Graph().as_directed()
     outOG.add_vertices(len(blocksList))
     if len(blocksList) == 0:
         return outOG
     ## Add edges and edge weight
+    
+    edgeList = deque()
+    esWeight = deque()
+    sourceList = deque()
+    targetList = deque()
     for i in blocksList:
         if len(i.children) > 0:
-            outOG.add_edges(zip([i.id]*len(i.children), i.children))
-            outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
+            edgeList.extend(list(zip([i.id]*len(i.children), i.children)))
+            esWeight.extend([-i.score]*len(i.children))
+            sourceList.extend([i.id]*len(i.children))
+            targetList.extend(i.children)
+    outOG.add_edges(list(edgeList))
+    outOG.es["weight"] = list(esWeight)
+    outOG.es["source"] = list(sourceList)
+    outOG.es["target"] = list(targetList)
     return outOG
 
+#
+#def getAllLongestPaths(graph,sNode, eNode,by="weight"):
+#    """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
+#    directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
+#    are negative, so shortest path from sNode to eNode corresponds to the longest path.
+#       
+#        Parameters
+#        ----------
+#        graph: directeed igraph Graph(),
+#            Directed acyclic graph containing all the nodes and edges in the graph.
+#           
+#        sNode: int, 
+#            index of the start node in the graph.
+#       
+#        eNode: int list,
+#            list of all end nodes. longest path from start node to end nodes will be
+#            calculated
+#        
+#        by: igraph edge weight
+#        
+#        Returns
+#        -------
+#        list of len(eNodes) longest paths from sNodes to eNodes
+#        
+#    """
+#    pathList = []
+#    dist = {}
+#    pred = {}
+#    
+#    allNodes = graph.vs.indices
+#    for i in allNodes:
+#        dist[i] = float("inf")
+#        pred[i] = None
+#        
+#    dist[sNode] = 0
+#    changes = 1
+#    
+#    for i in range(len(allNodes)-1):
+#        if changes == 0:
+#            break
+#        changes = 0
+#        for e in graph.es:
+#            if dist[e.source] + e[by] < dist[e.target]:
+#                changes = 1
+#                dist[e.target] = dist[e.source] + e[by]
+#                pred[e.target] = e.source
+#    
+#    for e in graph.es:
+#        if dist[e.source] + e[by] < dist[e.target]:
+#            sys.exit("Negative weight cycle identified")
+#    
+#    for key in eNode:
+#        if dist[key] != float("inf"):
+#            path = []
+#            while key!=sNode:
+#                path.append(key)
+#                key = pred[key]
+#            path.append(sNode)
+#            pathList.append(path[::-1])
+#    return(pathList)
 
-def getAllLongestPaths(graph,sNode, eNode,by="weight"):
+
+
+
+#
+#%%cython
+#cimport numpy as np
+#import numpy as np
+#import sys
+
+cpdef getAllLongestPaths(graph,sNode, eNode, np.ndarray[np.int32_t, ndim =1] source, np.ndarray[np.int32_t, ndim =1] target, np.ndarray[np.float32_t, ndim=1] weight, by="weight"):
     """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
     directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
     are negative, so shortest path from sNode to eNode corresponds to the longest path.
@@ -691,31 +814,27 @@ def getAllLongestPaths(graph,sNode, eNode,by="weight"):
         
     """
     pathList = []
-    dist = {}
-    pred = {}
-    
-    allNodes = graph.vs.indices
-    for i in allNodes:
-        dist[i] = float("inf")
-        pred[i] = None
-        
+    cdef:
+        cdef Py_ssize_t i, j, n = len(graph.vs.indices)
+        np.ndarray[np.int32_t, ndim =1] pred = np.array([-1]*n, dtype = np.int32)
+        np.ndarray[np.float32_t, ndim=1] dist = np.array([np.float32('inf')]*n, dtype = np.float32)
+
     dist[sNode] = 0
     changes = 1
-    
-    for i in range(len(allNodes)-1):
+
+    for i in range(n-1):
         if changes == 0:
             break
         changes = 0
-        for e in graph.es:
-            if dist[e.source] + e[by] < dist[e.target]:
+        for j in range(len(source)):
+            if dist[source[j]] + weight[j] < dist[target[j]]:
                 changes = 1
-                dist[e.target] = dist[e.source] + e[by]
-                pred[e.target] = e.source
-    
-    for e in graph.es:
-        if dist[e.source] + e[by] < dist[e.target]:
+                dist[target[j]] = dist[source[j]] + weight[j]
+                pred[target[j]] = source[j]
+    for j in range(len(source)):
+        if dist[source[j]] + weight[j] < dist[target[j]]:
             sys.exit("Negative weight cycle identified")
-    
+
     for key in eNode:
         if dist[key] != float("inf"):
             path = []
@@ -725,68 +844,6 @@ def getAllLongestPaths(graph,sNode, eNode,by="weight"):
             path.append(sNode)
             pathList.append(path[::-1])
     return(pathList)
-
-#cpdef np.ndarray[np.int, ndim =2] getAllLongestPaths(graph,sNode, eNode,by="weight"):
-#    """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
-#    directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
-#    are negative, so shortest path from sNode to eNode corresponds to the longest path.
-#       
-#        Parameters
-#        ----------
-#        graph: directeed igraph Graph(),
-#            Directed acyclic graph containing all the nodes and edges in the graph.
-#           
-#        sNode: int, 
-#            index of the start node in the graph.
-#       
-#        eNode: int list,
-#            list of all end nodes. longest path from start node to end nodes will be
-#            calculated
-#        
-#        by: igraph edge weight
-#        
-#        Returns
-#        -------
-#        list of len(eNodes) longest paths from sNodes to eNodes
-#        
-#    """
-#    cdef np.ndarray pathList = np.array([],dtype=np.int)
-#    cdef np.ndarray[object, ndim=1] dist, pred, allNodes = np.array(graph.vs.indices,dtype=object)
-#    cdef np.int n = len(allNodes)
-#    assert(list(allNodes) == sorted(allNodes))
-#    dist = np.array([np.float('inf')]*n, dtype = object)
-#    pred = np.array([None]*n, dtype = object)
-#    
-#    allEdges = graph.es
-#    for i in allNodes:
-#        dist[i] = float("inf")
-#        pred[i] = None
-#        
-#    dist[sNode] = 0
-#    changes = 1
-#
-#    for i in range(len(allNodes)-1):
-#        if changes == 0:
-#            break
-#        changes = 0
-#        for e in graph.es:
-#            if dist[e.source] + e[by] < dist[e.target]:
-#                changes = 1
-#                dist[e.target] = dist[e.source] + e[by]
-#                pred[e.target] = e.source
-#    
-#    for e in graph.es:
-#        if dist[e.source] + e[by] < dist[e.target]:
-#            sys.exit("Negative weight cycle identified")
-#    for key in eNode:
-#        if dist[key] != float("inf"):
-#            path = []
-#            while key!=sNode:
-#                path.append(key)
-#                key = pred[key]
-#            path.append(sNode)
-#            pathList = np.append(pathList,path[::-1])
-#    return(pathList)
 
 
 
@@ -835,8 +892,6 @@ cpdef np.ndarray getTranslocationScore_ctx(np.ndarray aStart, np.ndarray aEnd, n
     cdef np.float blockScore, aScore, bScore, aGap, bGap
     cdef np.ndarray transScores = np.array([-1]*n, dtype = object), blocksScores
     for i in range(n):
-        if i%200 == 0:
-            print(i, str(datetime.now()))
         l = len(translocations[i])
         blocksScores = np.array([-1]*l, dtype = object)
         for j in range(l):
@@ -896,7 +951,6 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
                all syntenic alignment blocks
            threshold: int, 
                cut-off value.
-        
            Returns
            --------
            outBlocks: list,
@@ -1042,12 +1096,14 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
     orderedBlocksList = makeBlocksList(outOrderedBlocks, orderedBlocks)
     outOG = getConnectivityGraph(orderedBlocksList)
     shortestOutOG = []
+    source = np.array(outOG.es['source'], dtype = np.int32)
+    target = np.array(outOG.es['target'], dtype = np.int32)
+    weight = np.array(outOG.es['weight'], dtype = np.float32)
     for i in range(len(orderedBlocksList)):
-        if i%500 == 0:
-            print(i, str(datetime.now()))
         eNode = [i]
         eNode.extend(list(np.where(outOrderedBlocks.iloc[i] == True)[0]))
-        shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,"weight"))   
+#        getAllLongestPaths(outOG,i,eNode,source, target, weight, "weight")
+        shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,source, target, weight, "weight"))   
     shortestOutOG = np.array(shortestOutOG)
     if not ctx:
         transScores = getTranslocationScore(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, shortestOutOG)
@@ -1141,11 +1197,7 @@ cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aE
                 outOrderedBlocks[i][j] = False
     return(outOrderedBlocks)
     
-#%%cython
-#cimport numpy as np
-#import numpy as np
-#import sys
-cpdef np.ndarray[object, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold):
+cpdef np.ndarray[np.npy_bool, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold):
     """Compute whether two alignments can be part of one translation block. For this:
         the alignments should not be separated by any inPlaceBlock on both ends and
         they should be syntenic with respect to each other.
@@ -1159,160 +1211,94 @@ cpdef np.ndarray[object, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.ndarra
     assert(aStart.dtype==np.int and aEnd.dtype==np.int and bStart.dtype==np.int and bEnd.dtype==np.int and bDir.dtype==np.int and aChr.dtype==np.object and bChr.dtype==np.object and index.dtype==np.int)
     cdef Py_ssize_t i,j, n = len(aStart)
     assert(n == len(aEnd) == len(bStart) == len(bEnd) == len(index) == len(bDir) == len(aChr) == len(bChr))
-    cdef np.ndarray[object, ndim =2 ] outOrderedBlocks =  np.array([[np.nan]*n]*n, dtype=object)
+    
+    cdef np.ndarray outOrderedBlocks =  np.array([[np.False_]*n]*n, dtype=np.bool)
     
     for i in range(n):
+#        if i%1000 ==0:
+#            print(i)
         for j in range(i,n):
             if bDir[i] != bDir[j]:
                 sys.exit("ERROR: bDir not matching")
             elif aChr[i] != aChr[j] or bChr[i] != bChr[j]:
-                outOrderedBlocks[i][j] = False
+                continue
+#                outOrderedBlocks[i][j] = False              #False
             elif bDir[i] == 1:
                 if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
-                    outOrderedBlocks[i][j] = True
+                    outOrderedBlocks[i][j] = True          #True
                 else:
-                    outOrderedBlocks[i][j] = False
+                    continue
+#                    outOrderedBlocks[i][j] = False       #False
             elif bDir[i] == -1:
                 if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[i] - bStart[j]) > threshold and (bEnd[i] - bEnd[j]) > threshold:
                     outOrderedBlocks[i][j] = True
                 else:
-                    outOrderedBlocks[i][j] = False
+                    continue
+#                    outOrderedBlocks[i][j] = False
             else:
                 sys.exit("ERROR: ILLEGAL BDIR VALUE")
     return(outOrderedBlocks)
-    
-    
+             
+#def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
+#   
+#    nodeStack = []
+#    visitedTransBlock = []
+#    transCluster = []
 #    
-#    
-#    cdef np.ndarray allRanges = np.array([range(left[i]+1,right[i]) for i in range(n)])
-#    for i in range(n):
-#        for j in range(i,n):
-#            #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
-#            if not any([k in allRanges[i] for k in allRanges[j]]):
-#                    outOrderedBlocks[i][j] = False
-#            elif bDir[i] == bDir[j]:             
-#                if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
-#                    outOrderedBlocks[i][j] = True
-#                else:
-#                    outOrderedBlocks[i][j] = False
-#            elif(aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bEnd[i]) > threshold and (bEnd[j] - bStart[i]) > threshold:
-#                outOrderedBlocks[i][j] = True
-#            else:
-#                outOrderedBlocks[i][j] = False
-#    return(outOrderedBlocks)   
-    
-    
+#    j = 0
+#    for key,value in transGroupIndices.items():
+#        if key not in visitedTransBlock:
+#            newGroup = [key]
+#            visitedTransBlock.append(key)
+#            node1 = value[0]
+#            node2 = value[1]
+#            nodeStack.extend(transGenomeAGroups[node1].member)
+#            nodeStack.extend(transGenomeBGroups[node2].member)
 #
-#
-#
-#
-#def makeBlocksTree(inPlaceBlocks, blocksData, threshold, transBlocksNeighbours = None, ctx = False):
-#    """Compute whether two alignments can be part of one translation block. For this:
-#        the alignments should not be separated by any inPlaceBlock on both ends and
-#        they should be syntenic with respect to each other.
-#       
-#       Parameters
-#       ----------
-#       inPlaceBlocks: pandas DataFrame, 
-#           dataframe containing coordinates and other information for all inPlaceBlocks
-#       blocksData: pandas DataFrame,
-#           dataframe containing coordinates of alignments which are needed to be connected.
-#           Requires that `alignment_start` < `alingment_end` 
-#       threshold: int, 
-#           cut-off value.
-#       transBlocksNeighbours: list,
-#           list containing indices of inPlaceBlocks neighbours of each alignment. Output
-#           of getTransSynOrientation.
-#    
-#       Returns
-#       --------
-#       outOrderedBlocks: pandas DataFrame,
-#           Dataframe of type Object. Lower half is NA, upper half contains whether two
-#           alignments can be connected (True) or not (False).
-#    """
-#    if not isinstance(ctx, bool):
-#        print("CTX status must be a boolean")
-#        sys.exit()
-#    if not ctx:
-#        if transBlocksNeighbours == None:
-#            sys.exit("ERROR: MISSING transBlocksNeighbours")
-#        orderedBlocksLen = len(blocksData)
-#        outOrderedBlocks = np.zeros((orderedBlocksLen,orderedBlocksLen), dtype = object)
-#        outOrderedBlocks[np.tril_indices(outOrderedBlocks.shape[0],-1)] = np.nan
-#        outOrderedBlocks[np.triu_indices(outOrderedBlocks.shape[0],0)] = np.False_
-#        for i in range(orderedBlocksLen):
-#            for j in range(i+1, orderedBlocksLen):
-#                if len(np.intersect1d(range(transBlocksNeighbours[i][0]+1,transBlocksNeighbours[i][1]),\
-#                    range(transBlocksNeighbours[j][0]+1,transBlocksNeighbours[j][1]))) == 0:
-#                    continue
-#                outOrderedBlocks[i][j] = SynAndOverlap(blocksData.iloc[j],blocksData.iloc[i], threshold)
-#        outOrderedBlocks = pd.DataFrame(outOrderedBlocks)
-#        return outOrderedBlocks
-#    
-#    if ctx:
-#        indices = blocksData.index.values
-#        orderedBlocksLen = len(indices)
-#        outOrderedBlocks = np.zeros((orderedBlocksLen, orderedBlocksLen), dtype = object)
-#        outOrderedBlocks[np.tril_indices(outOrderedBlocks.shape[0],-1)] = np.nan
-#        outOrderedBlocks[np.triu_indices(outOrderedBlocks.shape[0],0)] = np.False_
-#        for i in range(len(indices)):
-#            index = indices[i]
-#            iData = blocksData.loc[index]
-#            for j in range(i+1, len(indices)):
-#                index_2 = indices[j]
-#                if blocksData.at[index_2,"aChr"] != iData.aChr or blocksData.at[index_2, "bChr"] != iData.bChr:
-#                    continue
-#                if blocksData.at[index,"bDir"] != blocksData.at[index_2,"bDir"]:
-#                    sys.exit("ERROR: bDir not matching")
-#                if blocksData.at[index, "bDir"] == 1:   ##When input contains ordered blocks
-#                    outOrderedBlocks[i][j] = SynAndOverlap(blocksData.loc[index_2], blocksData.loc[index], threshold)
-#                elif blocksData.at[index, "bDir"] == -1:    ##When input contains inverted blocks
-#                    iData = blocksData.loc[index]
-#                    jData = blocksData.loc[index_2]
-#                    if (jData.aStart - iData.aStart) > threshold and (jData.aEnd - iData.aEnd) > threshold and (iData.bStart - jData.bStart) > threshold and (iData.bEnd - jData.bEnd) > threshold:
-#                        outOrderedBlocks[i][j] = True
-#                else:
-#                    sys.exit("ERROR: ILLEGAL BDIR VALUE")
-#        outOrderedBlocks = pd.DataFrame(outOrderedBlocks)
-#        outOrderedBlocks.index = blocksData.index
-#        outOrderedBlocks.columns = blocksData.index.values
-#        return outOrderedBlocks
-#                
-#                
-   #%%     
-            
-
-    
-    
+#            while len(nodeStack) != 0:
+#                newKey = nodeStack.pop()
+#                if newKey not in visitedTransBlock:
+#                    visitedTransBlock.append(newKey)
+#                    newGroup.append(newKey)
+#                    nodeStack.extend(transGenomeAGroups[transGroupIndices[newKey][0]].member)
+#                    nodeStack.extend(transGenomeBGroups[transGroupIndices[newKey][1]].member)
+#                if len(nodeStack) > len(transGroupIndices):
+#                    nodeStack = deque(pd.unique(nodeStack))
+#                    nodeStack = deque([ele for ele in nodeStack if ele not in visitedTransBlock])
+#            newGroup.sort()
+#            transCluster.append(list(newGroup))
+#    return(transCluster)
 
 
 
-            
+
 def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
-    nodeStack = []
-    visitedTransBlock = []
+    assert(list(transGroupIndices.keys()) == list(range(len(transGroupIndices))))
+    nodeStack = np.zeros(len(transGroupIndices), dtype='uint8')
+    visitedTransBlock = np.zeros(len(transGroupIndices), dtype='uint8')
     transCluster = []
     
+    j = 0
     for key,value in transGroupIndices.items():
-        if key not in visitedTransBlock:
+        if visitedTransBlock[key] == 0:
+            visitedTransBlock[key]=1
             newGroup = [key]
-            visitedTransBlock.append(key)
             node1 = value[0]
             node2 = value[1]
-            nodeStack.extend(transGenomeAGroups[node1].member)
-            nodeStack.extend(transGenomeBGroups[node2].member)
-            
-            while len(nodeStack) != 0:
-                newKey = nodeStack.pop()
-                if newKey not in visitedTransBlock:
-                    visitedTransBlock.append(newKey)
+            nodeStack[transGenomeAGroups[node1].member] = 1
+            nodeStack[transGenomeBGroups[node2].member] = 1
+            nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
+            while len(np.nonzero(nodeStack)[0]) > 0:
+                newKey = np.where(nodeStack == 1)[0][0]
+                if visitedTransBlock[newKey]== 0:
+                    visitedTransBlock[newKey] = 1
                     newGroup.append(newKey)
-                    nodeStack.extend(transGenomeAGroups[transGroupIndices[newKey][0]].member)
-                    nodeStack.extend(transGenomeBGroups[transGroupIndices[newKey][1]].member)
+                    nodeStack[transGenomeAGroups[transGroupIndices[newKey][0]].member] = 1 
+                    nodeStack[transGenomeBGroups[transGroupIndices[newKey][1]].member] = 1
+                    nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
             newGroup.sort()
-            transCluster.append(newGroup)
+            transCluster.append(list(newGroup))
     return(transCluster)
-
 
 def getBestClusterSubset(cluster, transBlocksData):
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
@@ -1406,76 +1392,152 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
         bestScore, bestComb = updateBestComb(bestScore, bestComb, outBlocks, transBlocksData)
     return( bestScore, bestComb)
 
+#
+#    
+#def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):    
+#    bestScore = 0
+#    bestComb = []
+#    for i in range(iterCount):
+#        tempCluster = cluster.copy()
+#        length = len(tempCluster)
+#        outBlocks =  seedBlocks.copy()
+#        [tempCluster.remove(i) for i in outBlocks]
+#        skipList = []
+#        transBlocksScore = {}
+#        for i in tempCluster:
+#            transBlocksScore[i] = (transBlocksData[i].aEnd - transBlocksData[i].aStart) + (transBlocksData[i].bEnd - transBlocksData[i].bStart)
+#        while len(tempCluster) > 0:
+#            while len(tempCluster) != length:
+#                length = len(tempCluster)
+#                for i in tempCluster:
+#                    if hasattr(transBlocksData[i],"meTo"):
+#                        if any(j in outBlocks for j in transBlocksData[i].meTo):
+#                            tempCluster.remove(i)
+#                            skipList.append(i)
+#                    elif hasattr(transBlocksData[i], "meAlist"):
+#                        if any(j in outBlocks for j in transBlocksData[i].meAlist) and any(j in outBlocks for j in transBlocksData[i].meBlist):
+#                            tempCluster.remove(i)
+#                            skipList.append(i)
+#                            
+#                
+#                for i in tempCluster:
+#                    if hasattr(transBlocksData[i],"meTo"):
+#                        if all(j in skipList for j in transBlocksData[i].meTo):
+#                            tempCluster.remove(i)
+#                            outBlocks.append(i)
+#                    elif hasattr(transBlocksData[i], "meAlist"):
+#                        if all(j in skipList for j in transBlocksData[i].meAlist) and all(j in outBlocks for j in transBlocksData[i].meBlist):
+#                            tempCluster.remove(i)
+#                            outBlocks.append(i)
+# 
+#            if len(tempCluster) > 0:
+#                topBlocks = sorted(tempCluster, key = lambda x: transBlocksScore[x], reverse = True)[:20]
+#                totalScore = sum(transBlocksScore[i] for i in topBlocks)
+#                prob = [transBlocksScore[i]/totalScore for i in topBlocks]
+#                newBlock = int(np.random.choice(topBlocks, size = 1, p = prob))
+#                outBlocks.append(newBlock)
+#                tempCluster.remove(newBlock)
+#                if hasattr(transBlocksData[newBlock],"meTo"):
+#                    for i in transBlocksData[newBlock].meTo:
+#                        if i in tempCluster:
+#                            tempCluster.remove(i)
+#                        skipList.append(i)
+#                elif hasattr(transBlocksData[newBlock],"meAlist"):
+#                    if any(j in outBlocks for j in transBlocksData[newBlock].meAlist):
+#                        for k in transBlocksData[newBlock].meBlist:
+#                            if k in tempCluster:
+#                                tempCluster.remove(k)
+#                        skipList.extend(transBlocksData[newBlock].meBlist)
+#                    elif any(j in outBlocks for j in transBlocksData[newBlock].meBlist):
+#                        for k in transBlocksData[newBlock].meAlist:
+#                            if k in tempCluster:
+#                                tempCluster.remove(k)
+#                        skipList.extend(transBlocksData[newBlock].meAlist)
+#                    for meElement in transBlocksData[newBlock].meAlist:
+#                        if meElement in transBlocksData[newBlock].meBlist:
+#                            if meElement in tempCluster:
+#                                tempCluster.remove(meElement)
+#                            skipList.append(meElement)
+##        print(outBlocks)
+#        bestScore, bestComb = updateBestComb(bestScore, bestComb, outBlocks, transBlocksData)
+#    return(bestScore, bestComb)
+#    
 
-    
-def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):    
+
+
+def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):
+    np.random.seed(1)
     bestScore = 0
     bestComb = []
     for i in range(iterCount):
-        tempCluster = cluster.copy()
-        length = len(tempCluster)
-        outBlocks =  seedBlocks.copy()
-        [tempCluster.remove(i) for i in outBlocks]
-        skipList = []
+        tempCluster = np.zeros(len(transBlocksData), dtype="uint8")
+        outBlocks = np.zeros(len(transBlocksData), dtype="uint8")
+        skipList = np.zeros(len(transBlocksData), dtype="uint8")
+        tempCluster[cluster] = 1
+        outBlocks[seedBlocks] = 1
+        length = tempCluster.sum()
+        tempCluster[seedBlocks] = 0
         transBlocksScore = {}
-        for i in tempCluster:
+        for i in np.nonzero(tempCluster)[0]:
             transBlocksScore[i] = (transBlocksData[i].aEnd - transBlocksData[i].aStart) + (transBlocksData[i].bEnd - transBlocksData[i].bStart)
-        while len(tempCluster) > 0:
-            while len(tempCluster) != length:
-                length = len(tempCluster)
-                for i in tempCluster:
+        while tempCluster.sum() > 0:
+#            print("while",tempCluster.sum())
+            while tempCluster.sum() != length:
+                length = tempCluster.sum()
+                for i in np.nonzero(tempCluster)[0]:
                     if hasattr(transBlocksData[i],"meTo"):
-                        if any(j in outBlocks for j in transBlocksData[i].meTo):
-                            tempCluster.remove(i)
-                            skipList.append(i)
+                        if outBlocks[transBlocksData[i].meTo].sum() > 0:
+#                            print("has",i)
+                            tempCluster[i] = 0
+                            skipList[i]=1
                     elif hasattr(transBlocksData[i], "meAlist"):
-                        if any(j in outBlocks for j in transBlocksData[i].meAlist) and any(j in outBlocks for j in transBlocksData[i].meBlist):
-                            tempCluster.remove(i)
-                            skipList.append(i)
+                        if len(np.where(outBlocks[transBlocksData[i].meAlist] == 1)[0]) > 0 and len(np.where(outBlocks[transBlocksData[i].meBlist] == 1)[0]) > 0:
+#                            print("has2",i)
+                            tempCluster[i] = 0
+                            skipList[i] = 1
+                for i in np.nonzero(tempCluster)[0]:
+                    if hasattr(transBlocksData[i],"meTo"):
+                        if skipList[transBlocksData[i].meTo].sum() == len(transBlocksData[i].meTo):
                             
-                
-                for i in tempCluster:
-                    if hasattr(transBlocksData[i],"meTo"):
-                        if all(j in skipList for j in transBlocksData[i].meTo):
-                            tempCluster.remove(i)
-                            outBlocks.append(i)
+#                            print("has3",i)
+                            tempCluster[i] = 0
+                            outBlocks[i]=1
                     elif hasattr(transBlocksData[i], "meAlist"):
-                        if all(j in skipList for j in transBlocksData[i].meAlist) and all(j in outBlocks for j in transBlocksData[i].meBlist):
-                            tempCluster.remove(i)
-                            outBlocks.append(i)
- 
-            if len(tempCluster) > 0:
-                topBlocks = sorted(tempCluster, key = lambda x: transBlocksScore[x], reverse = True)[:20]
+                        if skipList[transBlocksData[i].meAlist].sum() == len(transBlocksData[i].meAlist) and skipList[transBlocksData[i].meBlist].sum() == len(transBlocksData[i].meBlist):
+#                            print("has4",i)
+                            tempCluster[i] = 0
+                            outBlocks[i] = 1
+            
+#            print("if",tempCluster.sum())
+            if tempCluster.sum() > 0:
+                topBlocks = sorted(np.nonzero(tempCluster)[0], key = lambda x: transBlocksScore[x], reverse = True)[:20]
                 totalScore = sum(transBlocksScore[i] for i in topBlocks)
                 prob = [transBlocksScore[i]/totalScore for i in topBlocks]
                 newBlock = int(np.random.choice(topBlocks, size = 1, p = prob))
-                outBlocks.append(newBlock)
-                tempCluster.remove(newBlock)
+                outBlocks[newBlock] = 1
+                tempCluster[newBlock] = 0
                 if hasattr(transBlocksData[newBlock],"meTo"):
-                    for i in transBlocksData[newBlock].meTo:
-                        if i in tempCluster:
-                            tempCluster.remove(i)
-                        skipList.append(i)
+                    tempCluster[transBlocksData[newBlock].meTo] = 0
+                    skipList[transBlocksData[newBlock].meTo] = 1
                 elif hasattr(transBlocksData[newBlock],"meAlist"):
-                    if any(j in outBlocks for j in transBlocksData[newBlock].meAlist):
-                        for k in transBlocksData[newBlock].meBlist:
-                            if k in tempCluster:
-                                tempCluster.remove(k)
-                        skipList.extend(transBlocksData[newBlock].meBlist)
-                    elif any(j in outBlocks for j in transBlocksData[newBlock].meBlist):
-                        for k in transBlocksData[newBlock].meAlist:
-                            if k in tempCluster:
-                                tempCluster.remove(k)
-                        skipList.extend(transBlocksData[newBlock].meAlist)
+                    if outBlocks[transBlocksData[newBlock].meAlist].sum() > 0:
+                        tempCluster[transBlocksData[newBlock].meBlist] = 0
+                        skipList[transBlocksData[newBlock].meBlist] = 1
+                    elif outBlocks[transBlocksData[newBlock].meAlist].sum() > 0:
+                        tempCluster[transBlocksData[newBlock].meAlist] = 0
+                        skipList[transBlocksData[newBlock].meBlist] = 1
                     for meElement in transBlocksData[newBlock].meAlist:
                         if meElement in transBlocksData[newBlock].meBlist:
-                            if meElement in tempCluster:
-                                tempCluster.remove(meElement)
-                            skipList.append(meElement)
-#        print(outBlocks)
-        bestScore, bestComb = updateBestComb(bestScore, bestComb, outBlocks, transBlocksData)
-    return(bestScore, bestComb)
+                            tempCluster[meElement] = 0
+                            skipList[meElement] = 1
+        bestScore, bestComb = updateBestComb(bestScore, bestComb, np.nonzero(outBlocks)[0], transBlocksData)
+    return(bestScore, bestComb)    
     
+
+
+
+
+
 
 def updateBestComb(bestScore, bestComb, outBlocks, transBlocksData):
     score = getScore(outBlocks, transBlocksData)  
@@ -1608,7 +1670,7 @@ def getTransClasses(clusterSolutionBlocks, transData):
                         isTrans = 1
                         for k in transData[j].genomeAMembers:
                             if k in i:
-                                if getScore([k], transData) > getScore([j],transData):
+                                if getScore([k], transData) >= getScore([j],transData):
                                     isTrans = 0
                                     break
                         if isTrans:
@@ -1619,7 +1681,7 @@ def getTransClasses(clusterSolutionBlocks, transData):
                         isTrans = 1
                         for k in transData[j].genomeBMembers:
                             if k in i:
-                                if getScore([k], transData) > getScore([j],transData):
+                                if getScore([k], transData) >= getScore([j],transData):
                                     isTrans = 0
                                     break
                         if isTrans:

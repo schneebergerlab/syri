@@ -21,8 +21,7 @@ import  multiprocessing
 from datetime import datetime
 import os
 
-
-
+np.random.seed(1)
 
 def SynSearch(chromo, threshold, coords, cwdPath):
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
@@ -78,11 +77,7 @@ def SynSearch(chromo, threshold, coords, cwdPath):
         invCoord.append(sum((invBlockData.aLen+invBlockData.bLen)*invBlockData.iden)/(invCoord[-2] + invCoord[-1]))
         invCoord.extend([1,-1,chromo,chromo])
         for j in range(profitable[i-1].neighbours[0]+1,profitable[i-1].neighbours[1]):
-            print(i,j)
-            print(len(inPlaceBlocks))
-            print(Counter(inPlaceBlocks.index != synData.iloc[j].name))
             inPlaceBlocks = inPlaceBlocks[inPlaceBlocks.index != synData.iloc[j].name]
-            print(len(inPlaceBlocks))
             try:
                 inPlaceIndices.remove(synData.iloc[j].name)
             except:
@@ -93,6 +88,7 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     inPlaceBlocks.index = range(inPlaceBlocks.shape[0])
     outPlaceBlocks = chromBlocks[~chromBlocks.index.isin(inPlaceIndices)]
     
+    print("Translocations : found blocks", chromo, str(datetime.now()))
     ## Should not filter redundant alignments as they "can" be part of bigger translocations
     ## filtering them may lead to removal of those translocations
     
@@ -118,7 +114,7 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
     outInvertedBlocks = pd.DataFrame(makeBlocksTree(invertedCoords.aStart.values, invertedCoords.aEnd.values, invertedCoords.bStart.values, invertedCoords.bEnd.values, invertedCoords.bDir.values, invertedCoords.aChr.values, invertedCoords.bChr.values, invertedCoords.index.values, threshold, invTransBlocksNeighbours[0].values, invTransBlocksNeighbours[1].values))
 #    outInvertedBlocks = makeBlocksTree(inPlaceBlocks, invertedCoords, threshold, invTransBlocksNeighbours)
-    
+    print("Translocations : found orderedBlocks", chromo, str(datetime.now()))
     #### find all translocations which don't have large gaps between its alignments
     #### and are not overlappign with the syntenic blocks
     
@@ -127,7 +123,8 @@ def SynSearch(chromo, threshold, coords, cwdPath):
 
     ## Find inverted translocation
     invTransBlocks = findOrderedTranslocations(outInvertedBlocks, invertedCoords, inPlaceBlocks, threshold, ctx = False)
-
+    
+    print("Translocations : merging blocks ", chromo, str(datetime.now()))
     allTransBlocks, allTransIndexOrder = mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks)
     allTransGenomeAGroups = makeTransGroupList(allTransBlocks, "aStart", "aEnd", threshold)
     allTransGenomeBGroups = makeTransGroupList(allTransBlocks, "bStart", "bEnd", threshold)
@@ -140,12 +137,14 @@ def SynSearch(chromo, threshold, coords, cwdPath):
         for block in allTransGenomeBGroups[i].member:
             allTransGroupIndices[block].append(i)
     
+    print("Translocations : getting clusters ", chromo, str(datetime.now()))
     allTransCluster = getTransCluster(allTransGroupIndices, allTransGenomeAGroups, allTransGenomeBGroups)
     
     allTransClusterIndices = dict()
     for i in range(len(allTransCluster)):
         allTransClusterIndices.update(dict.fromkeys(allTransCluster[i], i))
     
+    print("Translocations : making blocks data", chromo, str(datetime.now()))
     allTransBlocksData = []
     for i in range(allTransBlocks.shape[0]):
         tempTransBlock = transBlock(allTransBlocks.iat[i,0],\
@@ -188,13 +187,15 @@ def SynSearch(chromo, threshold, coords, cwdPath):
                     ME_B.append(j)
             tempTransBlock.setMEList(ME_A, ME_B)
 
-    
+    print("Translocations : finding solutions ", chromo, str(datetime.now()))
     clusterSolutions = []
     for i in range(len(allTransCluster)):
         tempCluster = allTransCluster[i].copy()
         clusterSolutions.append(getBestClusterSubset(tempCluster, allTransBlocksData))
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
     clusterBlocks = unlist(clusterSolutionBlocks)
+    
+    print("Translocations : processing translocations ", chromo, str(datetime.now()))
     
     transClasses = getTransClasses(clusterSolutionBlocks, allTransBlocksData)
     
@@ -355,9 +356,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
     print("Making Tree", str(datetime.now()))
 
     outOrderedBlocks = pd.DataFrame(makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold))
-    
-#    outOrderedBlocks1 = makeBlocksTree(annoCoords, orderedBlocks.iloc[0:500], threshold, ctx = True)
-    
+        
     ## Create connectivity tree for inverted blocks
     outInvertedBlocks = pd.DataFrame(makeBlocksTree_ctx(invertedBlocks.aStart.values, invertedBlocks.aEnd.values, invertedBlocks.bStart.values, invertedBlocks.bEnd.values, invertedBlocks.bDir.values, invertedBlocks.aChr.values, invertedBlocks.bChr.values, invertedBlocks.index.values, threshold))
 
@@ -488,11 +487,11 @@ if __name__ == "__main__":
     threshold = 50
 #    procs = []
     print(uniChromo)
-    with Pool(processes = nCores) as pool:
-        pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
-    mergeOutputFiles(uniChromo,cwdPath)
+#    with Pool(processes = nCores) as pool:
+#        pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
+#    mergeOutputFiles(uniChromo,cwdPath)
     ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold)
-    outSyn(cwdPath, threshold)
+#    outSyn(cwdPath, threshold)
 
     print("End of program")
     
