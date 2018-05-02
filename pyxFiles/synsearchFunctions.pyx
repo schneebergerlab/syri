@@ -81,64 +81,7 @@ cpdef list getShortest(invBlocks):
             shortest.append(getAllLongestPaths(invG,i,j,source,target,weight))
     return shortest
 
-#
-#
-#%%cython
-#cimport numpy as np
-#import numpy as np   
-#
-#
-#cpdef list getRevenue(invBlocks, shortest, invertedCoordsOri):
-#    cdef:
-#        list revenue, i, j, values, startA, endA, startB, endB, iden
-#        int k, l
-#    revenue = []
-#    for i in shortest:
-#        values = []
-#        for j in i:
-#            if len(j) == 1:
-#                values.append(invBlocks[j[0]].score)
-#            else:              
-#                score = 0
-#                startA = [invertedCoordsOri.iat[j[0],0]]
-#                endA = [invertedCoordsOri.iat[j[0],1]]
-#                startB = [invertedCoordsOri.iat[j[0],3]]
-#                endB = [invertedCoordsOri.iat[j[0],2]]
-#                iden = [invertedCoordsOri.iat[j[0],6]]
-#                for k in j[1:]:
-#                    isMore = True if invertedCoordsOri.iat[k,6] > iden[-1] else False
-#                    if invertedCoordsOri.iat[k,0] < endA[-1]:
-#                        if isMore:
-#                            endA[-1] = invertedCoordsOri.iat[k,0]
-#                            startA.append(invertedCoordsOri.iat[k,0])
-#                            endA.append(invertedCoordsOri.iat[k,1])
-#                        else:
-#                            startA.append(endA[-1])
-#                            endA.append(invertedCoordsOri.iat[k,1])
-#                    else:
-#                        startA.append(invertedCoordsOri.iat[k,0])
-#                        endA.append(invertedCoordsOri.iat[k,1])
-#                    
-#                    if invertedCoordsOri.iat[k,2] > startB[-1]:
-#                        if isMore:
-#                            startB[-1] = invertedCoordsOri.iat[k,2]
-#                            startB.append(invertedCoordsOri.iat[k,3])
-#                            endB.append(invertedCoordsOri.iat[k,2])
-#                        else:
-#                            endB.append(startB[-1])
-#                            startB.append(invertedCoordsOri.iat[k,3])
-#                    else:
-#                        startB.append(invertedCoordsOri.iat[k,3])
-#                        endB.append(invertedCoordsOri.iat[k,2])
-#                    iden.append(invertedCoordsOri.iat[k,6])
-#                if len(startA) == len(endA) == len(startB) == len(endB) == len(iden):
-#                    for l in range(len(iden)):
-#                        score += iden[l]*((endA[l] - startA[l]) + (endB[l] - startB[l]))
-#                values.append(score)
-#        revenue = revenue + [values]
-#    return(revenue)
-#    
-################################################################################################
+
 
 cpdef list getRevenue(invBlocks, shortest, np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray iDen):
     cdef:
@@ -190,39 +133,6 @@ cpdef list getRevenue(invBlocks, shortest, np.ndarray aStart, np.ndarray aEnd, n
         revenue = revenue + [values]
     return(revenue)
     
-################################################################################################
-
-    
-#    
-#%%cython
-#cimport numpy as np
-#import numpy as np  
-#cpdef dict getNeighbourSyn(invertedCoordsOri, synData, int threshold):
-#    cdef:
-#        dict neighbourSyn = dict()
-#        int i, j, index, upBlock, downBlock
-#        list upSyn, downSyn
-#    for i in range(invertedCoordsOri.shape[0]):
-#        index = invertedCoordsOri.index.values[i]
-#        upSyn = np.where(synData.index.values < index)[0].tolist()
-#        downSyn = np.where(synData.index.values > index)[0].tolist()
-#        
-#        upBlock  = -1
-#        downBlock = len(synData)    
-#        for j in upSyn[::-1]:
-#            if SynAndOverlap(invertedCoordsOri.loc[index], synData.iloc[j], threshold):
-#                upBlock = j
-#                break
-#        
-#        for j in downSyn:
-#            if SynAndOverlap(synData.iloc[j], invertedCoordsOri.loc[index], threshold):
-#                downBlock = j
-#                break
-#        neighbourSyn[i] = [upBlock, downBlock]
-#    return(neighbourSyn)
-#    
-#######################################################################################
-    
 
 cpdef dict getNeighbourSyn(np.ndarray aStartInv, np.ndarray aEndInv, np.ndarray bStartInv, np.ndarray bEndInv, np.ndarray indexInv, np.ndarray bDirInv, np.ndarray aStartSyn, np.ndarray aEndSyn, np.ndarray bStartSyn, np.ndarray bEndSyn, np.ndarray indexSyn, np.ndarray bDirSyn, int threshold):
    
@@ -262,12 +172,6 @@ cpdef dict getNeighbourSyn(np.ndarray aStartInv, np.ndarray aEndInv, np.ndarray 
         neighbourSyn[i] = [upBlock, downBlock]
     return(neighbourSyn)
     
-    
-    
-    
-    
-    
-
 
 cpdef list getCost(list synPath, list shortest, dict neighbourSyn, list synBlockScore, synData, invertedCoordsOri):
     cdef:
@@ -1307,10 +1211,13 @@ def getBestClusterSubset(cluster, transBlocksData):
         if output == "Failed":
             output = greedySubsetSelector(cluster, transBlocksData, seedBlocks)
     else:
-        output = greedySubsetSelector(cluster, transBlocksData, seedBlocks)            
+        output = greedySubsetSelector(cluster, transBlocksData, seedBlocks)
     return output
 
 def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
+    if len(cluster) > 10:
+        print("starting cluster of length ", len(cluster), str(datetime.now()))
+
     posComb = [seedBlocks]
     skipList = [seedBlocks]
     for i in cluster:
@@ -1375,7 +1282,10 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
             skipList.extend(newSkipList)
         timeTaken = time.time() - startTime
         remainingIterations = len(cluster) - cluster.index(i)
-        if (timeTaken > 10 and timeTaken*(1.5**remainingIterations) > 600):
+#        if len(cluster)>10:
+#            print("cluster size", len(cluster), "remaining iterations",remainingIterations, "time taken", timeTaken, str(datetime.now()))
+
+        if (timeTaken > 5 and timeTaken*(1.5**remainingIterations) > 600):
             print("Cluster is too big for Brute Force\nTime taken for last iteration ",
                   timeTaken, " iterations remaining ",remainingIterations)
             return "Failed"

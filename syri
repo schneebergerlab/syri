@@ -20,7 +20,7 @@ from functools import partial
 import  multiprocessing
 from datetime import datetime
 import os
-
+import argparse 
 np.random.seed(1)
 
 def SynSearch(chromo, threshold, coords, cwdPath):
@@ -277,6 +277,13 @@ def SynSearch(chromo, threshold, coords, cwdPath):
     fout.close()
 
 ########################################################################################################################
+    
+def getBlocks(orderedBlocks, annoCoords, threshold):
+    outOrderedBlocks = pd.DataFrame(makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold))
+    transBlocks = findOrderedTranslocations(outOrderedBlocks, orderedBlocks, annoCoords, threshold, ctx = True)
+    return(transBlocks)
+    
+    
 def getCTX(coords, cwdPath, uniChromo, threshold):
     print("Identifying cross-chromosomal translocation and duplication for chromosome", str(datetime.now()))
 
@@ -354,20 +361,26 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
     ## Create connectivity tree for directed blocks
     
     print("Making Tree", str(datetime.now()))
-
-    outOrderedBlocks = pd.DataFrame(makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold))
+                
+    with Pool(processes = 2) as pool:
+        blks = pool.map(partial(getBlocks, annoCoords=annoCoords, threshold=threshold), [orderedBlocks,invertedBlocks])
+    transBlocks = blks[0]
+    invTransBlocks = blks[1]
+    del(blks)
+        
+#    outOrderedBlocks = pd.DataFrame(makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold))
         
     ## Create connectivity tree for inverted blocks
-    outInvertedBlocks = pd.DataFrame(makeBlocksTree_ctx(invertedBlocks.aStart.values, invertedBlocks.aEnd.values, invertedBlocks.bStart.values, invertedBlocks.bEnd.values, invertedBlocks.bDir.values, invertedBlocks.aChr.values, invertedBlocks.bChr.values, invertedBlocks.index.values, threshold))
+#    outInvertedBlocks = pd.DataFrame(makeBlocksTree_ctx(invertedBlocks.aStart.values, invertedBlocks.aEnd.values, invertedBlocks.bStart.values, invertedBlocks.bEnd.values, invertedBlocks.bDir.values, invertedBlocks.aChr.values, invertedBlocks.bChr.values, invertedBlocks.index.values, threshold))
 
 #    outInvertedBlocks1 = makeBlocksTree(annoCoords, invertedBlocks, threshold, ctx = True)
     print("finding Blocks", str(datetime.now()))
 
     ## find all translocations which don't have large gaps between its alignments
     ## and are not overlappign with the syntenic blocks    
-    transBlocks = findOrderedTranslocations(outOrderedBlocks, orderedBlocks, annoCoords, threshold, ctx = True)
+#    transBlocks = findOrderedTranslocations(outOrderedBlocks, orderedBlocks, annoCoords, threshold, ctx = True)
 
-    invTransBlocks = findOrderedTranslocations(outInvertedBlocks, invertedBlocks, annoCoords, threshold, ctx = True)
+#    invTransBlocks = findOrderedTranslocations(outInvertedBlocks, invertedBlocks, annoCoords, threshold, ctx = True)
 
     print("Preparing for cluster analysis", str(datetime.now()))
 
@@ -450,6 +463,8 @@ def getCTX(coords, cwdPath, uniChromo, threshold):
 
     clusterSolutions = []
     for i in range(len(ctxCluster)):
+#    for i in range(5):
+#        print(i)
         tempCluster = ctxCluster[i].copy()
         if len(tempCluster) == 0:
             continue
@@ -481,17 +496,18 @@ if __name__ == "__main__":
     bChromo = set(coords["bChr"])
     uniChromo = list(aChromo if len(aChromo) < len(bChromo) else bChromo)
     uniChromo.sort()
+    bruteRunTime = 60                               ## max number of seconds to solve a cluster using brute force
     # Set this as an argument
     ## This is the number of non-overlapping BPs required to consider two overlapping
     ## alignments as different
     threshold = 50
 #    procs = []
     print(uniChromo)
-#    with Pool(processes = nCores) as pool:
-#        pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
-#    mergeOutputFiles(uniChromo,cwdPath)
+    with Pool(processes = nCores) as pool:
+        pool.map(partial(SynSearch,threshold=threshold,coords=coords, cwdPath= cwdPath), uniChromo) 
+    mergeOutputFiles(uniChromo,cwdPath)
     ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold)
-#    outSyn(cwdPath, threshold)
+    outSyn(cwdPath, threshold)
 
     print("End of program")
     
