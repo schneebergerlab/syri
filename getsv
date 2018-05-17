@@ -24,7 +24,6 @@ if __name__ == "__main__":
     for file in fileLists:
         if file not in listDir:
             sys.exit(file + "is not present in the directory. Exiting")
-#        fileLocation = "/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_ler_Chr/out_m_i90_l100.coords"
     
     allAlignments = readSVData(cwdPath)
     mumSNPIn = allAlignments[["aStart","aEnd","bStart","bEnd","aChr","bChr"]].copy()

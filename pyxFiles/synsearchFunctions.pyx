@@ -20,8 +20,488 @@ from collections import Counter, deque
 from scipy.stats import *
 from datetime import datetime
 cimport numpy as np
-
+import pandas as pd
+from matplotlib import pyplot as plt
+from multiprocessing import Pool
+from functools import partial
+#import  multiprocessing
+import os
+from gc import collect
 np.random.seed(1)
+
+
+def startSyri(args):
+    coords = pd.read_table(args.inFile.name, header = None)
+    nCores = args.nCores
+    bRT = args.bruteRunTime
+    threshold = args.threshold
+    cwdPath = args.outDir
+    prefix = args.prefix
+    coords.columns  =   ["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr"]
+    aChromo = set(coords["aChr"])
+    bChromo = set(coords["bChr"])
+    uniChromo = list(aChromo if len(aChromo) < len(bChromo) else bChromo)
+    uniChromo.sort()
+    # Set this as an argument
+    ## This is the number of non-overlapping BPs required to consider two overlapping
+    ## alignments as different
+    print(uniChromo)
+    with Pool(processes = nCores) as pool:
+        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix), uniChromo) 
+    mergeOutputFiles(uniChromo,cwdPath, prefix)
+    ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix)
+    outSyn(cwdPath, threshold, prefix)
+    
+
+
+def syri(chromo, threshold, coords, cwdPath, bRT, prefix):
+    coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
+    print(chromo, coordsData.shape)
+    print("Identifying Synteny for chromosome", chromo, str(datetime.now()))
+    df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)    
+    
+#    df = coordsData.apply( lambda X : coordsData.loc[X.name:].apply(TS, axis = 1, args = (X, threshold)), axis = 1)
+    nrow = df.shape[0]
+    blocks = [alingmentBlock(i, np.where(df.iloc[i,] == True)[0], coordsData.iloc[i]) for i in range(nrow)]
+    for block in blocks:
+        i = 0
+        while(i < len(block.children)):
+            block.children = list(set(block.children) - set(blocks[block.children[i]].children))
+            i+=1
+        block.children.sort()
+        
+        for child in block.children:
+            blocks[child].addParent(block.id)
+        
+        scores = [blocks[parent].score for parent in block.parents]
+        if len(scores) > 0:
+            block.bestParent(block.parents[scores.index(max(scores))], max(scores)) 
+    synPath = getSynPath(blocks)
+    synData = coordsData.iloc[synPath].copy()
+    del(coordsData, blocks)
+    collect()
+    
+    
+    
+    ##########################################################################
+    #    print("Finding Inversions")
+    ##########################################################################
+    print("Identifying Inversions for chromosome", chromo, str(datetime.now()))
+
+    invertedCoordsOri, profitable, bestInvPath, invData, synInInv, badSyn = getInversions(coords,chromo, threshold, synData, synPath)
+    
+
+    ##########################################################
+    #### Identify Translocation and duplications
+    ##########################################################
+    print("Identifying translocation and duplication for chromosome", chromo, str(datetime.now()))
+
+    chromBlocks = coords[(coords.aChr == chromo) & (coords.bChr == chromo)]
+    inPlaceIndices = sorted(list(synData.index.values) + list(invData.index.values))
+    inPlaceBlocks = chromBlocks[chromBlocks.index.isin(sorted(list(synData.index.values)))].copy()
+    
+    
+    for i in bestInvPath:
+        invPos = profitable[i-1].invPos
+        invBlockData = invertedCoordsOri.iloc[invPos]
+        invCoord = [invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2]]
+        invCoord.append(invCoord[1] - invCoord[0])
+        invCoord.append(invCoord[3] - invCoord[2])
+        invCoord.append(sum((invBlockData.aLen+invBlockData.bLen)*invBlockData.iden)/(invCoord[-2] + invCoord[-1]))
+        invCoord.extend([1,-1,chromo,chromo])
+        for j in range(profitable[i-1].neighbours[0]+1,profitable[i-1].neighbours[1]):
+            inPlaceBlocks = inPlaceBlocks[inPlaceBlocks.index != synData.iloc[j].name]
+            try:
+                inPlaceIndices.remove(synData.iloc[j].name)
+            except:
+                pass
+        inPlaceBlocks = inPlaceBlocks.append(pd.Series(invCoord, index = inPlaceBlocks.columns, name = invPos[0]))
+        
+    inPlaceBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
+    inPlaceBlocks.index = range(inPlaceBlocks.shape[0])
+    outPlaceBlocks = chromBlocks[~chromBlocks.index.isin(inPlaceIndices)]
+    
+    print("Translocations : found blocks", chromo, str(datetime.now()))
+    ## Should not filter redundant alignments as they "can" be part of bigger translocations
+    ## filtering them may lead to removal of those translocations
+    
+    outPlaceBlocksFiltered = outPlaceBlocks.copy() 
+    
+    
+    ## Create connectivity tree for directed and inverted blocks
+    
+    #### find all translocations which don't have large gaps between its alignments
+    #### and are not overlappign with the syntenic blocks
+    
+    orderedBlocks = outPlaceBlocksFiltered[outPlaceBlocksFiltered.bDir == 1]
+    invertedBlocks = outPlaceBlocksFiltered[outPlaceBlocksFiltered.bDir == -1]
+
+    if len(orderedBlocks) > 0:
+        transBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, orderedBlocks, threshold)
+        outOrderedBlocks = pd.DataFrame(makeBlocksTree(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold, transBlocksNeighbours[0].values, transBlocksNeighbours[1].values))
+        transBlocks = findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, ctx = False)
+    else:
+        transBlocks = []
+    
+    if len(invertedBlocks) > 0:
+        invertedCoords = invertedBlocks.copy()
+        invertedCoords.bStart = invertedCoords.bStart + invertedCoords.bEnd
+        invertedCoords.bEnd = invertedCoords.bStart - invertedCoords.bEnd
+        invertedCoords.bStart = invertedCoords.bStart - invertedCoords.bEnd
+        invTransBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, invertedBlocks, threshold)
+        invertedCoords = invertedBlocks.copy()
+        maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
+        invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart 
+        invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
+        outInvertedBlocks = pd.DataFrame(makeBlocksTree(invertedCoords.aStart.values, invertedCoords.aEnd.values, invertedCoords.bStart.values, invertedCoords.bEnd.values, invertedCoords.bDir.values, invertedCoords.aChr.values, invertedCoords.bChr.values, invertedCoords.index.values, threshold, invTransBlocksNeighbours[0].values, invTransBlocksNeighbours[1].values))
+        invTransBlocks = findOrderedTranslocations(outInvertedBlocks, invertedCoords, inPlaceBlocks, threshold, ctx = False)
+    else:
+        invTransBlocks = []
+
+    print("Translocations : found orderedBlocks", chromo, str(datetime.now()))
+   
+    print("Translocations : merging blocks ", chromo, str(datetime.now()))
+    allTransBlocks, allTransIndexOrder = mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks)
+    allTransGenomeAGroups = makeTransGroupList(allTransBlocks, "aStart", "aEnd", threshold)
+    allTransGenomeBGroups = makeTransGroupList(allTransBlocks, "bStart", "bEnd", threshold)
+    
+    allTransGroupIndices = {}
+    for i in range(len(allTransGenomeAGroups)):
+        for block in allTransGenomeAGroups[i].member:
+            allTransGroupIndices[block] = [i]
+    for i in range(len(allTransGenomeBGroups)):
+        for block in allTransGenomeBGroups[i].member:
+            allTransGroupIndices[block].append(i)
+    
+    print("Translocations : getting clusters ", chromo, str(datetime.now()))
+    allTransCluster = getTransCluster(allTransGroupIndices, allTransGenomeAGroups, allTransGenomeBGroups)
+    
+    allTransClusterIndices = dict()
+    for i in range(len(allTransCluster)):
+        allTransClusterIndices.update(dict.fromkeys(allTransCluster[i], i))
+    
+    print("Translocations : making blocks data", chromo, str(datetime.now()))
+    allTransBlocksData = []
+    for i in range(allTransBlocks.shape[0]):
+        tempTransBlock = transBlock(allTransBlocks.iat[i,0],\
+                                    allTransBlocks.iat[i,1],\
+                                    allTransBlocks.iat[i,2],\
+                                    allTransBlocks.iat[i,3],\
+                                    allTransBlocks.iat[i,4],\
+                                    allTransClusterIndices[i],\
+                                    i)
+        tempTransBlock.addTransGroupIndices(allTransGroupIndices[i])
+        tempTransBlock.checkOverlapWithSynBlocks(inPlaceBlocks, threshold)
+        tempTransBlock.addGenomeGroupMembers(allTransGenomeAGroups, allTransGenomeBGroups)
+        if (tempTransBlock.aUni and tempTransBlock.genomeAUni)	or (tempTransBlock.bUni and tempTransBlock.genomeBUni):
+            tempTransBlock.setStatus(1)
+        allTransBlocksData.append(tempTransBlock)
+
+    
+    for i in range(allTransBlocks.shape[0]):
+        tempTransBlock = allTransBlocksData[i]
+        if not tempTransBlock.aUni and not tempTransBlock.bUni:
+            allTransCluster[allTransClusterIndices[i]].remove(i)
+        elif tempTransBlock.status == 1:
+            continue
+        elif not tempTransBlock.aUni:
+            for j in tempTransBlock.genomeBMembers:
+                if allTransBlocksData[j].bStart - threshold < tempTransBlock.bStart and allTransBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
+                    tempTransBlock.addMEBlock(j)
+        elif not tempTransBlock.bUni:
+            for j in tempTransBlock.genomeAMembers:
+                if allTransBlocksData[j].aStart - threshold < tempTransBlock.aStart and allTransBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
+                    tempTransBlock.addMEBlock(j)
+        else:
+            ME_A = []
+            for j in tempTransBlock.genomeAMembers:
+                if allTransBlocksData[j].aStart - threshold < tempTransBlock.aStart and allTransBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
+                    ME_A.append(j)
+            ME_B = []
+            for j in tempTransBlock.genomeBMembers:
+                if allTransBlocksData[j].bStart - threshold < tempTransBlock.bStart and allTransBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
+                    ME_B.append(j)
+            tempTransBlock.setMEList(ME_A, ME_B)
+
+    print("Translocations : finding solutions ", chromo, str(datetime.now()))
+    clusterSolutions = []
+    for i in range(len(allTransCluster)):
+#        tempCluster = allTransCluster[i].copy()
+        if len(allTransCluster[i]) > 0:
+            clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT))
+    
+    clusterSolutionBlocks = [i[1] for i in clusterSolutions]
+    clusterBlocks = unlist(clusterSolutionBlocks)
+    
+    print("Translocations : processing translocations ", chromo, str(datetime.now()))
+    
+    transClasses = getTransClasses(clusterSolutionBlocks, allTransBlocksData)
+    
+    dupData = allTransBlocks.iloc[transClasses["duplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
+    invDupData = allTransBlocks.iloc[transClasses["invDuplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
+    TLData = allTransBlocks.iloc[transClasses["translocation"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
+    invTLData = allTransBlocks.iloc[transClasses["invTranslocation"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])  
+    
+    dupData = getDupGenome(dupData, allTransBlocksData, transClasses)
+    invDupData = getDupGenome(invDupData, allTransBlocksData, transClasses)
+    
+    
+    fout = open(cwdPath+prefix+chromo+"_invOut.txt","w")
+    tempInvBlocks = []
+    for i in bestInvPath:
+        invPos = profitable[i-1].invPos
+        tempInvBlocks.append([invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2]])
+        fout.write("\t".join(map(str,["#",invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],"-",invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2],"\n"])))
+        for j in invPos:
+            fout.write("\t".join(map(str,invertedCoordsOri.iloc[j][:4])))
+            fout.write("\n")
+    fout.close()
+    
+    
+    ## Grouping Syn blocks : This grouping is effectively wrong as it does not include
+    ## ctx information. But, is still used to keep old functions working. Final synblock
+    ## identification is done after ctx identification.
+    allBlocks, outClusters = groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn)
+    
+########################################################################################################################
+    fout = open(cwdPath+prefix+chromo+"_synOut.txt","w")
+    for i in outClusters:
+        fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"],"\n"])))
+        for j in i:
+            fout.write("\t".join(map(str,allBlocks.loc[j][:-1])))
+            if j in synInInv:
+                fout.write("\tSyn_in_Inv\n")
+            else:
+                fout.write("\n")
+    fout.close()
+########################################################################################################################
+    
+    fout = open(cwdPath+prefix+chromo+"_dupOut.txt","w")
+    for i in dupData.index.values:
+        fout.write("\t".join(map(str,["#",dupData.at[i,"aStart"],dupData.at[i,"aEnd"],"-",dupData.at[i,"bStart"],dupData.at[i,"bEnd"],"-", dupData.at[i,"dupGenomes"],"\n"])))
+        for j in transBlocks[allTransIndexOrder[i]]:
+            fout.write("\t".join(map(str,orderedBlocks.iloc[j][:4])))
+            fout.write("\n")
+    fout.close()
+
+########################################################################################################################    
+    
+    fout = open(cwdPath+prefix+chromo+"_invDupOut.txt","w")
+    for i in invDupData.index.values:
+        fout.write("\t".join(map(str,["#",invDupData.at[i,"aStart"],invDupData.at[i,"aEnd"],"-",invDupData.at[i,"bStart"],invDupData.at[i,"bEnd"],"-", invDupData.at[i,"dupGenomes"],"\n"])))
+        for j in invTransBlocks[allTransIndexOrder[i]]:
+            fout.write("\t".join(map(str,invertedBlocks.iloc[j][:4])))
+            fout.write("\n")
+    fout.close()
+
+########################################################################################################################
+    
+    fout = open(cwdPath+prefix+chromo+"_TLOut.txt","w")
+    for i in TLData.index.values:
+        fout.write("\t".join(map(str,["#",TLData.at[i,"aStart"],TLData.at[i,"aEnd"],"-",TLData.at[i,"bStart"],TLData.at[i,"bEnd"],"\n"])))
+        for j in transBlocks[allTransIndexOrder[i]]:
+            fout.write("\t".join(map(str,orderedBlocks.iloc[j][:4])))
+            fout.write("\n")
+    fout.close()
+
+########################################################################################################################
+    
+    fout = open(cwdPath+prefix+chromo+"_invTLOut.txt","w")
+    for i in invTLData.index.values:
+        fout.write("\t".join(map(str,["#",invTLData.at[i,"aStart"],invTLData.at[i,"aEnd"],"-",invTLData.at[i,"bStart"],invTLData.at[i,"bEnd"],"\n"])))
+        for j in invTransBlocks[allTransIndexOrder[i]]:
+            fout.write("\t".join(map(str,invertedBlocks.iloc[j][:4])))
+            fout.write("\n")
+    fout.close()
+
+########################################################################################################################
+    
+def getBlocks(orderedBlocks, annoCoords, threshold):
+    if len(orderedBlocks) == 0:
+        return([])
+    outOrderedBlocks = pd.DataFrame(makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold))
+    transBlocks = findOrderedTranslocations(outOrderedBlocks, orderedBlocks, annoCoords, threshold, ctx = True)
+    return(transBlocks)
+    
+    
+def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix):
+    print("Identifying cross-chromosomal translocation and duplication for chromosome", str(datetime.now()))
+
+    def getDupCTX(indices, allTransBlocksData, transClasses):
+        dupGenomes = {}
+        for index in indices:
+            if index in transClasses["translocation"] or index in transClasses["invTranslocation"]:
+                dupGenomes[index] = ""
+                continue
+            found = False
+            tempTransBlock = allTransBlocksData[index]
+            if not tempTransBlock.aUni:
+                dupGenomes[index] = "B"
+                continue
+            elif not tempTransBlock.bUni:
+                dupGenomes[index] = "A"
+                continue
+            elif tempTransBlock.genomeAUni:
+                dupGenomes[index] = "A"
+                continue
+            elif tempTransBlock.genomeBUni:
+                dupGenomes[index] = "B"
+                continue
+            for i in tempTransBlock.meAlist:
+                if i in transClasses["translocation"] or i in transClasses["invTranslocation"]:
+                    found = True
+                    dupGenomes[index] = "B"
+                    break
+            if not found:
+                dupGenomes[index] = "A"
+        return(dupGenomes)
+    
+    def printCTX(cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks ,transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks):
+        transClasses = getTransClasses(clusterSolutionBlocks, ctxBlocksData)
+        indices = sorted(unlist(list(transClasses.values())))
+        keys = [key for index in indices for key in list(transClasses.keys()) if index in transClasses[key]]
+        blocksClasses = dict(zip(indices,keys))
+        dupGenomes = getDupCTX(indices, ctxBlocksData, transClasses)
+        
+        fout = open(cwdPath+prefix+"ctxOut.txt","w")
+        for index in indices:
+            if ctxBlocksData[index].dir == 1:
+                alignIndices = transBlocks[ctxTransIndexOrder[index]]
+                fout.write("#\t" + "\t".join(map(str,[ctxTransBlocks.iloc[index]["aChr"], ctxTransBlocks.iloc[index]["aStart"], ctxTransBlocks.iloc[index]["aEnd"], "-", ctxTransBlocks.iloc[index]["bChr"], ctxTransBlocks.iloc[index]["bStart"],ctxTransBlocks.iloc[index]["bEnd"]])) + "\t" + blocksClasses[index]+ "\t" +  dupGenomes[index]+"\n")
+                for i in alignIndices:
+                    fout.write("\t".join(map(str,orderedBlocks.iloc[i,0:4]))+"\n")            
+            elif ctxBlocksData[index].dir == -1:
+                alignIndices = invTransBlocks[ctxTransIndexOrder[index]]
+                fout.write("#\t" + "\t".join(map(str,[ctxTransBlocks.iloc[index]["aChr"], ctxTransBlocks.iloc[index]["aStart"], ctxTransBlocks.iloc[index]["aEnd"], "-", ctxTransBlocks.iloc[index]["bChr"], ctxTransBlocks.iloc[index]["bStart"],ctxTransBlocks.iloc[index]["bEnd"]]))+ "\t" + blocksClasses[index] + "\t" +  dupGenomes[index]+ "\n")
+                for i in alignIndices:
+                    fout.write("\t".join(map(str,invertedBlocks.iloc[i,[0,1,3,2]])) + "\n")
+        fout.close()
+        
+        
+    print("Reading Coords", str(datetime.now()))
+
+    annoCoords = readAnnoCoords(cwdPath, uniChromo, prefix)
+    ctxData = coords.loc[coords['aChr'] != coords['bChr']].copy()
+    ctxData.index = range(len(ctxData))
+    invCTXIndex = ctxData.index[ctxData.bDir == -1]
+    ctxData.loc[invCTXIndex,"bStart"] = ctxData.loc[invCTXIndex].bStart + ctxData.loc[invCTXIndex].bEnd
+    ctxData.loc[invCTXIndex, "bEnd"] = ctxData.loc[invCTXIndex].bStart - ctxData.loc[invCTXIndex].bEnd
+    ctxData.loc[invCTXIndex, "bStart"] = ctxData.loc[invCTXIndex].bStart - ctxData.loc[invCTXIndex].bEnd
+    ctxData.sort_values(by= ["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
+    ctxData["aIndex"] = range(ctxData.shape[0])    
+    ctxData.sort_values(by= ["bChr","bStart","bEnd","aChr","aStart","aEnd"], inplace = True)
+    ctxData["bIndex"] = range(ctxData.shape[0])    
+    ctxData.sort_values("aIndex", inplace = True)
+    
+    print("CTX identification: ctxdata size", ctxData.shape, str(datetime.now()))
+
+    orderedBlocks = ctxData[ctxData.bDir == 1]
+    invertedBlocks = ctxData[ctxData.bDir == -1]
+    
+    ## Create connectivity tree for directed blocks
+    
+    print("Making Tree", str(datetime.now()))
+                
+    with Pool(processes = 2) as pool:
+        blks = pool.map(partial(getBlocks, annoCoords=annoCoords, threshold=threshold), [orderedBlocks,invertedBlocks])
+    transBlocks = blks[0]
+    invTransBlocks = blks[1]
+    del(blks)
+    collect()        
+    print("finding Blocks", str(datetime.now()))
+    print("Preparing for cluster analysis", str(datetime.now()))
+
+    ctxTransBlocks, ctxTransIndexOrder = mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks, ctx = True)
+   
+    ctxTransGenomeAGroups = []
+    for chromo in uniChromo:
+        ctxTransGenomeAGroups += makeTransGroupList(ctxTransBlocks.loc[ctxTransBlocks.aChr == chromo, ["aStart","aEnd","bStart","bEnd"]], "aStart","aEnd",threshold)
+        
+    
+    ctxTransGenomeBGroups = []
+    for chromo in uniChromo:
+        ctxTransGenomeBGroups += makeTransGroupList(ctxTransBlocks.loc[ctxTransBlocks.bChr == chromo, ["aStart","aEnd","bStart","bEnd"]], "bStart","bEnd",threshold)
+    
+    
+    ctxGroupIndices = {}
+    for i in range(len(ctxTransGenomeAGroups)):
+        for block in ctxTransGenomeAGroups[i].member:
+            ctxGroupIndices[block] = [i]
+    
+    for i in range(len(ctxTransGenomeBGroups)):
+        for block in ctxTransGenomeBGroups[i].member:
+            ctxGroupIndices[block].append(i)
+    
+    ctxCluster = getTransCluster(ctxGroupIndices, ctxTransGenomeAGroups, ctxTransGenomeBGroups)
+    
+    ctxClusterIndices = dict()
+    for i in range(len(ctxCluster)):
+        ctxClusterIndices.update(dict.fromkeys(ctxCluster[i], i))
+    
+    ctxBlocksData = []
+    for i in ctxTransBlocks.index.values:
+        tempTransBlock = transBlock(ctxTransBlocks.at[i,"aStart"],\
+                                    ctxTransBlocks.at[i,"aEnd"],\
+                                    ctxTransBlocks.at[i,"bStart"],\
+                                    ctxTransBlocks.at[i,"bEnd"],\
+                                    ctxTransBlocks.at[i,"bDir"],\
+                                    ctxClusterIndices[i],\
+                                    i)
+        tempTransBlock.addTransGroupIndices(ctxGroupIndices[i])
+        tempTransBlock.checkOverlapWithSynBlocks_A(annoCoords.loc[annoCoords.aChr == ctxTransBlocks.at[i,"aChr"]], threshold)
+        tempTransBlock.checkOverlapWithSynBlocks_B(annoCoords.loc[annoCoords.bChr == ctxTransBlocks.at[i,"bChr"]], threshold)
+        tempTransBlock.addGenomeGroupMembers(ctxTransGenomeAGroups, ctxTransGenomeBGroups)
+        if (tempTransBlock.aUni and tempTransBlock.genomeAUni) or (tempTransBlock.bUni and tempTransBlock.genomeBUni):
+            tempTransBlock.setStatus(1)
+        ctxBlocksData.append(tempTransBlock)
+
+    
+    for i in range(len(ctxBlocksData)):
+        tempTransBlock = ctxBlocksData[i]
+        index = tempTransBlock.transBlocksID
+        if not tempTransBlock.aUni and not tempTransBlock.bUni:
+            ctxCluster[ctxClusterIndices[index]].remove(index)
+        elif tempTransBlock.status == 1:
+            continue
+        elif not tempTransBlock.aUni:
+            for j in tempTransBlock.genomeBMembers:
+                j_pos = np.where(ctxTransBlocks.index.values == j)[0][0]
+                if ctxBlocksData[j_pos].bStart - threshold < tempTransBlock.bStart and ctxBlocksData[j_pos].bEnd + threshold > tempTransBlock.bEnd:
+                    tempTransBlock.addMEBlock(j)
+        elif not tempTransBlock.bUni:
+            for j in tempTransBlock.genomeAMembers:
+                j_pos = np.where(ctxTransBlocks.index.values == j)[0][0]
+                if ctxBlocksData[j_pos].aStart - threshold < tempTransBlock.aStart and ctxBlocksData[j_pos].aEnd + threshold > tempTransBlock.aEnd:
+                    tempTransBlock.addMEBlock(j)
+        else:
+            ME_A = []
+            for j in tempTransBlock.genomeAMembers:
+                j_pos = np.where(ctxTransBlocks.index.values == j)[0][0]
+                if ctxBlocksData[j_pos].aStart - threshold < tempTransBlock.aStart and ctxBlocksData[j_pos].aEnd + threshold > tempTransBlock.aEnd:
+                    ME_A.append(j)
+            ME_B = []
+            for j in tempTransBlock.genomeBMembers:
+                j_pos = np.where(ctxTransBlocks.index.values == j)[0][0]
+                if ctxBlocksData[j_pos].bStart - threshold < tempTransBlock.bStart and ctxBlocksData[j_pos].bEnd + threshold > tempTransBlock.bEnd:
+                    ME_B.append(j)
+            tempTransBlock.setMEList(ME_A, ME_B)
+
+    print("Finding clusters", str(datetime.now()))
+
+    clusterSolutions = []
+    for i in range(len(ctxCluster)):
+#    for i in range(5):
+#        print(i)
+        tempCluster = ctxCluster[i].copy()
+        if len(tempCluster) == 0:
+            continue
+        else:
+            clusterSolutions.append(getBestClusterSubset(tempCluster, ctxBlocksData, bRT))
+        
+    clusterSolutionBlocks = [i[1] for i in clusterSolutions]
+    
+    printCTX(cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks ,transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks)
+    return 0
 
 cpdef apply_TS(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.int threshold):
     assert(aStart.dtype == np.int and aEnd.dtype == np.int and bStart.dtype == np.int and bEnd.dtype == np.int)
@@ -33,6 +513,7 @@ cpdef apply_TS(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray
     cdef np.ndarray[object, ndim =2 ] df =  np.array([[np.nan]*n]*n, dtype=object)
 #    print(df)
     for i in range(n):
+#        df[i][i] = True
         for j in range(i+1,n):
             df[i][j] =  True if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold else False
     return df
@@ -66,6 +547,7 @@ cpdef getInvBlocks(invTree, invertedCoordsOri):
             invBlocks[child].addParent(block.id)
     return(invBlocks)
 
+
 cpdef list getShortest(invBlocks):
     cdef:
         list shortest = []
@@ -76,11 +558,9 @@ cpdef list getShortest(invBlocks):
     target = np.array(invG.es['target'], dtype = np.int32)
     weight = np.array(invG.es['weight'], dtype = np.float32)
        
-    if len(invG.es) > 0:        
-        for i in j:
-            shortest.append(getAllLongestPaths(invG,i,j,source,target,weight))
+    for i in j:
+        shortest.append(getAllLongestPaths(invG,i,j,source,target,weight))
     return shortest
-
 
 
 cpdef list getRevenue(invBlocks, shortest, np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray iDen):
@@ -172,7 +652,7 @@ cpdef dict getNeighbourSyn(np.ndarray aStartInv, np.ndarray aEndInv, np.ndarray 
         neighbourSyn[i] = [upBlock, downBlock]
     return(neighbourSyn)
     
-
+#%%cython
 cpdef list getCost(list synPath, list shortest, dict neighbourSyn, list synBlockScore, synData, invertedCoordsOri):
     cdef:
         list cost, i, j, values
@@ -191,7 +671,7 @@ cpdef list getCost(list synPath, list shortest, dict neighbourSyn, list synBlock
                 values.append(synCost)
             else:
                 overlapLength = (leftEnd - invertedCoordsOri.iat[j[0], 0]) + (invertedCoordsOri.iat[j[-1],1] - rightEnd)
-                if overlapLength < ((rightEnd - leftEnd)/2):
+                if overlapLength > ((rightEnd - leftEnd)/2):
                     values.append(synCost + 10000000000000)
                 else:
                     values.append(synCost)
@@ -202,7 +682,7 @@ def getNeighbours(neighbourSyn, j):
     return(min(neighbourSyn[j[0]]+neighbourSyn[j[-1]]), max(neighbourSyn[j[0]]+neighbourSyn[j[-1]]))
  
 
- 
+
 def getInversions(coords,chromo, threshold, synData, synPath):
     
     class inversion:
@@ -212,14 +692,14 @@ def getInversions(coords,chromo, threshold, synData, synPath):
             self.profit = revenue - cost
             self.neighbours = list(neighbours)
             self.invPos = invPos
-    
+       
     def bestInv(profG):
         cdef:
             int i, j
             list scores
             int vcount = profG.vcount()
         for i in range(vcount):
-            parents = profG.neighbors(i,IN)
+            parents = profG.neighbors(i,'IN')
             if len(parents) > 0:
                 scores = [profG.vs[j]["score"] for j in parents]
                 profG.vs[i]["parent"] = parents[scores.index(max(scores))]
@@ -237,6 +717,10 @@ def getInversions(coords,chromo, threshold, synData, synPath):
         
     
     invertedCoordsOri = coords.loc[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == -1)]
+    
+    if len(invertedCoordsOri) == 0:
+        return(invertedCoordsOri, [],[],invertedCoordsOri,[],[])
+        
     invertedCoords = invertedCoordsOri.copy()    
 #    minCoords = np.min(np.min(invertedCoords[["bStart","bEnd"]]))
     maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
@@ -245,7 +729,12 @@ def getInversions(coords,chromo, threshold, synData, synPath):
     invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
 
     nrow = pd.Series(range(invertedCoords.shape[0]))
-    invTree = pd.DataFrame(apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold), index = range(len(invertedCoords)), columns = invertedCoords.index.values)
+    
+    if len(invertedCoordsOri) > 0:
+        invTree = pd.DataFrame(apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold), index = range(len(invertedCoords)), columns = invertedCoords.index.values)
+    else:
+        invTree = pd.DataFrame([], index = range(len(invertedCoords)), columns = invertedCoords.index.values)
+        
     print("found inv Tree", chromo, str(datetime.now()))   
     
     #######################################################################
@@ -296,6 +785,9 @@ def getInversions(coords,chromo, threshold, synData, synPath):
                              for i in range(len(profit)) for j in range(len(profit[i]))\
                                  if profit[i][j] > (0.1*cost[i][j])]     ##Select only those inversions for which the profit is more than  10% of the cost
     print("found profitable ", chromo, str(datetime.now()))
+    
+    del(invBlocks, revenue, neighbourSyn, shortest, synBlockScore)
+    collect()
     #####################################################################
     #### Find optimal set of inversions from all profitable inversions
     #####################################################################
@@ -314,55 +806,51 @@ def getInversions(coords,chromo, threshold, synData, synPath):
             iBStart.append(invertedCoordsOri.iat[i.invPos[-1], 3])
             iBEnd.append(invertedCoordsOri.iat[i.invPos[0], 2])
         
-        nonOverLapA = [np.where(iAStart > i - threshold)[0] for i in iAEnd] 
-        nonOverLapB = [np.where(iBStart > i - threshold)[0] for i in iBEnd]
+        iAStart = np.array(iAStart)
+        iAEnd = np.array(iAEnd)
+        iBStart = np.array(iBStart)
+        iBEnd = np.array(iBEnd)
         
-        
-#        j = 0
-#        for i in range(len(profitable)):
-#            j+=1
-#            print(j)
-#            childNodes = np.intersect1d(nonOverLapA[i], nonOverLapB[i]) + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes 
-#            profG.add_edges(zip([i+1]*len(childNodes), childNodes))
-#            profG.es[-len(childNodes):]["weight"] = profitable[i].profit
-#            profG.vs[i+1]["child"] = list(childNodes)
-#            profG.vs[i+1]["score"] = profitable[i].profit
-    
         edgeList = deque()
         esWeight = deque()
         chNodes = deque()
         vsScore = deque()
         
-        j = 0 
         for i in range(len(profitable)):
-            j+=1
-#            print(j)
-            childNodes = np.intersect1d(nonOverLapA[i], nonOverLapB[i]) + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes 
+            nonOverlapA = np.where(iAStart > (iAEnd[i] - threshold))[0]
+            nonOverlapB = np.where(iBStart > (iBEnd[i] - threshold))[0]
+            childNodes = np.intersect1d(nonOverlapA, nonOverlapB) + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes 
             edgeList.extend(list(zip([i+1]*len(childNodes), childNodes)))
             esWeight.extend([profitable[i].profit]*len(childNodes))
             chNodes.append(list(childNodes))
             vsScore.append(profitable[i].profit)
             
+            ## Add edges to graph if a million edges have been found
+            if len(edgeList) > 1000000:             
+                profG.add_edges(list(edgeList))
+                profG.es["weight"] = list(esWeight)
+                edgeList = deque()
+                esWeight = deque()
+
+                
         profG.add_edges(list(edgeList))
         profG.es["weight"] = list(esWeight)
         profG.vs[range(1,len(profG.vs))]["child"] = list(chNodes)
         profG.vs[range(1,len(profG.vs))]["score"] = list(vsScore)
-                
+                        
         profG.vs[[0,vcount-1]]["score"] = 0
         
         noInEdge = np.where(np.array(profG.vs[1:-1].indegree()) == 0)[0] + 1
         noOutEdge = np.where(np.array(profG.vs[1:-1].outdegree()) == 0)[0] + 1
         
-        for i in noInEdge:
-            profG.add_edge(0,i)
-            profG.es[-1:]["weight"] = 0
+        profG.add_edges(list(zip([0]*len(noInEdge),noInEdge)))
+        profG.es[-len(noInEdge):]["weight"] = 0
         profG.vs[0]["child"] = noInEdge
-        for i in noOutEdge:
-            profG.add_edge(i,vcount - 1)
-            profG.es[-1:]["weight"] = profitable[i-1].profit         
-            profG.vs[i]["child"] = vcount-1
         
-                
+        profG.add_edges(list(zip(noOutEdge,[vcount-1]*len(noOutEdge))))
+        profG.es[-len(noOutEdge):]["weight"] = profitable[i-1].profit
+        profG.vs[list(noOutEdge)]["child"] = vcount-1
+    
         bestInvPath = bestInv(profG)
     else:
         bestInvPath = []
@@ -435,71 +923,6 @@ def getTransSynOrientation(inPlaceData, transData, threshold, ctx = False):
             transPositions[i] = [upBlock, downBlock]
         transPositions = pd.DataFrame(transPositions).transpose()
         return transPositions
-
-#    if ctx:
-#        
-#        inPlaceBlocks.sort_values(["aIndex"], inplace = True)
-#        transRowIndex = transData.index.values
-#        transPositions = dict()
-#        ## identify neighbours on reference genome
-#        for i in transRowIndex:
-#            upSyn = getValues(inPlaceBlocks.index.values,
-#                              np.intersect1d(
-#                                      np.where(inPlaceBlocks.aStart <= transData.at[i,"aEnd"])[0],
-#                                      np.where(inPlaceBlocks.aChr == transData.at[i,"aChr"])[0]))
-#            downSyn = getValues(inPlaceBlocks.index.values,
-#                                np.intersect1d(
-#                                        np.where(inPlaceBlocks.aEnd >= transData.at[i,"aStart"])[0],
-#                                        np.where(inPlaceBlocks.aChr == transData.at[i,"aChr"])[0]))
-#            
-#            upBlock = -1
-#            downBlock = len(inPlaceBlocks)
-#            
-#            for j in upSyn[::-1]:
-#                if (transData.at[i,"aStart"] - inPlaceBlocks.at[j,"aStart"]) > threshold and (transData.at[i,"aEnd"] - inPlaceBlocks.at[j,"aEnd"]) > threshold:
-#                    upBlock = j
-#                    break
-#            
-#            for j in downSyn:
-#                if (inPlaceBlocks.at[j,"aStart"] - transData.at[i,"aStart"]) > threshold and (inPlaceBlocks.at[j,"aEnd"] - transData.at[i,"aEnd"]) > threshold:
-#                    downBlock = j 
-#                    break
-#            
-#            transPositions[i] = [inPlaceBlocks.at[upBlock,"aIndex"]] if upBlock != -1 else [-1]
-#            transPositions[i].append(inPlaceBlocks.at[downBlock,"aIndex"]) if downBlock != len(inPlaceBlocks) else transPositions[i].append(len(inPlaceBlocks))
-#            
-#        
-#        ## identify neighbours on query genome
-#        inPlaceBlocks.sort_values("bIndex", inplace = True)
-#        for i in transRowIndex:
-#            bUpSyn = getValues(inPlaceBlocks.index.values,
-#                               np.intersect1d(
-#                                       np.where(inPlaceBlocks.bStart <= transData.at[i,"bEnd"])[0],
-#                                       np.where(inPlaceBlocks.bChr == transData.at[i,"bChr"])[0]))
-#            bDownSyn = getValues(inPlaceBlocks.index.values,
-#                                 np.intersect1d(
-#                                         np.where(inPlaceBlocks.bEnd >= transData.at[i,"bStart"])[0],
-#                                         np.where(inPlaceBlocks.bChr == transData.at[i, "bChr"])[0]))
-#
-#            bUpBlock = -1
-#            bDownBlock = len(inPlaceBlocks)
-#            
-#            for j in bUpSyn[::-1]:
-#                if (transData.at[i,"bStart"] - inPlaceBlocks.at[j,"bStart"]) > threshold and (transData.at[i,"bEnd"] - inPlaceBlocks.at[j,"bEnd"]) > threshold:
-#                    bUpBlock = j
-#                    break
-#            
-#            for j in bDownSyn:
-#                if (inPlaceBlocks.at[j,"bStart"] - transData.at[i,"bStart"]) > threshold and (inPlaceBlocks.at[j,"bEnd"] - transData.at[i,"bEnd"]) > threshold:
-#                    bDownBlock = j 
-#                    break 
-#            transPositions[i].append(inPlaceBlocks.at[bUpBlock,"bIndex"]) if bUpBlock != -1 else transPositions[i].append(-1)
-#            transPositions[i].append(inPlaceBlocks.at[bDownBlock,"bIndex"]) if bDownBlock != len(inPlaceBlocks) else transPositions[i].append(len(inPlaceBlocks))
-#        return transPositions
-#    
-#        
-
-#%%
 
 def mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks, ctx = False):
     if not isinstance(ctx,bool):
@@ -580,26 +1003,7 @@ def findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd):
                                       np.where(inPlaceBlocks.bEnd.values > bStart)[0]))
     return(aBlocks, bBlocks)
     
-
-
-
-#def getConnectivityGraph(blocksList):
-#    outOG = Graph().as_directed()
-#    outOG.add_vertices(len(blocksList))
-#    if len(blocksList) == 0:
-#        return outOG
-#    ## Add edges and edge weight
-#    count = 0
-#    for i in blocksList:
-#        count+=1
-#        if count == 5000:
-#            break
-#        if len(i.children) > 0:
-#            outOG.add_edges(zip([i.id]*len(i.children), i.children))
-#            outOG.es[-len(i.children):]["weight"] = [-i.score]*len(i.children)
-#    return outOG
-
-
+    
 def getConnectivityGraph(blocksList):
     outOG = Graph().as_directed()
     outOG.add_vertices(len(blocksList))
@@ -622,76 +1026,6 @@ def getConnectivityGraph(blocksList):
     outOG.es["source"] = list(sourceList)
     outOG.es["target"] = list(targetList)
     return outOG
-
-#
-#def getAllLongestPaths(graph,sNode, eNode,by="weight"):
-#    """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
-#    directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
-#    are negative, so shortest path from sNode to eNode corresponds to the longest path.
-#       
-#        Parameters
-#        ----------
-#        graph: directeed igraph Graph(),
-#            Directed acyclic graph containing all the nodes and edges in the graph.
-#           
-#        sNode: int, 
-#            index of the start node in the graph.
-#       
-#        eNode: int list,
-#            list of all end nodes. longest path from start node to end nodes will be
-#            calculated
-#        
-#        by: igraph edge weight
-#        
-#        Returns
-#        -------
-#        list of len(eNodes) longest paths from sNodes to eNodes
-#        
-#    """
-#    pathList = []
-#    dist = {}
-#    pred = {}
-#    
-#    allNodes = graph.vs.indices
-#    for i in allNodes:
-#        dist[i] = float("inf")
-#        pred[i] = None
-#        
-#    dist[sNode] = 0
-#    changes = 1
-#    
-#    for i in range(len(allNodes)-1):
-#        if changes == 0:
-#            break
-#        changes = 0
-#        for e in graph.es:
-#            if dist[e.source] + e[by] < dist[e.target]:
-#                changes = 1
-#                dist[e.target] = dist[e.source] + e[by]
-#                pred[e.target] = e.source
-#    
-#    for e in graph.es:
-#        if dist[e.source] + e[by] < dist[e.target]:
-#            sys.exit("Negative weight cycle identified")
-#    
-#    for key in eNode:
-#        if dist[key] != float("inf"):
-#            path = []
-#            while key!=sNode:
-#                path.append(key)
-#                key = pred[key]
-#            path.append(sNode)
-#            pathList.append(path[::-1])
-#    return(pathList)
-
-
-
-
-#
-#%%cython
-#cimport numpy as np
-#import numpy as np
-#import sys
 
 cpdef getAllLongestPaths(graph,sNode, eNode, np.ndarray[np.int32_t, ndim =1] source, np.ndarray[np.int32_t, ndim =1] target, np.ndarray[np.float32_t, ndim=1] weight, by="weight"):
     """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
@@ -783,9 +1117,7 @@ cpdef np.ndarray getTranslocationScore(np.ndarray aStart, np.ndarray aEnd, np.nd
     return transScores
 #
 #
-#%%cython
-#cimport numpy as np
-#import numpy as np
+
 cpdef np.ndarray getTranslocationScore_ctx(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray aLen, np.ndarray bLen, np.ndarray bDir, np.ndarray translocations):
     """Function to score the proposed translocation block based on the number of
         basepairs it explains and the gaps between alignments of the block
@@ -1143,38 +1475,6 @@ cpdef np.ndarray[np.npy_bool, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.n
                 sys.exit("ERROR: ILLEGAL BDIR VALUE")
     return(outOrderedBlocks)
              
-#def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
-#   
-#    nodeStack = []
-#    visitedTransBlock = []
-#    transCluster = []
-#    
-#    j = 0
-#    for key,value in transGroupIndices.items():
-#        if key not in visitedTransBlock:
-#            newGroup = [key]
-#            visitedTransBlock.append(key)
-#            node1 = value[0]
-#            node2 = value[1]
-#            nodeStack.extend(transGenomeAGroups[node1].member)
-#            nodeStack.extend(transGenomeBGroups[node2].member)
-#
-#            while len(nodeStack) != 0:
-#                newKey = nodeStack.pop()
-#                if newKey not in visitedTransBlock:
-#                    visitedTransBlock.append(newKey)
-#                    newGroup.append(newKey)
-#                    nodeStack.extend(transGenomeAGroups[transGroupIndices[newKey][0]].member)
-#                    nodeStack.extend(transGenomeBGroups[transGroupIndices[newKey][1]].member)
-#                if len(nodeStack) > len(transGroupIndices):
-#                    nodeStack = deque(pd.unique(nodeStack))
-#                    nodeStack = deque([ele for ele in nodeStack if ele not in visitedTransBlock])
-#            newGroup.sort()
-#            transCluster.append(list(newGroup))
-#    return(transCluster)
-
-
-
 
 def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
     assert(list(transGroupIndices.keys()) == list(range(len(transGroupIndices))))
@@ -1204,20 +1504,17 @@ def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
             transCluster.append(list(newGroup))
     return(transCluster)
 
-def getBestClusterSubset(cluster, transBlocksData):
+def getBestClusterSubset(cluster, transBlocksData, bRT):
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
     if len(cluster) < 50:
-        output = bruteSubsetSelector(cluster, transBlocksData, seedBlocks)
+        output = bruteSubsetSelector(cluster, transBlocksData, seedBlocks, bRT)
         if output == "Failed":
             output = greedySubsetSelector(cluster, transBlocksData, seedBlocks)
     else:
         output = greedySubsetSelector(cluster, transBlocksData, seedBlocks)
     return output
 
-def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
-    if len(cluster) > 10:
-        print("starting cluster of length ", len(cluster), str(datetime.now()))
-
+def bruteSubsetSelector(cluster, transBlocksData, seedBlocks, bRT):
     posComb = [seedBlocks]
     skipList = [seedBlocks]
     for i in cluster:
@@ -1282,10 +1579,8 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
             skipList.extend(newSkipList)
         timeTaken = time.time() - startTime
         remainingIterations = len(cluster) - cluster.index(i)
-#        if len(cluster)>10:
-#            print("cluster size", len(cluster), "remaining iterations",remainingIterations, "time taken", timeTaken, str(datetime.now()))
 
-        if (timeTaken > 5 and timeTaken*(1.5**remainingIterations) > 600):
+        if (timeTaken*(1.5**remainingIterations) > bRT):
             print("Cluster is too big for Brute Force\nTime taken for last iteration ",
                   timeTaken, " iterations remaining ",remainingIterations)
             return "Failed"
@@ -1301,78 +1596,6 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks):
         outBlocks = posComb[i]
         bestScore, bestComb = updateBestComb(bestScore, bestComb, outBlocks, transBlocksData)
     return( bestScore, bestComb)
-
-#
-#    
-#def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):    
-#    bestScore = 0
-#    bestComb = []
-#    for i in range(iterCount):
-#        tempCluster = cluster.copy()
-#        length = len(tempCluster)
-#        outBlocks =  seedBlocks.copy()
-#        [tempCluster.remove(i) for i in outBlocks]
-#        skipList = []
-#        transBlocksScore = {}
-#        for i in tempCluster:
-#            transBlocksScore[i] = (transBlocksData[i].aEnd - transBlocksData[i].aStart) + (transBlocksData[i].bEnd - transBlocksData[i].bStart)
-#        while len(tempCluster) > 0:
-#            while len(tempCluster) != length:
-#                length = len(tempCluster)
-#                for i in tempCluster:
-#                    if hasattr(transBlocksData[i],"meTo"):
-#                        if any(j in outBlocks for j in transBlocksData[i].meTo):
-#                            tempCluster.remove(i)
-#                            skipList.append(i)
-#                    elif hasattr(transBlocksData[i], "meAlist"):
-#                        if any(j in outBlocks for j in transBlocksData[i].meAlist) and any(j in outBlocks for j in transBlocksData[i].meBlist):
-#                            tempCluster.remove(i)
-#                            skipList.append(i)
-#                            
-#                
-#                for i in tempCluster:
-#                    if hasattr(transBlocksData[i],"meTo"):
-#                        if all(j in skipList for j in transBlocksData[i].meTo):
-#                            tempCluster.remove(i)
-#                            outBlocks.append(i)
-#                    elif hasattr(transBlocksData[i], "meAlist"):
-#                        if all(j in skipList for j in transBlocksData[i].meAlist) and all(j in outBlocks for j in transBlocksData[i].meBlist):
-#                            tempCluster.remove(i)
-#                            outBlocks.append(i)
-# 
-#            if len(tempCluster) > 0:
-#                topBlocks = sorted(tempCluster, key = lambda x: transBlocksScore[x], reverse = True)[:20]
-#                totalScore = sum(transBlocksScore[i] for i in topBlocks)
-#                prob = [transBlocksScore[i]/totalScore for i in topBlocks]
-#                newBlock = int(np.random.choice(topBlocks, size = 1, p = prob))
-#                outBlocks.append(newBlock)
-#                tempCluster.remove(newBlock)
-#                if hasattr(transBlocksData[newBlock],"meTo"):
-#                    for i in transBlocksData[newBlock].meTo:
-#                        if i in tempCluster:
-#                            tempCluster.remove(i)
-#                        skipList.append(i)
-#                elif hasattr(transBlocksData[newBlock],"meAlist"):
-#                    if any(j in outBlocks for j in transBlocksData[newBlock].meAlist):
-#                        for k in transBlocksData[newBlock].meBlist:
-#                            if k in tempCluster:
-#                                tempCluster.remove(k)
-#                        skipList.extend(transBlocksData[newBlock].meBlist)
-#                    elif any(j in outBlocks for j in transBlocksData[newBlock].meBlist):
-#                        for k in transBlocksData[newBlock].meAlist:
-#                            if k in tempCluster:
-#                                tempCluster.remove(k)
-#                        skipList.extend(transBlocksData[newBlock].meAlist)
-#                    for meElement in transBlocksData[newBlock].meAlist:
-#                        if meElement in transBlocksData[newBlock].meBlist:
-#                            if meElement in tempCluster:
-#                                tempCluster.remove(meElement)
-#                            skipList.append(meElement)
-##        print(outBlocks)
-#        bestScore, bestComb = updateBestComb(bestScore, bestComb, outBlocks, transBlocksData)
-#    return(bestScore, bestComb)
-#    
-
 
 
 def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):
@@ -1443,11 +1666,6 @@ def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):
         bestScore, bestComb = updateBestComb(bestScore, bestComb, np.nonzero(outBlocks)[0], transBlocksData)
     return(bestScore, bestComb)    
     
-
-
-
-
-
 
 def updateBestComb(bestScore, bestComb, outBlocks, transBlocksData):
     score = getScore(outBlocks, transBlocksData)  
@@ -1643,7 +1861,7 @@ def getDupGenome(dupData, allTransBlocksData, transClasses):
     dupData["dupGenomes"] = pd.Series(dupGenomes, index = dupData.index)
     return(dupData)
 
-def outSyn(cwdPath, threshold):
+def outSyn(cwdPath, threshold, prefix):
 #    reCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
     ctxAnnoDict = {"duplication":"dupCtx",
                    "invDuplication":"invDupCtx",
@@ -1652,7 +1870,7 @@ def outSyn(cwdPath, threshold):
     reCoords =  pd.DataFrame()
         
     synData = []
-    with open(cwdPath+"synOut.txt","r") as fin:
+    with open(cwdPath+prefix+"synOut.txt","r") as fin:
         for line in fin:
             line = line.strip().split("\t")
             if line[0] == "#":
@@ -1673,7 +1891,7 @@ def outSyn(cwdPath, threshold):
        
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt","ctxOut.txt"]:    
         data = []
-        with open(cwdPath+i,"r") as fin: 
+        with open(cwdPath+prefix+i,"r") as fin: 
             if i != "ctxOut.txt":
                 for line in fin:
                     line = line.strip().split("\t")
@@ -1794,7 +2012,7 @@ def outSyn(cwdPath, threshold):
     
     hasSynInInv = "isinInv" in synData.columns
     
-    with open(cwdPath+"synOut.txt","w") as fout:
+    with open(cwdPath+prefix+"synOut.txt","w") as fout:
         for i in outClusters:
             fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"],"\n"])))
             for j in i:
@@ -1912,121 +2130,10 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
             currentCluster = [i]
     outClusters.append(currentCluster)
     return (allBlocks, outClusters)
-#
-#
-#
-#def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData):
-#    
-#    allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
-#    allBlocks["class"] = "syn"
-#        
-#    tempInvBlocks = pd.DataFrame(tempInvBlocks,columns =["aStart","aEnd","bStart","bEnd"], dtype= object)
-#    tempInvBlocks["class"] = "inv"
-#    
-#    tempDupData = dupData[["aStart","aEnd","bStart","bEnd"]].copy()
-#    tempDupData["class"] = "dup"
-#    
-#    tempInvDupData = invDupData[["aStart","aEnd","bStart","bEnd"]].copy()
-#    tempInvDupData["class"] = "invDup"
-#    
-#    tempInvTLData = invTLData[["aStart","aEnd","bStart","bEnd"]].copy()
-#    tempInvTLData["class"] = "invTL"
-#    
-#    tempTLData = TLData[["aStart","aEnd","bStart","bEnd"]].copy()
-#    tempTLData["class"] = "TL"
-#    
-#    for i in [tempInvBlocks, tempInvDupData, tempInvTLData, tempTLData, tempDupData]:
-#        if len(i) > 0:
-#            allBlocks = allBlocks.append(i)
-#    allBlocks.index = range(allBlocks.shape[0])
-#    
-#    """
-#    Take data of all blocks and create groups of syntenic blocks from syntenic alignments
-#    """
-#    
-#    allBlocks.sort_values(["aStart","aEnd","bStart","bEnd"],inplace = True)
-#   
-#    aClusters = []
-#    currentCluster = []
-#    for index, row in allBlocks.iterrows():        
-#        if len(currentCluster) == 0 and row["class"] != "syn":
-#            continue
-#        
-#        if row["class"] == "syn":
-#            currentCluster.append(index)
-#        elif row["class"] in ["TL", "inv","invTL"]:
-#            aClusters.append(currentCluster)
-#            currentCluster = []
-#        else:
-#            if row["aEnd"] < allBlocks.loc[currentCluster[-1]]["aEnd"] + threshold:
-#                continue
-#            else:
-#                allClasses = allBlocks["class"][index:]
-#                if len(np.where(allClasses=="syn")[0]) > 0:
-#                    nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
-#                    if row["aStart"] > allBlocks.loc[nextSyn]["aStart"] - threshold:
-#                        continue
-#                    else:
-#                        aClusters.append(currentCluster)
-#                        currentCluster = []
-#                else:
-#                    aClusters.append(currentCluster)
-#                    currentCluster = []
-#    aClusters.append(currentCluster)
-#                    
-#    allBlocks.sort_values(["bStart","bEnd","aStart","aEnd"],inplace = True)
-#   
-#    bClusters = []
-#    currentCluster = []
-#    for index, row in allBlocks.iterrows():
-#        
-#        if len(currentCluster) == 0 and row["class"] != "syn":
-#            continue
-#        
-#        if row["class"] == "syn":
-#            currentCluster.append(index)
-#        elif row["class"] in ["TL", "inv","invTL"]:
-#            bClusters.append(currentCluster)
-#            currentCluster = []
-#        else:
-#            if row["bEnd"] < allBlocks.loc[currentCluster[-1]]["bEnd"] + threshold:
-#                continue
-#            else:
-#                allClasses = allBlocks["class"][index:]
-#                if len(np.where(allClasses=="syn")[0]) > 0:
-#                    nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
-#                    if row["bStart"] > allBlocks.loc[nextSyn]["bStart"] - threshold:
-#                        continue
-#                    else:
-#                        bClusters.append(currentCluster)
-#                        currentCluster = []
-#                else:
-#                    bClusters.append(currentCluster)
-#                    currentCluster = []
-#    bClusters.append(currentCluster)
-#    allBlocks.sort_values(["aStart","aEnd","bStart","bEnd"],inplace = True)
-#   
-#    outClusters = []
-#    aIndex = 0 
-#    bIndex = 0
-#    currentCluster = []
-#    for i in range(synData.shape[0]):
-#        if i in aClusters[aIndex] and i in bClusters[bIndex]:
-#            currentCluster.append(i)
-#        else:
-#            if i not in aClusters[aIndex]:
-#                aIndex+=1
-#            if i not in bClusters[bIndex]:
-#                bIndex+=1
-#            outClusters.append(currentCluster)
-#            currentCluster = [i]
-#    outClusters.append(currentCluster)
-#    return (allBlocks, outClusters)
 
-
-def mergeOutputFiles(uniChromo,path):
+def mergeOutputFiles(uniChromo,path,prefix):
     def addData(fName,anno, chromo):
-        fPath = open(path+chromo+"_"+anno+"Out.txt","r")
+        fPath = open(path+prefix+chromo+"_"+anno+"Out.txt","r")
         for line in fPath.readlines():
             line = line.strip().split("\t")
             if line[0] == "#":
@@ -2034,14 +2141,14 @@ def mergeOutputFiles(uniChromo,path):
             else:
                 fName.write("\t".join(line) + "\n")
         fPath.close()
-        fileRemove(path+chromo+"_"+anno+"Out.txt")
+        fileRemove(path+prefix+chromo+"_"+anno+"Out.txt")
                 
-    fSyn = open(path+"synOut.txt","w")
-    fInv = open(path+"invOut.txt","w")
-    fTL = open(path+"TLOut.txt","w")
-    fInvTL = open(path+"invTLOut.txt","w")
-    fDup = open(path+"dupOut.txt","w")
-    fInvDup = open(path+"invDupOut.txt","w")
+    fSyn = open(path+prefix+"synOut.txt","w")
+    fInv = open(path+prefix+"invOut.txt","w")
+    fTL = open(path+prefix+"TLOut.txt","w")
+    fInvTL = open(path+prefix+"invTLOut.txt","w")
+    fDup = open(path+prefix+"dupOut.txt","w")
+    fInvDup = open(path+prefix+"invDupOut.txt","w")
     
     files = [fSyn, fInv, fTL, fInvTL, fDup, fInvDup]
     classes = ["syn","inv","TL","invTL","dup","invDup"]
@@ -2053,10 +2160,10 @@ def mergeOutputFiles(uniChromo,path):
     for f in files:
         f.close()
 
-def readAnnoCoords(cwdPath, uniChromo):
+def readAnnoCoords(cwdPath, uniChromo, prefix):
     annoCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
     synData = []
-    fin = open(cwdPath+"synOut.txt","r")
+    fin = open(cwdPath+prefix+"synOut.txt","r")
     for line in fin:
         line = line.strip().split("\t")
         if line[0] == "#":
@@ -2069,7 +2176,7 @@ def readAnnoCoords(cwdPath, uniChromo):
     
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt"]:    
         data = []
-        fin = open(cwdPath+i,"r")
+        fin = open(cwdPath+prefix+i,"r")
         for line in fin:
             line = line.strip().split("\t")
             if line[0] == "#":
@@ -2689,7 +2796,6 @@ def getSV(cwdPath, allAlignments):
     return None                
 
 
-
 def getNotAligned(cwdPath):    
     annoCoords = pd.DataFrame()
     for fileType in ["syn","inv", "TL", "invTL","dup", "invDup"]:
@@ -2701,10 +2807,6 @@ def getNotAligned(cwdPath):
         except Exception as e:
             print("ERROR: while trying to read ", fileType, "Out.txt", e)
             continue
-        
-        
-        
-#        fileData = pd.read_table(cwdPath+fileType+"Out.txt", header = None, dtype = object)
         coordsData = fileData.loc[fileData[0] == "#",[2,3,6,7,1,5]].copy()
         coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
         coordsData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
@@ -2721,8 +2823,6 @@ def getNotAligned(cwdPath):
     annoCoords.index = range(len(annoCoords))
   
     fout = open(cwdPath + "notAligned.txt","w")
-    
-#    fout.write("#Reference Genome\n")
     df = annoCoords[["aStart","aEnd","aChr"]].copy()
     df.sort_values(["aChr", "aStart", "aEnd"], inplace = True)
     for chrom in sorted(annoCoords.aChr.unique()):
@@ -2736,9 +2836,6 @@ def getNotAligned(cwdPath):
             if row.aEnd > maxEnd:
                 maxEnd = row.aEnd
     
-#    fout.write("\n")
-    
-#    fout.write("#Query Genome\n")
     df = annoCoords[["bStart","bEnd","bChr"]].copy()
     df.sort_values(["bChr", "bStart", "bEnd"], inplace = True)
     for chrom in sorted(annoCoords.bChr.unique()):
@@ -3034,5 +3131,3 @@ def plotBlocks(blocksData):
     plt.gca().add_patch(patches.Rectangle((10,10), 30,5))
     plt.show()
     plt.plot()
-
-    
