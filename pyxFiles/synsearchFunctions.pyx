@@ -35,7 +35,7 @@ def startSyri(args):
     nCores = args.nCores
     bRT = args.bruteRunTime
     threshold = args.threshold
-    cwdPath = args.outDir
+    cwdPath = args.dir
     prefix = args.prefix
     coords.columns  =   ["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr"]
     aChromo = set(coords["aChr"])
@@ -183,6 +183,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix):
     print("Translocations : making blocks data", chromo, str(datetime.now()))
     allTransBlocksData = []
     for i in range(allTransBlocks.shape[0]):
+#    for i in range(2000):
         tempTransBlock = transBlock(allTransBlocks.iat[i,0],\
                                     allTransBlocks.iat[i,1],\
                                     allTransBlocks.iat[i,2],\
@@ -2014,7 +2015,7 @@ def outSyn(cwdPath, threshold, prefix):
     
     with open(cwdPath+prefix+"synOut.txt","w") as fout:
         for i in outClusters:
-            fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"],"\n"])))
+            fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"]])) +"\n")
             for j in i:
                 fout.write("\t".join(map(str,allBlocks.loc[j][0:4])))
                 if hasSynInInv and synData.loc[synLocs[j]]["isinInv"] == "Syn_in_Inv":
@@ -2249,10 +2250,17 @@ class transBlock:
         self.overlappingInPlaceBlocks = []
     
     def addGenomeGroupMembers(self,transGenomeAGroups, transGenomeBGroups):
-        self.genomeAMembers = list(set(transGenomeAGroups[self.transGroupIndices[0]].member)\
-                                       - set([self.transBlocksID]))
-        self.genomeBMembers = list(set(transGenomeBGroups[self.transGroupIndices[1]].member)\
-                                       - set([self.transBlocksID]))
+#        self.genomeAMembers = list(set(transGenomeAGroups[self.transGroupIndices[0]].member)\
+#                                       - set([self.transBlocksID]))
+#        self.genomeBMembers = list(set(transGenomeBGroups[self.transGroupIndices[1]].member)\
+#                                       - set([self.transBlocksID]))
+        
+        self.genomeAMembers = np.array(list(set(transGenomeAGroups[self.transGroupIndices[0]].member)\
+                                       - set([self.transBlocksID])), dtype = 'int32')
+        self.genomeBMembers = np.array(list(set(transGenomeBGroups[self.transGroupIndices[1]].member)\
+                                       - set([self.transBlocksID])), dtype = 'int32')
+        
+        
         self.genomeAUni = True if len(self.genomeAMembers) == 0 else False
         self.genomeBUni = True if len(self.genomeBMembers) == 0 else False
         
@@ -2390,11 +2398,11 @@ class transBlock:
 ### SV identification functions
 #################################################################
         
-def readSVData(cwdPath):
+def readSVData(cwdPath, prefix):
     annoCoords = pd.DataFrame()
     for fileType in ["syn","inv","TL","invTL"]:
         try:
-            fileData = pd.read_table(cwdPath+fileType+"Out.txt", header = None, dtype = object)
+            fileData = pd.read_table(cwdPath+prefix+fileType+"Out.txt", header = None, dtype = object)
         except pd.io.common.EmptyDataError:
             print(fileType, "Out.txt is empty. Skipping analysing it.")
             continue
@@ -2421,21 +2429,20 @@ def readSVData(cwdPath):
         coordsData["state"] = fileType
         annoCoords = annoCoords.append(coordsData.copy())
                                    
-    fileData = pd.read_table(cwdPath+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
+    fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
     annoIndices = np.where(fileData[0] =="#")[0]
-    states = list(fileData[9].loc[annoIndices])
-    coordsData = fileData.loc[fileData[0] !="#"].copy()
+    states = list(fileData[8].loc[annoIndices])
+    coordsData = fileData.loc[fileData[0] =="#"].copy()
+    coordsData1 = fileData.loc[fileData[0] !="#", [0,1,2,3]].copy().astype(dtype="int")
     annoIndices = np.append(annoIndices,len(fileData))
     repCount = annoIndices[1:] - annoIndices[:-1] - 1
-    
-    
     
     reps = np.repeat(range(len(annoIndices)-1), repCount)
     stateReps = np.repeat(states, repCount)
     
-    coordsData1 = coordsData[[0,1,2,3]].astype(dtype = "int64")
-    coordsData1["aChr"] = coordsData[9]
-    coordsData1["bChr"] = coordsData[10]
+#    coordsData1 = fileData.loc[annoIndices, [0,1,2,3]] #coordsData[[0,1,2,3]].astype(dtype = "int64")
+    coordsData1["aChr"] = np.repeat(coordsData[1], repCount).tolist()
+    coordsData1["bChr"] = np.repeat(coordsData[5], repCount).tolist()
     coordsData1["group"] = reps
     coordsData1["state"] = stateReps
     coordsData1 = coordsData1[[0,1,2,3,"group","aChr","bChr","state"]]
@@ -2446,15 +2453,15 @@ def readSVData(cwdPath):
     annoCoords.columns = ["aStart","aEnd","bStart","bEnd","group","aChr","bChr","state"]
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
     annoCoords.index = range(len(annoCoords))
-    invIndices = annoCoords.state == "invCtx"
-    annoCoords.loc[invIndices, "bStart"] = annoCoords.bStart + annoCoords.bEnd
-    annoCoords.loc[invIndices, "bEnd"] = annoCoords.bStart - annoCoords.bEnd
-    annoCoords.loc[invIndices, "bStart"] = annoCoords.bStart - annoCoords.bEnd
+#    invIndices = annoCoords.state == "invCtx"
+#    annoCoords.loc[invIndices, "bStart"] = annoCoords.bStart + annoCoords.bEnd
+#    annoCoords.loc[invIndices, "bEnd"] = annoCoords.bStart - annoCoords.bEnd
+#    annoCoords.loc[invIndices, "bStart"] = annoCoords.bStart - annoCoords.bEnd
     return annoCoords
 
 
-def getSV(cwdPath, allAlignments):
-    fout = open(cwdPath+"sv.txt","w")
+def getSV(cwdPath, allAlignments, prefix):
+    fout = open(cwdPath+prefix+"sv.txt","w")
     allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
     allBlocks = pd.unique(allAlignments.id)
 
@@ -2796,11 +2803,11 @@ def getSV(cwdPath, allAlignments):
     return None                
 
 
-def getNotAligned(cwdPath):    
+def getNotAligned(cwdPath, prefix):    
     annoCoords = pd.DataFrame()
     for fileType in ["syn","inv", "TL", "invTL","dup", "invDup"]:
         try:
-            fileData = pd.read_table(cwdPath+fileType+"Out.txt", header = None, dtype = object)  
+            fileData = pd.read_table(cwdPath+prefix+fileType+"Out.txt", header = None, dtype = object)  
         except pd.io.common.EmptyDataError:
             print(fileType, "Out.txt is empty. Skipping analysing it.")
             continue
@@ -2812,7 +2819,7 @@ def getNotAligned(cwdPath):
         coordsData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
         annoCoords = annoCoords.append(coordsData.copy())
 
-    fileData = pd.read_table(cwdPath+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
+    fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
     coordsData = fileData.loc[fileData[0] == "#"]
     coordsData = coordsData[[2,3,6,7,1,5]].copy()
     coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
@@ -2822,7 +2829,7 @@ def getNotAligned(cwdPath):
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
     annoCoords.index = range(len(annoCoords))
   
-    fout = open(cwdPath + "notAligned.txt","w")
+    fout = open(cwdPath + prefix+"notAligned.txt","w")
     df = annoCoords[["aStart","aEnd","aChr"]].copy()
     df.sort_values(["aChr", "aStart", "aEnd"], inplace = True)
     for chrom in sorted(annoCoords.aChr.unique()):

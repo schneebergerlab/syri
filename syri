@@ -17,9 +17,10 @@ if __name__ == "__main__":
     parser.add_argument("-C","--TransUniCount", help="Number of uniques bps for selecting translocation", type = int, default = 1000)
     parser.add_argument("-P","--TransUniPercent", help="Percent of unique region requried to select tranalocation. Value should be in range (0,1]", type = float, default = 0.5)
     parser.add_argument('--nCores', help="number of cores to use (max is number of chromosomes)", type=int, default=1)
-    parser.add_argument('-o','--outDir',help="directory to save output in", action = 'store', default = os.getcwd()+os.sep)
+    parser.add_argument('-d','--dir',help="path to working directory (in not current directory)", action = 'store', default = os.getcwd()+os.sep)
     parser.add_argument("-I","--increaseBy", help="Minimum score increase required to add another alingment to translocation cluster solution", type = int, default = 1000)
     parser.add_argument("-p","--prefix", help="Prefix to add before the output file Names", type = str, default = "")
+    parser.add_argument("--seed", help="seed for generating random numbers", type = int, default = 1)
     
 
     args = parser.parse_args()
