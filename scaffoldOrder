@@ -25,23 +25,26 @@ def scaffoldOrder(cwdPath, queryPath, coordsFilePath, scafSizeCutOff, alignSizeC
     else:
         print("Found info for generating",len(gpFileList),"chromosomes")
         
-        
+    
     queryGenome = {fasta.id:fasta for fasta in parse(queryPath,'fasta')}
+    ## Size of each molecule in query
     scafSize = {fasta.id: len(fasta.seq) for fasta in queryGenome.values()}
+    ##select long molecules
     longScaf = getValues(list(scafSize.keys()),np.where(np.array(list(scafSize.values())) > scafSizeCutOff)[0])
     
+    ##select long alignments between ref and long scaffolds
     coords = pd.read_table(coordsFilePath,header=None)
     coordsFilter = coords.loc[coords[4] > alignSizeCutOff]
     coordsFilter = coordsFilter.loc[coordsFilter[10].isin(longScaf)]
+    
+    ## identify scaffold-refChrom pairing from alignment data
     scafCountDict, scafSizeDict, scafChrDict = getscafDict(np.unique(coordsFilter[10]), coordsFilter, scafSize)
-    
-    
     uniChrom = np.unique(coordsFilter[9])
-    
     NNs = "N"*nsLen
-    
+    ## get files corresponding to individual refGenome
     chrGpDict = {i:gp for i in uniChrom for gp in gpFileList if i in gp}
     
+    ##create pseudo-genome using the scaffold order data from mummerplot output file
     pseudoGenome = []
     anchorInfo = []
     for chromo in sorted(chrGpDict.keys()):

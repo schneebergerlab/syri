@@ -1691,13 +1691,22 @@ def count_uniq_elems(coordinates):
 
                 
 def getscafDict(scaffolds, data, scafSize):
+    """
+    Select the reference chromosome to which the scaffold align best.
+    Four conditions are checked (progressively) to select the best aligned region. 
+    1) If the scaffold align to only one refChrom then that chromosome is selected
+    2) If all refChrom have similar distribution for alignment length the query scaffold,
+    then the refChrom which have total longest alignment is selected
+    3) If refChrom_A_alignment_length - refGenome_B_alignment_length > a given threshold,
+    then refGenome A is selected
+    4) refGenome which has the average alignment length is selected
+    """
     scafChrDict = {}
     scafCountDict = {}
     scafSizeDict = {}
     percentCutoff = 0.1
     for i in scaffolds:
         scafCountDict[i] = Counter(data.iloc[np.where(data[10] == i)[0], 9])
-        #scafData = data.iloc[np.where(data[10] == i)[0],]
         scafData = data.loc[data[10] == i]
         uniChr = np.unique(scafData[9])
         bpSizeDict = {}
@@ -1710,7 +1719,6 @@ def getscafDict(scaffolds, data, scafSize):
         if len(uniChr) == 1:
             scafChrDict[i] = uniChr[0]
         else: 
-#            print(alignSizes.values())
             if kruskal(*alignSizes.values())[1] > 0.05:
                 scafChrDict[i] = max(scafSizeDict[i].items(), key=lambda x: x[1])[0]
             else:
@@ -1718,11 +1726,12 @@ def getscafDict(scaffolds, data, scafSize):
                 percentCutoffSize = percentCutoff*size
                 bpSizeValues = sorted(bpSizeDict.values())
                 identified = 0
-                for j in range(len(bpSizeValues)-1,0,-1):
-                    if (bpSizeValues[j] - bpSizeValues[j-1]) > percentCutoffSize:
-                        scafChrDict[i] = list(bpSizeDict.keys())[list(bpSizeDict.values()).index(bpSizeValues[j])]
-                        identified = 1
-                        break
+#                for j in range(len(bpSizeValues)-1,0,-1):
+                j = len(bpSizeValues)
+                if (bpSizeValues[j] - bpSizeValues[j-1]) > percentCutoffSize:
+                    scafChrDict[i] = list(bpSizeDict.keys())[list(bpSizeDict.values()).index(bpSizeValues[j])]
+                    identified = 1
+#                        break
                 if identified == 0:
                     meanAlignSize = {}
                     for j in uniChr:
