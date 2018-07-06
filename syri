@@ -10,7 +10,7 @@ import argparse
 import os
    
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("inFile", help="location of coords file", type=argparse.FileType('r'))
     parser.add_argument("-T","--threshold", help="If alignments have more than 'threshold' bases in common, they would be considered as overlapping", type=int,default=50)
     parser.add_argument("-B","--bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds)", type = int, default = 60)
@@ -25,6 +25,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     from pyxFiles.synsearchFunctions import startSyri
+#    print(args)
     startSyri(args)
     
     

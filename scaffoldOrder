@@ -7,18 +7,18 @@ This is a temporary script file.
 """
 
 #%%
-import pandas as pd
-import numpy as np
-from func.synsearchFunctions import orderFromMummerplot, getscafDict
-from func.myUsefulFunctions import getValues
-from Bio.SeqIO import parse, write
-from Bio.Seq import Seq
-from Bio.SeqRecord import SeqRecord
+import argparse
 import os
 import sys
-from glob import glob
 
-def scaffoldOrder(cwdPath, queryPath, coordsFilePath, scafSizeCutOff, alignSizeCutOff, nsLen):
+def scaffoldOrder(args):
+    cwdPath = os.getcwd()+os.sep
+    queryPath = args.qry.name
+    coordsFilePath = args.coords.name
+    scafSizeCutOff = args.s
+    alignSizeCutOff = args.a
+    nsLen = args.n
+    
     gpFileList = glob(cwdPath+"*.gp")
     if len(gpFileList) == 0:
         sys.exit("NO mummerplot output file found")
@@ -76,16 +76,28 @@ def scaffoldOrder(cwdPath, queryPath, coordsFilePath, scafSizeCutOff, alignSizeC
     write(pseudoGenome,pseudoPath,"fasta")
 
 if __name__ == "__main__":
-    if len(sys.argv)!=3:
-        sys.exit("Usage: scaffoldOrder <queryGenome> <coordsFile>")
-    cwdPath = os.getcwd()+os.sep
-    queryPath = cwdPath + sys.argv[1]
-    coordsFilePath = cwdPath + sys.argv[2]
+    parser = argparse.ArgumentParser(description="Use incomplete assembly (in fasta) and alignment information to generate pseudo genome",formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("qry", help="fasta file of incomplete assembly",type= argparse.FileType('r'))
+    parser.add_argument("coords", help="alignment information", type=argparse.FileType('r'))
+    parser.add_argument("-s", help="minimum scaf size (in bp) to use in pseudo genome", type=int, default=50000)
+    parser.add_argument("-a", help="minimum align size (in bp) to use in estimating scaf:chrom pairing", type=int, default=10000)
+    parser.add_argument("-n", help="number of Ns (in bp) to add between two scaffolds", type=int, default=500)
+            
+    if len(sys.argv[1:]) == 0:
+        parser.print_help()
+        sys.exit()
     
-    scafSizeCutOff = 50000
-    alignSizeCutOff = 10000
-    nsLen = 500
-    scaffoldOrder(cwdPath, queryPath, coordsFilePath, scafSizeCutOff, alignSizeCutOff, nsLen)
+    cwdPath = os.getcwd()+os.sep
+    args = parser.parse_args()
+    import pandas as pd
+    import numpy as np
+    from pyxFiles.synsearchFunctions import orderFromMummerplot, getscafDict
+    from func.myUsefulFunctions import getValues
+    from Bio.SeqIO import parse, write
+    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+    from glob import glob
+    scaffoldOrder(args)
 
     
 
