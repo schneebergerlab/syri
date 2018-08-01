@@ -1,4 +1,13 @@
-#**OutDated**
+## Requires:
+- Python3
+- Python packages:
+    - Cython
+    - Numpy
+    - Scipy
+    - Pandas
+    - Igraph
+    - Biopython
+    -
 
 
 ## **Installation guide**:
