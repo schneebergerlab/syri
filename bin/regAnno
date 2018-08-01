@@ -44,6 +44,7 @@ def getRegion(args, cwdPath):
         regions.sort_values(["qryChr","qryStart","qryEnd","refChr","refStart","refEnd"],inplace=True)
     print(regions.to_csv(sep="\t",index=False, header=False))
 
+
 def getBed(args, cwdPath):
     data = readData(args,cwdPath)
     mar = args.m
@@ -62,12 +63,36 @@ def getBed(args, cwdPath):
     print(outD.to_csv(sep="\t", index=False, header=False))
 
     
+def getSnpAnno(args, cwdPath):
+    fin = pd.read_table(args.fin, header = None)
+    fin.columns = ["chr","pos"]
+    data = readData(args, cwdPath)
+    outData = pd.DataFrame()
+    if not args.q:
+        for row in fin.itertuples():
+            regions = data.loc[(data.refChr== row.chr) & (data.refStart <= row.pos) & (data.refEnd >= row.pos)].copy()
+            regions["inChr"] = row.chr
+            regions["inPos"] = row.pos
+            outData = outData.append(regions)
+    elif args.q:
+        for row in fin.itertuples():
+            regions = data.loc[(data.qryChr== row.chr) & (data.qryStart <= row.pos) & (data.qryEnd >= row.pos)].copy()
+            regions["inChr"] = row.chr
+            regions["inPos"] = row.pos
+            outData = outData.append(regions)    
+    print(outData.to_csv(sep="\t", index=False,header=False), end = "")
+    
+    
+    
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
     
     parser_region = subparsers.add_parser("region", help="get annotation for the region")
     parser_getbed = subparsers.add_parser("getbed", help= "get bed file for the regions")
+    parser_snpanno = subparsers.add_parser("snpanno", help= "get annotation for SNPs list")
+    
     if len(sys.argv[1:]) == 0:
         parser.print_help()
         sys.exit()
@@ -84,6 +109,12 @@ if __name__ == "__main__":
     parser_getbed.add_argument("-f", help="files to search",type=argparse.FileType('r'), nargs="+", default = None)
     parser_getbed.add_argument("-m",help="margin to add on the regions", type= int, default = 0)
     parser_getbed.add_argument("-a",help="output region annotation", action="store_true", default = False)
+    
+    parser_snpanno.set_defaults(func=getSnpAnno)
+    parser_snpanno.add_argument("fin", help ="input file in tab separated format. Column 1: Chr. Column 2: position", type=argparse.FileType('r'), default = None)
+    parser_snpanno.add_argument("-q",help="search annotation in query genome",action="store_true", default=False)
+    parser_snpanno.add_argument("-f", help="files to search. by default all files will be searched",type=argparse.FileType('r'), nargs="+", default = None)
+       
     
     cwdPath = os.getcwd()+os.sep
     args = parser.parse_args()

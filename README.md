@@ -1,5 +1,5 @@
 ## Requires:
-- Python3
+- Python3 (preferred python3.5)
 - Python packages:
     - Cython
     - Numpy
@@ -7,10 +7,20 @@
     - Pandas
     - Igraph
     - Biopython
-    -
-
+- MUMmer3
 
 ## **Installation guide**:
+1. Download the directory
+2. Open it and run:
+    ```python3 setup.py build_ext --inplace'''
+    
+## **Genome difference identification**:
+###
+
+
+
+
+
 #### **Linux**:
 - Install python, pip, and related libraries
 	- ```apt install python3 python3-dev python3-pip python3-tk libxml2-dev zlib1g-dev```
