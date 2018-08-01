@@ -12,10 +12,28 @@
 ## **Installation guide**:
 1. Download the directory
 2. Open it and run:
-```python3 setup.py build_ext --inplace```
-    
+
+```bash
+python3 setup.py build_ext --inplace
+```
+
+This will compile cython code.
+
 ## **Genome difference identification**:
-###
+
+### Pre-requisite:
+Chromosomal assemblies need to be aligned. This can be done using mummer's nucmer
+tool. The nucmer specific parameter would depend on the complexity of the concerned
+genomes (amount of repeat regions) and assembly quality (gaps).
+
+a
+
+```bash
+## nucmer
+
+### SR identification:
+
+
 
 
 
