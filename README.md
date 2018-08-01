@@ -12,7 +12,7 @@
 ## **Installation guide**:
 1. Download the directory
 2. Open it and run:
-```python3 setup.py build_ext --inplace'''
+```python3 setup.py build_ext --inplace```
     
 ## **Genome difference identification**:
 ###
