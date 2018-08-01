@@ -7,27 +7,19 @@ Created on Mon Jun 19 15:54:53 2017
 import numpy as np
 from func.myUsefulFunctions import *
 import sys
-#from matplotlib import pyplot as plt
-#import matplotlib.patches as patches
-#from math import log
-#import matplotlib.patheffects as pe
-#from itertools import chain
 import time
-#from operator import itemgetter
 from igraph import *
 from collections import Counter, deque
 from scipy.stats import *
 from datetime import datetime
 import pandas as pd
-#from matplotlib import pyplot as plt
 from multiprocessing import Pool
 from functools import partial
 import os
 from gc import collect
 cimport numpy as np
+
 np.random.seed(1)
-
-
 def startSyri(args):
     try:
         coords = pd.read_table(args.inFile.name, header = None)
@@ -78,13 +70,13 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
             block.bestParent(block.parents[scores.index(max(scores))], max(scores)) 
     synPath = getSynPath(blocks)
     synData = coordsData.iloc[synPath].copy()
-    del(coordsData, blocks)
+    del(coordsData, blocks, df)
     collect()
     
     
     
     ##########################################################################
-    #    print("Finding Inversions")
+    #   Finding Inversions
     ##########################################################################
     print("Identifying Inversions for chromosome", chromo, str(datetime.now()))
 
@@ -102,14 +94,14 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     
     
     for i in bestInvPath:
-        invPos = profitable[i-1].invPos
+        invPos = profitable[i].invPos
         invBlockData = invertedCoordsOri.iloc[invPos]
         invCoord = [invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2]]
         invCoord.append(invCoord[1] - invCoord[0])
         invCoord.append(invCoord[3] - invCoord[2])
         invCoord.append(sum((invBlockData.aLen+invBlockData.bLen)*invBlockData.iden)/(invCoord[-2] + invCoord[-1]))
         invCoord.extend([1,-1,chromo,chromo])
-        for j in range(profitable[i-1].neighbours[0]+1,profitable[i-1].neighbours[1]):
+        for j in range(profitable[i].neighbours[0]+1,profitable[i].neighbours[1]):
             inPlaceBlocks = inPlaceBlocks[inPlaceBlocks.index != synData.iloc[j].name]
             try:
                 inPlaceIndices.remove(synData.iloc[j].name)
@@ -126,8 +118,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     ## filtering them may lead to removal of those translocations
     
     outPlaceBlocksFiltered = outPlaceBlocks.copy() 
-    
-    
+        
     ## Create connectivity tree for directed and inverted blocks
     
     #### find all translocations which don't have large gaps between its alignments
@@ -183,7 +174,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     print("Translocations : making blocks data", chromo, str(datetime.now()))
     allTransBlocksData = []
     for i in range(allTransBlocks.shape[0]):
-#    for i in range(2000):
         tempTransBlock = transBlock(allTransBlocks.iat[i,0],\
                                     allTransBlocks.iat[i,1],\
                                     allTransBlocks.iat[i,2],\
@@ -227,7 +217,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     print("Translocations : finding solutions ", chromo, str(datetime.now()))
     clusterSolutions = []
     for i in range(len(allTransCluster)):
-#        tempCluster = allTransCluster[i].copy()
         if len(allTransCluster[i]) > 0:
             clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT))
     
@@ -250,7 +239,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     fout = open(cwdPath+prefix+chromo+"_invOut.txt","w")
     tempInvBlocks = []
     for i in bestInvPath:
-        invPos = profitable[i-1].invPos
+        invPos = profitable[i].invPos
         tempInvBlocks.append([invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2]])
         fout.write("\t".join(map(str,["#",invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],"-",invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2],"\n"])))
         for j in invPos:
@@ -259,9 +248,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     fout.close()
     
     
-    ## Grouping Syn blocks : This grouping is effectively wrong as it does not include
-    ## ctx information. But, is still used to keep old functions working. Final synblock
-    ## identification is done after ctx identification.
+    ## Grouping Syn blocks : Final synblock identification is done after ctx identification.
     allBlocks, outClusters = groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn)
     
 ########################################################################################################################
@@ -431,7 +418,6 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP):
     
     for i in range(len(ctxTransGenomeBGroups)):
         for block in ctxTransGenomeBGroups[i].member:
-#            print(block)
             ctxGroupIndices[block].append(i)
     
     ctxCluster = getTransCluster(ctxGroupIndices, ctxTransGenomeAGroups, ctxTransGenomeBGroups)
@@ -460,33 +446,27 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP):
     
     for i in range(len(ctxBlocksData)):
         
-#    def foo():
         tempTransBlock = ctxBlocksData[i]
         index = tempTransBlock.transBlocksID
         if not tempTransBlock.aUni and not tempTransBlock.bUni:
             ctxCluster[ctxClusterIndices[index]].remove(index)
         elif tempTransBlock.status == 1:
             continue
-#            pass
         elif not tempTransBlock.aUni:
             for j in tempTransBlock.genomeBMembers:
-#                j_pos = np.where(ctxTransBlocks.index.values == j)[0][0]
                 if ctxBlocksData[j].bStart - threshold < tempTransBlock.bStart and ctxBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
                     tempTransBlock.addMEBlock(j)
         elif not tempTransBlock.bUni:
             for j in tempTransBlock.genomeAMembers:
-#                j_pos = np.where(ctxTransBlocks.index.values == j)[0][0]
                 if ctxBlocksData[j].aStart - threshold < tempTransBlock.aStart and ctxBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
                     tempTransBlock.addMEBlock(j)
         else:
             ME_A = []
             for j in tempTransBlock.genomeAMembers:
-#                j_pos = np.where(ctxTransBlocks.index.values == j)[0][0]
                 if ctxBlocksData[j].aStart - threshold < tempTransBlock.aStart and ctxBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
                     ME_A.append(j)
             ME_B = []
             for j in tempTransBlock.genomeBMembers:
-#                j_pos = np.where(ctxTransBlocks.index.values == j)[0][0]
                 if ctxBlocksData[j].bStart - threshold < tempTransBlock.bStart and ctxBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
                     ME_B.append(j)
             tempTransBlock.setMEList(ME_A, ME_B)
@@ -509,14 +489,9 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP):
 cpdef apply_TS(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.int threshold):
     assert(aStart.dtype == np.int and aEnd.dtype == np.int and bStart.dtype == np.int and bEnd.dtype == np.int)
     cdef Py_ssize_t i, j,  n = len(aStart)
-#    print(n)
     assert(n == len(aEnd) == len(bStart) == len(bEnd))
-#    cdef np.ndarray[double, ndim =2] res = np.empty(n).reshape([10,10])
-#    print(res)
     cdef np.ndarray[object, ndim =2 ] df =  np.array([[np.nan]*n]*n, dtype=object)
-#    print(df)
     for i in range(n):
-#        df[i][i] = True
         for j in range(i+1,n):
             df[i][j] =  True if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold else False
     return df
@@ -531,8 +506,6 @@ def getSynPath(blocks):
         lastBlock = blocks[lastBlock].bestParentID        
     synPath.append(lastBlock)
     return(synPath[::-1])
-
-#%%
 
 cpdef getInvBlocks(invTree, invertedCoordsOri):
     cdef int nrow, i, child
@@ -550,6 +523,84 @@ cpdef getInvBlocks(invTree, invertedCoordsOri):
             invBlocks[child].addParent(block.id)
     return(invBlocks)
 
+def getConnectivityGraph(blocksList):
+    outOG = Graph().as_directed()
+    outOG.add_vertices(len(blocksList))
+    if len(blocksList) == 0:
+        return outOG
+    
+    ## Add edges and edge weight
+    edgeList = deque()
+    esWeight = deque()
+    sourceList = deque()
+    targetList = deque()
+    for i in blocksList:
+        if len(i.children) > 0:
+            edgeList.extend(list(zip([i.id]*len(i.children), i.children)))
+            esWeight.extend([-i.score]*len(i.children))
+            sourceList.extend([i.id]*len(i.children))
+            targetList.extend(i.children)
+    outOG.add_edges(list(edgeList))
+    outOG.es["weight"] = list(esWeight)
+    outOG.es["source"] = list(sourceList)
+    outOG.es["target"] = list(targetList)
+    return outOG
+
+cpdef getAllLongestPaths(graph,sNode, eNode, np.ndarray[np.int32_t, ndim =1] source, np.ndarray[np.int32_t, ndim =1] target, np.ndarray[np.float32_t, ndim=1] weight, by="weight"):
+    """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
+    directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
+    are negative, so shortest path from sNode to eNode corresponds to the longest path.
+       
+        Parameters
+        ----------
+        graph: directeed igraph Graph(),
+            Directed acyclic graph containing all the nodes and edges in the graph.
+           
+        sNode: int, 
+            index of the start node in the graph.
+       
+        eNode: int list,
+            list of all end nodes. longest path from start node to end nodes will be
+            calculated
+        
+        by: igraph edge weight
+        
+        Returns
+        -------
+        list of len(eNodes) longest paths from sNodes to eNodes
+        
+    """
+    pathList = []
+    cdef:
+        cdef Py_ssize_t i, j, n = len(graph.vs.indices)
+        np.ndarray[np.int32_t, ndim =1] pred = np.array([-1]*n, dtype = np.int32)
+        np.ndarray[np.float32_t, ndim=1] dist = np.array([np.float32('inf')]*n, dtype = np.float32)
+
+    dist[sNode] = 0
+    changes = True
+    for i in range(n-1):
+        if not changes:
+            break
+        changes = False
+        for j in range(len(source)):
+            if dist[source[j]] + weight[j] < dist[target[j]]:
+                changes = True
+                dist[target[j]] = dist[source[j]] + weight[j]
+                pred[target[j]] = source[j]
+                
+    for j in range(len(source)):
+        if dist[source[j]] + weight[j] < dist[target[j]]:
+            sys.exit("Negative weight cycle identified")
+
+    for key in eNode:
+        if dist[key] != float("inf"):
+            path = []
+            while key!=sNode:
+                path.append(key)
+                key = pred[key]
+            path.append(sNode)
+            pathList.append(np.array(path[::-1], dtype="int32"))
+    return(pathList)
 
 cpdef list getShortest(invBlocks):
     cdef:
@@ -568,15 +619,17 @@ cpdef list getShortest(invBlocks):
 
 cpdef list getRevenue(invBlocks, shortest, np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray iDen):
     cdef:
-        list revenue, i, j, values, startA, endA, startB, endB, iden
-        int k, l
+        list revenue,i, values, startA, endA, startB, endB, iden
+        np.ndarray[np.int32_t] j 
+        np.int32_t k
+        Py_ssize_t l
     revenue = []
     for i in shortest:
         values = []
         for j in i:
             if len(j) == 1:
                 values.append(invBlocks[j[0]].score)
-            else:              
+            else:       
                 score = 0
                 startA = [aStart[j[0]]]
                 endA = [aEnd[j[0]]]
@@ -632,7 +685,6 @@ cpdef dict getNeighbourSyn(np.ndarray aStartInv, np.ndarray aEndInv, np.ndarray 
         upBlock  = -1
         downBlock = len(indexSyn)   
         for j in upSyn[::-1]:
-#            print(aStartInv[i], aEndInv[i], bStartInv[i], bEndInv[i], bDirInv[i], aStartSyn[j], aEndSyn[j], bStartSyn[j], bEndSyn[j], bDirSyn[j])
             if bDirSyn[j] == bDirInv[i]:
                 if (aStartInv[i] - aStartSyn[j]) > threshold and (aEndInv[i] - aEndSyn[j]) > threshold and (bStartInv[i] - bStartSyn[j]) > threshold and (bEndInv[i] - bEndSyn[j]) > threshold:
                     upBlock = j
@@ -655,12 +707,12 @@ cpdef dict getNeighbourSyn(np.ndarray aStartInv, np.ndarray aEndInv, np.ndarray 
         neighbourSyn[i] = [upBlock, downBlock]
     return(neighbourSyn)
     
-#%%cython
 cpdef list getCost(list synPath, list shortest, dict neighbourSyn, list synBlockScore, synData, invertedCoordsOri):
     cdef:
-        list cost, i, j, values
+        list cost, i, values
         int leftSyn, rightSyn, leftEnd, rightEnd, overlapLength
         double syncost
+        np.ndarray[np.int32_t] j
     cost = []
     synLength = len(synPath)
     for i in shortest:
@@ -695,37 +747,13 @@ def getInversions(coords,chromo, threshold, synData, synPath):
             self.profit = revenue - cost
             self.neighbours = list(neighbours)
             self.invPos = invPos
-       
-    def bestInv(profG):
-        cdef:
-            int i, j
-            list scores
-            int vcount = profG.vcount()
-        for i in range(vcount):
-            parents = profG.neighbors(i,'IN')
-            if len(parents) > 0:
-                scores = [profG.vs[j]["score"] for j in parents]
-                profG.vs[i]["parent"] = parents[scores.index(max(scores))]
-                profG.vs[i]["score"] = profG.vs[i]["score"] + max(scores)
-        nodeScores = profG.vs["score"]
-    #    print(nodeScores)
-        node = profG.vs[nodeScores.index(max(nodeScores))]
-        bestInvPath = []
-        while(node["parent"]):
-            bestInvPath.append(node.index)
-            node = profG.vs[node["parent"]]
-    
-        bestInvPath.append(node.index)
-        return(bestInvPath[::-1])
-        
-    
+           
     invertedCoordsOri = coords.loc[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == -1)]
     
     if len(invertedCoordsOri) == 0:
         return(invertedCoordsOri, [],[],invertedCoordsOri,[],[])
         
     invertedCoords = invertedCoordsOri.copy()    
-#    minCoords = np.min(np.min(invertedCoords[["bStart","bEnd"]]))
     maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
     
     invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart 
@@ -795,10 +823,9 @@ def getInversions(coords,chromo, threshold, synData, synPath):
     #### Find optimal set of inversions from all profitable inversions
     #####################################################################
     profitInvs = [p.profit for p in profitable]
-    if len(profitInvs) > 0:  
-        vcount = len(profitable)+2
-        profG =  Graph().as_directed()
-        profG.add_vertices(vcount)
+
+    if len(profitInvs) > 0: 
+        lp = len(profitable)
         iAStart = deque()
         iAEnd = deque()
         iBStart = deque()
@@ -814,61 +841,39 @@ def getInversions(coords,chromo, threshold, synData, synPath):
         iBStart = np.array(iBStart)
         iBEnd = np.array(iBEnd)
         
-        edgeList = deque()
-        esWeight = deque()
-        chNodes = deque()
-        vsScore = deque()
-        
-        for i in range(len(profitable)):
+        scores = np.array([i.profit for i in profitable], dtype= int)
+        parents = np.array([-1]*lp, dtype = int)
+        totscore = scores.copy()
+        for i in range(lp):
             nonOverlapA = np.where(iAStart > (iAEnd[i] - threshold))[0]
             nonOverlapB = np.where(iBStart > (iBEnd[i] - threshold))[0]
-            childNodes = np.intersect1d(nonOverlapA, nonOverlapB) + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes 
-            edgeList.extend(list(zip([i+1]*len(childNodes), childNodes)))
-            esWeight.extend([profitable[i].profit]*len(childNodes))
-            chNodes.append(list(childNodes))
-            vsScore.append(profitable[i].profit)
-            
-            ## Add edges to graph if a million edges have been found
-            if len(edgeList) > 1000000:             
-                profG.add_edges(list(edgeList))
-                profG.es["weight"] = list(esWeight)
-                edgeList = deque()
-                esWeight = deque()
-
-                
-        profG.add_edges(list(edgeList))
-        profG.es["weight"] = list(esWeight)
-        profG.vs[range(1,len(profG.vs))]["child"] = list(chNodes)
-        profG.vs[range(1,len(profG.vs))]["score"] = list(vsScore)
-                        
-        profG.vs[[0,vcount-1]]["score"] = 0
+            childNodes = np.intersect1d(nonOverlapA, nonOverlapB, assume_unique=True) #.astype("uint32") + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes
+            chIndex =  np.where(scores[childNodes] + totscore[i] > totscore[childNodes])[0]
+            totscore[childNodes[chIndex]] = scores[childNodes[chIndex]] + totscore[i]
+            parents[childNodes[chIndex]] = i
+                   
+        maxid = totscore.argmax()
+        bestInvPath = deque([maxid])
+        while parents[i] != -1:
+            bestInvPath.append(parents[i])
+            i = parents[i]
+        bestInvPath = list(bestInvPath)[::-1]
         
-        noInEdge = np.where(np.array(profG.vs[1:-1].indegree()) == 0)[0] + 1
-        noOutEdge = np.where(np.array(profG.vs[1:-1].outdegree()) == 0)[0] + 1
-        
-        profG.add_edges(list(zip([0]*len(noInEdge),noInEdge)))
-        profG.es[-len(noInEdge):]["weight"] = 0
-        profG.vs[0]["child"] = noInEdge
-        
-        profG.add_edges(list(zip(noOutEdge,[vcount-1]*len(noOutEdge))))
-        profG.es[-len(noOutEdge):]["weight"] = profitable[i-1].profit
-        profG.vs[list(noOutEdge)]["child"] = vcount-1
-    
-        bestInvPath = bestInv(profG)
     else:
         bestInvPath = []
+
     
     print("found bestInvPath", chromo, str(datetime.now()))
 
-    invBlocksIndex = unlist([profitable[i-1].invPos for i in bestInvPath])
+    invBlocksIndex = unlist([profitable[i].invPos for i in bestInvPath])
     invData = invertedCoordsOri.iloc[invBlocksIndex]
     
     badSyn = []
     synInInv = []
     for i in bestInvPath:
-        invNeighbour = profitable[i-1].neighbours
+        invNeighbour = profitable[i].neighbours
 #        synInInv = list(range(invNeighbour[0]+1, invNeighbour[1]))
-        invPos = profitable[i-1].invPos
+        invPos = profitable[i].invPos
         invCoord = [invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2]]
         for j in range(invNeighbour[0]+1, invNeighbour[1]):
             sd = synData.iloc[j][["aStart","aEnd","bStart","bEnd"]]
@@ -876,10 +881,7 @@ def getInversions(coords,chromo, threshold, synData, synPath):
                 synInInv.append(j)
             else:
                 badSyn.append(j)
-    
 
-#    invNeighbours  = [profitable[i-1].neighbours for i in bestInvPath]
-#    synInInv = unlist([list(range(i[0]+1, i[1])) for i in invNeighbours])
     return(invertedCoordsOri, profitable, bestInvPath,invData, synInInv, badSyn)
                
 def getRedundantIndex(inPlaceBlocks, outPlaceBlocks, threshold):
@@ -1008,94 +1010,22 @@ def findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd):
     bBlocks = list(np.where((inPlaceBlocks.bStart.values < bEnd) & (inPlaceBlocks.bEnd.values > bStart) == True)[0])
     return(aBlocks, bBlocks)
     
-    
-def getConnectivityGraph(blocksList):
-    outOG = Graph().as_directed()
-    outOG.add_vertices(len(blocksList))
-    if len(blocksList) == 0:
-        return outOG
-    ## Add edges and edge weight
-    
-    edgeList = deque()
-    esWeight = deque()
-    sourceList = deque()
-    targetList = deque()
-    for i in blocksList:
-        if len(i.children) > 0:
-            edgeList.extend(list(zip([i.id]*len(i.children), i.children)))
-            esWeight.extend([-i.score]*len(i.children))
-            sourceList.extend([i.id]*len(i.children))
-            targetList.extend(i.children)
-    outOG.add_edges(list(edgeList))
-    outOG.es["weight"] = list(esWeight)
-    outOG.es["source"] = list(sourceList)
-    outOG.es["target"] = list(targetList)
-    return outOG
-
-cpdef getAllLongestPaths(graph,sNode, eNode, np.ndarray[np.int32_t, ndim =1] source, np.ndarray[np.int32_t, ndim =1] target, np.ndarray[np.float32_t, ndim=1] weight, by="weight"):
-    """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
-    directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
-    are negative, so shortest path from sNode to eNode corresponds to the longest path.
-       
-        Parameters
-        ----------
-        graph: directeed igraph Graph(),
-            Directed acyclic graph containing all the nodes and edges in the graph.
-           
-        sNode: int, 
-            index of the start node in the graph.
-       
-        eNode: int list,
-            list of all end nodes. longest path from start node to end nodes will be
-            calculated
-        
-        by: igraph edge weight
-        
-        Returns
-        -------
-        list of len(eNodes) longest paths from sNodes to eNodes
-        
-    """
-    pathList = []
-    cdef:
-        cdef Py_ssize_t i, j, n = len(graph.vs.indices)
-        np.ndarray[np.int32_t, ndim =1] pred = np.array([-1]*n, dtype = np.int32)
-        np.ndarray[np.float32_t, ndim=1] dist = np.array([np.float32('inf')]*n, dtype = np.float32)
-
-    dist[sNode] = 0
-    changes = 1
-
-    for i in range(n-1):
-        if changes == 0:
-            break
-        changes = 0
-        for j in range(len(source)):
-            if dist[source[j]] + weight[j] < dist[target[j]]:
-                changes = 1
-                dist[target[j]] = dist[source[j]] + weight[j]
-                pred[target[j]] = source[j]
-    for j in range(len(source)):
-        if dist[source[j]] + weight[j] < dist[target[j]]:
-            sys.exit("Negative weight cycle identified")
-
-    for key in eNode:
-        if dist[key] != float("inf"):
-            path = []
-            while key!=sNode:
-                path.append(key)
-                key = pred[key]
-            path.append(sNode)
-            pathList.append(path[::-1])
-    return(pathList)
 
 
+#
+#%%cython
+#import numpy as np
+#cimport numpy as np
+#import sys
+#
+#
+#
 
 
 cpdef np.ndarray getTranslocationScore(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray aLen, np.ndarray bLen, np.ndarray translocations):
     """Function to score the proposed translocation block based on the number of
         basepairs it explains and the gaps between alignments of the block
     """
-#    print(len(translocations))
     cdef Py_ssize_t i,j,k, n = len(translocations)
     cdef int l
     cdef np.float blockScore, aScore, bScore, aGap, bGap
@@ -1127,7 +1057,6 @@ cpdef np.ndarray getTranslocationScore_ctx(np.ndarray aStart, np.ndarray aEnd, n
     """Function to score the proposed translocation block based on the number of
         basepairs it explains and the gaps between alignments of the block
     """
-#    print(len(translocations))
     cdef Py_ssize_t i,j,k, n = len(translocations)
     cdef int l
     cdef np.float blockScore, aScore, bScore, aGap, bGap
@@ -1270,51 +1199,7 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
                     blockBlength += almntData[almnt]['bLen']
                     blockAUni += almntData[almnt]['aScore']
                     blockBUni += almntData[almnt]['bScore']
-#                    aStart = orderedBlocks.iat[almnt,0]
-#                    aEnd = orderedBlocks.iat[almnt,1]
-#                    if orderedBlocks.iat[almnt,8] == 1:
-#                        bStart = orderedBlocks.iat[almnt,2]
-#                        bEnd = orderedBlocks.iat[almnt,3]
-#                    else:
-#                        bStart = orderedBlocks.iat[almnt,3]
-#                        bEnd = orderedBlocks.iat[almnt,2]      
-#                    blockAlength += orderedBlocks.iat[almnt,4]
-#                    blockBlength += orderedBlocks.iat[almnt,5]
-#                    
-#                    aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd)
-#        
-#                    for aBlock in aBlocks:
-#                        if inPlaceBlocks.iat[aBlock,0] - aStart < threshold and aEnd - inPlaceBlocks.iat[aBlock,1] < threshold:
-#                            aStart = aEnd
-#                            break
-#                        elif inPlaceBlocks.iat[aBlock,0] < aStart and inPlaceBlocks.iat[aBlock,1] < aEnd:
-#                            aStart = inPlaceBlocks.iat[aBlock,1]
-#                        else:
-#                            blockAUni += inPlaceBlocks.iat[aBlock,0] - aStart
-#                            if inPlaceBlocks.iat[aBlock,1] < aEnd:
-#                                aStart = inPlaceBlocks.iat[aBlock,1]
-#                            else:
-#                                aStart = aEnd
-#                                break
-#                    blockAUni += aEnd - aStart
-#                    
-#                    
-#                    for bBlock in bBlocks:
-#                        bBlockEnd = inPlaceBlocks.iat[bBlock,3]
-#                        bBlockStart = inPlaceBlocks.iat[bBlock,2]
-#                        if bBlockStart - bStart < threshold and bEnd - bBlockEnd < threshold:
-#                            bStart = bEnd
-#                            break
-#                        elif bBlockStart < bStart and bBlockEnd < bEnd:
-#                            bStart = bBlockEnd
-#                        else:
-#                            blockBUni += bBlockStart - bStart
-#                            if bBlockEnd < bEnd:
-#                                bStart = bBlockEnd
-#                            else:
-#                                bStart = bEnd
-#                                break
-#                    blockBUni += bEnd - bStart
+
         #Trans block is selected IFF either the unique region on any genome is larger than 1kb
         # or length of unique region on a genome is larger than 0.5 times the length of
         # the overlapping region on that genome
@@ -1406,143 +1291,7 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
                 if blockAUni > tUC or blockBUni > tUC or blockAUni > tUP*blockAlength or blockBUni > tUP*blockBlength:
                     outBlocks.append(block)
             return(outBlocks)
-        
-#        positiveTransScores = [np.where(np.array(i) >= 0)[0] for i in transScores]
-#        transBlocks = [getValues(shortTrans[i], positiveTransScores[i]) for i in range(len(shortTrans))]
-#        transBlocks = [i for j in transBlocks for i in j]
-#        outBlocks = []
-#        if not isinstance(ctx,bool):
-#            print("CTX status must be a boolean")
-#            sys.exit()
-#        if not ctx:
-#            for block in transBlocks:
-#                blockAlength = 0
-#                blockBlength = 0
-#                blockAUni = 0
-#                blockBUni = 0
-#                
-#                for almnt in block:
-#                    aStart = transData.iat[almnt,0]
-#                    aEnd = transData.iat[almnt,1]
-#                    if transData.iat[almnt,8] == 1:
-#                        bStart = transData.iat[almnt,2]
-#                        bEnd = transData.iat[almnt,3]
-#                    else:
-#                        bStart = transData.iat[almnt,3]
-#                        bEnd = transData.iat[almnt,2]      
-#                    blockAlength += transData.iat[almnt,4]
-#                    blockBlength += transData.iat[almnt,5]
-#                    
-#                    aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd)
-#        
-#                    for aBlock in aBlocks:
-#                        if inPlaceBlocks.iat[aBlock,0] - aStart < threshold and aEnd - inPlaceBlocks.iat[aBlock,1] < threshold:
-#                            aStart = aEnd
-#                            break
-#                        elif inPlaceBlocks.iat[aBlock,0] < aStart and inPlaceBlocks.iat[aBlock,1] < aEnd:
-#                            aStart = inPlaceBlocks.iat[aBlock,1]
-#                        else:
-#                            blockAUni += inPlaceBlocks.iat[aBlock,0] - aStart
-#                            if inPlaceBlocks.iat[aBlock,1] < aEnd:
-#                                aStart = inPlaceBlocks.iat[aBlock,1]
-#                            else:
-#                                aStart = aEnd
-#                                break
-#                    blockAUni += aEnd - aStart
-#                    
-#                    
-#                    for bBlock in bBlocks:
-#                        bBlockEnd = inPlaceBlocks.iat[bBlock,3]
-#                        bBlockStart = inPlaceBlocks.iat[bBlock,2]
-#                        if bBlockStart - bStart < threshold and bEnd - bBlockEnd < threshold:
-#                            bStart = bEnd
-#                            break
-#                        elif bBlockStart < bStart and bBlockEnd < bEnd:
-#                            bStart = bBlockEnd
-#                        else:
-#                            blockBUni += bBlockStart - bStart
-#                            if bBlockEnd < bEnd:
-#                                bStart = bBlockEnd
-#                            else:
-#                                bStart = bEnd
-#                                break
-#                    blockBUni += bEnd - bStart
-#        #Trans block is selected IFF either the unique region on any genome is larger than 1kb
-#        # or length of unique region on a genome is larger than 0.5 times the length of
-#        # the overlapping region on that genome
-#                if blockAUni > 1000 or blockBUni > 1000 or blockAUni > 0.5*blockAlength or blockBUni > 0.5*blockBlength:
-#                    outBlocks.append(block)
-#            return(outBlocks)
-#        ##########
-#        ## With CTX
-#        ##########
-#        if ctx:
-#            for block in transBlocks:
-#                blockAlength = 0
-#                blockBlength = 0
-#                blockAUni = 0
-#                blockBUni = 0
-#                
-#                for almnt in block:
-#                    index = transData.index.values[almnt]
-#                    aStart = transData.at[index,"aStart"]
-#                    aEnd = transData.at[index,"aEnd"]
-#                    bStart = transData.at[index,"bStart"]
-#                    bEnd = transData.at[index,"bEnd"]
-#                    
-#                    if bEnd < bStart:
-#                        print("CTX Input: bStart must be less than bEnd")
-#                        sys.exit()
-#     
-#                    blockAlength += transData.at[index,"aLen"]
-#                    blockBlength += transData.at[index,"bLen"]
-#                    
-#    #                aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd)
-#                    aBlocks = list(np.intersect1d(np.where(inPlaceBlocks.aStart.values < aEnd)[0], np.where(inPlaceBlocks.aEnd.values > aStart)[0]))
-#                    aBlocks = list(np.intersect1d(aBlocks, np.where(inPlaceBlocks.aChr == transData.at[index,"aChr"])[0]))
-#                    aBlocks = getValues(inPlaceBlocks.index.values,aBlocks)
-#        
-#                    for aBlock in aBlocks:
-#                        if inPlaceBlocks.at[aBlock,"aStart"] - aStart < threshold and aEnd - inPlaceBlocks.at[aBlock,"aEnd"] < threshold:
-#                            aStart = aEnd
-#                            break
-#                        elif inPlaceBlocks.at[aBlock,"aStart"] < aStart and inPlaceBlocks.at[aBlock,"aEnd"] < aEnd:
-#                            aStart = inPlaceBlocks.at[aBlock,"aEnd"]
-#                        else:
-#                            blockAUni += inPlaceBlocks.at[aBlock,"aStart"] - aStart
-#                            if inPlaceBlocks.at[aBlock,"aEnd"] < aEnd:
-#                                aStart = inPlaceBlocks.at[aBlock,"aEnd"]
-#                            else:
-#                                aStart = aEnd
-#                                break
-#                    blockAUni += aEnd - aStart
-#                    
-#                    bBlocks = list(np.intersect1d(np.where(inPlaceBlocks.bStart.values < bEnd)[0], np.where(inPlaceBlocks.bEnd.values > bStart)[0]))
-#                    bBlocks = list(np.intersect1d(bBlocks, np.where(inPlaceBlocks.bChr == transData.at[index,"bChr"])[0]))
-#                    bBlocks = getValues(inPlaceBlocks.index.values, bBlocks)
-#                    
-#                    for bBlock in bBlocks:
-#                        bBlockStart = inPlaceBlocks.at[bBlock,"bStart"]
-#                        bBlockEnd = inPlaceBlocks.at[bBlock,"bEnd"]
-#                        if bBlockStart -bStart < threshold and bEnd - bBlockEnd < threshold:
-#                            bStart = bEnd
-#                            break
-#                        elif bBlockStart < bStart and bBlockEnd < bEnd:
-#                            bStart = bBlockEnd
-#                        else:
-#                            blockBUni += bBlockStart - bStart
-#                            if bBlockEnd < bEnd:
-#                                bStart = bBlockEnd
-#                            else:
-#                                bStart = bEnd
-#                                break
-#                    blockBUni += bEnd - bStart
-#        #Trans block is selected IFF either the unique region on any genome is larger than 1kb
-#        # or length of unique region on a genome is larger than 0.5 times the length of
-#        # the overlapping region on that genome
-#                if blockAUni > 1000 or blockBUni > 1000 or blockAUni > 0.5*blockAlength or blockBUni > 0.5*blockBlength:
-#                    outBlocks.append(block)
-#            return(outBlocks)
+      
     
     orderedBlocksList = makeBlocksList(outOrderedBlocks, orderedBlocks)
     outOG = getConnectivityGraph(orderedBlocksList)
@@ -1556,10 +1305,10 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
 #        getAllLongestPaths(outOG,i,eNode,source, target, weight, "weight")
         shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,source, target, weight, "weight"))   
     shortestOutOG = np.array(shortestOutOG)
+    print("starting getTranslocationScore",str(datetime.now()))
     if not ctx:
         transScores = getTranslocationScore(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, shortestOutOG)
     elif ctx:
-        print("starting getTranslocationScore",str(datetime.now()))
         transScores = getTranslocationScore_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, orderedBlocks.bDir.values, shortestOutOG)
         print("finished getTranslocationScore",str(datetime.now()))
         
@@ -1666,58 +1415,104 @@ cpdef np.ndarray[np.npy_bool, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.n
     cdef np.ndarray outOrderedBlocks =  np.array([[np.False_]*n]*n, dtype=np.bool)
     
     for i in range(n):
-#        if i%1000 ==0:
-#            print(i)
         for j in range(i,n):
             if bDir[i] != bDir[j]:
                 sys.exit("ERROR: bDir not matching")
             elif aChr[i] != aChr[j] or bChr[i] != bChr[j]:
                 continue
-#                outOrderedBlocks[i][j] = False              #False
             elif bDir[i] == 1:
                 if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
                     outOrderedBlocks[i][j] = True          #True
                 else:
                     continue
-#                    outOrderedBlocks[i][j] = False       #False
             elif bDir[i] == -1:
                 if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[i] - bStart[j]) > threshold and (bEnd[i] - bEnd[j]) > threshold:
                     outOrderedBlocks[i][j] = True
                 else:
                     continue
-#                    outOrderedBlocks[i][j] = False
             else:
                 sys.exit("ERROR: ILLEGAL BDIR VALUE")
     return(outOrderedBlocks)
              
+#
+#def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
+#    assert(list(transGroupIndices.keys()) == list(range(len(transGroupIndices))))
+#    nodeStack = np.zeros(len(transGroupIndices), dtype='uint8')
+#    visitedTransBlock = np.zeros(len(transGroupIndices), dtype='uint8')
+#    transCluster = []
+#    
+#    j = 0
+#    for key,value in transGroupIndices.items():
+#        if visitedTransBlock[key] == 0:
+#            visitedTransBlock[key]=1
+#            newGroup = [key]
+#            node1 = value[0]
+#            node2 = value[1]
+#            nodeStack[transGenomeAGroups[node1].member] = 1
+#            nodeStack[transGenomeBGroups[node2].member] = 1
+#            nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
+#            while len(np.nonzero(nodeStack)[0]) > 0:
+#                newKey = np.where(nodeStack == 1)[0][0]
+#                if visitedTransBlock[newKey]== 0:
+#                    visitedTransBlock[newKey] = 1
+#                    newGroup.append(newKey)
+#                    nodeStack[transGenomeAGroups[transGroupIndices[newKey][0]].member] = 1 
+#                    nodeStack[transGenomeBGroups[transGroupIndices[newKey][1]].member] = 1
+#                    nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
+#            newGroup.sort()
+#            transCluster.append(list(newGroup))
+#    return(transCluster)
+
 
 def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
     assert(list(transGroupIndices.keys()) == list(range(len(transGroupIndices))))
     nodeStack = np.zeros(len(transGroupIndices), dtype='uint8')
     visitedTransBlock = np.zeros(len(transGroupIndices), dtype='uint8')
+    visitedIndices = deque()
     transCluster = []
-    
-    j = 0
+    addedAGroups = []
+    addedBGroups = []
+    count = 0
     for key,value in transGroupIndices.items():
         if visitedTransBlock[key] == 0:
             visitedTransBlock[key]=1
+            visitedIndices.append(key)
             newGroup = [key]
             node1 = value[0]
             node2 = value[1]
+            addedAGroups.append(value[0])
+            addedBGroups.append(value[1])
             nodeStack[transGenomeAGroups[node1].member] = 1
             nodeStack[transGenomeBGroups[node2].member] = 1
-            nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
-            while len(np.nonzero(nodeStack)[0]) > 0:
+            nodeStack[visitedIndices] = 0
+#            nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
+            while 1 in nodeStack:
+                count=count+1
+                if count%20000 ==0:
+                    print(count, str(datetime.now()))
+        
                 newKey = np.where(nodeStack == 1)[0][0]
                 if visitedTransBlock[newKey]== 0:
                     visitedTransBlock[newKey] = 1
+                    visitedIndices.append(newKey)
                     newGroup.append(newKey)
-                    nodeStack[transGenomeAGroups[transGroupIndices[newKey][0]].member] = 1 
-                    nodeStack[transGenomeBGroups[transGroupIndices[newKey][1]].member] = 1
-                    nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
+                    aInd = transGroupIndices[newKey][0]
+                    bInd = transGroupIndices[newKey][1]
+                    nodeStack[newKey] = 0
+                    
+                    if aInd not in addedAGroups:
+                        nodeStack[transGenomeAGroups[aInd].member] = 1
+                        addedAGroups.append(aInd)
+                        nodeStack[visitedIndices] = 0
+                    if bInd not in addedBGroups:
+                        nodeStack[transGenomeBGroups[bInd].member] = 1
+                        addedBGroups.append(bInd)
+                        nodeStack[visitedIndices] = 0
             newGroup.sort()
             transCluster.append(list(newGroup))
     return(transCluster)
+
+
 
 def getBestClusterSubset(cluster, transBlocksData, bRT):
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
@@ -1829,34 +1624,27 @@ def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):
         for i in np.nonzero(tempCluster)[0]:
             transBlocksScore[i] = (transBlocksData[i].aEnd - transBlocksData[i].aStart) + (transBlocksData[i].bEnd - transBlocksData[i].bStart)
         while tempCluster.sum() > 0:
-#            print("while",tempCluster.sum())
             while tempCluster.sum() != length:
                 length = tempCluster.sum()
                 for i in np.nonzero(tempCluster)[0]:
                     if hasattr(transBlocksData[i],"meTo"):
                         if outBlocks[transBlocksData[i].meTo].sum() > 0:
-#                            print("has",i)
                             tempCluster[i] = 0
                             skipList[i]=1
                     elif hasattr(transBlocksData[i], "meAlist"):
                         if len(np.where(outBlocks[transBlocksData[i].meAlist] == 1)[0]) > 0 and len(np.where(outBlocks[transBlocksData[i].meBlist] == 1)[0]) > 0:
-#                            print("has2",i)
                             tempCluster[i] = 0
                             skipList[i] = 1
                 for i in np.nonzero(tempCluster)[0]:
                     if hasattr(transBlocksData[i],"meTo"):
                         if skipList[transBlocksData[i].meTo].sum() == len(transBlocksData[i].meTo):
-                            
-#                            print("has3",i)
                             tempCluster[i] = 0
                             outBlocks[i]=1
                     elif hasattr(transBlocksData[i], "meAlist"):
                         if skipList[transBlocksData[i].meAlist].sum() == len(transBlocksData[i].meAlist) and skipList[transBlocksData[i].meBlist].sum() == len(transBlocksData[i].meBlist):
-#                            print("has4",i)
                             tempCluster[i] = 0
                             outBlocks[i] = 1
             
-#            print("if",tempCluster.sum())
             if tempCluster.sum() > 0:
                 topBlocks = sorted(np.nonzero(tempCluster)[0], key = lambda x: transBlocksScore[x], reverse = True)[:20]
                 totalScore = sum(transBlocksScore[i] for i in topBlocks)
@@ -3135,7 +2923,6 @@ def getBlocksData(filePaths, fileTypes):
     
     for i in filePaths[1:]:
         fileData = pd.read_table(i, header = None)
-#        print(fileData.head())
         fileData = fileData.loc[fileData[0] == "#"]
         fileData = fileData[[1,2,4,5]]
         fileData.columns = ["aStart", "aEnd","bStart","bEnd"]
@@ -3211,7 +2998,6 @@ def getConservedRegions(dataList, isSyn = True):
     count = 0
     for row in allCoords.itertuples(index=False):
         count+=1
-#        print(row.end, terminalData[row.bGenome].end)
         if row.end <= terminalData[row.bGenome].end:
             print("values must be sorted. Invalid Entry: ",row, terminalData[row.bGenome])
             sys.exit()
@@ -3221,11 +3007,8 @@ def getConservedRegions(dataList, isSyn = True):
         else:
             terminalData[row.bGenome].start = row.start
             terminalData[row.bGenome].end = row.end
-#        print(terminalData)
         if max(terminalData.loc["start"]) < min(terminalData.loc["end"]):
             regions.append((max(terminalData.loc["start"]),min(terminalData.loc["end"])))
-#        if count == 20:
-##            break
     regions = pd.DataFrame(regions, columns = ["start","end"])
     return regions
 
@@ -3287,13 +3070,11 @@ def getCLQ(adjM,partSize):
             return self.Z[t, self.partIndex[b]:self.partIndex[b]+self.partSize[b]]
 
         def getBt(self, partSize, t):
-#            nodeCount = [sum(self.Z[t,:partSize[0]])]
             nodeCount = [sum(self.getBits(t,i)) for i in self.BsOut]
             return self.BsOut[nodeCount.index(min(nodeCount))]
         
         def bitCLQ(self, t):
             bt = self.getBt(self.partSize, t)
-#            print(bt)
             sigBits = np.where(np.array(self.getBits(t,bt)) == True)[0]
             sigBitsLen = len(sigBits)
             count = 0
@@ -3305,7 +3086,6 @@ def getCLQ(adjM,partSize):
                 self.Z[t,nt] = 0
                 self.S.append(nt)
                 if len(self.S) == self.clqSize:
-#                    print("found clique:", self.S)
                     self.Q.append(self.S.copy())
                     self.S.remove(nt)
                 else:
