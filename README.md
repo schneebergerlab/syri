@@ -14,7 +14,7 @@
 2. Open it and run:
 
 ```bash
-python3 setup.py build_ext --inplace
+python3 setup.py install
 ```
 
 This will compile cython code.
@@ -26,9 +26,14 @@ Chromosomal assemblies need to be aligned. This can be done using mummer's nucme
 tool. The nucmer specific parameter would depend on the complexity of the concerned
 genomes (amount of repeat regions) and assembly quality (gaps).
 
-a
-
 ```bash
+## sample nucmer run
+nucmer --maxmatch -c 500 -b 500 -l 100 refgenome qrygenome;
+delta-filter -m -i 90 -l 100 out.delta > out_m_i90_l100.delta; 
+show-coords -THrd out_m_i90_l100.delta > out_m_i90_l100.coords;
+```
+
+Here, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as such
 ## nucmer
 
 ### SR identification:
