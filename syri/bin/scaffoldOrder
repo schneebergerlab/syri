@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Spyder Editor
+
+This is a temporary script file.
+"""
+
+#%%
+import argparse
+import os
+import sys
+
+def scaffoldOrder(args):
+    cwdPath = os.getcwd()+os.sep
+    queryPath = args.qry.name
+    coordsFilePath = args.coords.name
+    scafSizeCutOff = args.s
+    alignSizeCutOff = args.a
+    nsLen = args.n
+    
+    gpFileList = glob(cwdPath+"*.gp")
+    if len(gpFileList) == 0:
+        sys.exit("NO mummerplot output file found")
+    else:
+        print("Found info for generating",len(gpFileList),"chromosomes")
+        
+    
+    queryGenome = {fasta.id:fasta for fasta in parse(queryPath,'fasta')}
+    ## Size of each molecule in query
+    scafSize = {fasta.id: len(fasta.seq) for fasta in queryGenome.values()}
+    ##select long molecules
+    longScaf = getValues(list(scafSize.keys()),np.where(np.array(list(scafSize.values())) > scafSizeCutOff)[0])
+    
+    ##select long alignments between ref and long scaffolds
+    coords = pd.read_table(coordsFilePath,header=None)
+    coordsFilter = coords.loc[coords[4] > alignSizeCutOff]
+    coordsFilter = coordsFilter.loc[coordsFilter[10].isin(longScaf)]
+    
+    ## identify scaffold-refChrom pairing from alignment data
+    scafCountDict, scafSizeDict, scafChrDict = getscafDict(np.unique(coordsFilter[10]), coordsFilter, scafSize)
+    uniChrom = np.unique(coordsFilter[9])
+    NNs = "N"*nsLen
+    ## get files corresponding to individual refGenome
+    chrGpDict = {i:gp for i in uniChrom for gp in gpFileList if i in gp}
+    
+    ##create pseudo-genome using the scaffold order data from mummerplot output file
+    pseudoGenome = []
+    anchorInfo = []
+    for chromo in sorted(chrGpDict.keys()):
+        gpFilePath = chrGpDict[chromo]
+        chromoLen = 0
+        orderedScafID, invertedID = orderFromMummerplot(gpFilePath)
+        
+        scaffoldList = []
+        for i in orderedScafID:
+            if i in scafChrDict.keys():
+                if scafChrDict[i] == chromo:
+                    scaffoldList.append(i)
+        chromSeq = []
+        
+        for i in scaffoldList:
+            if i in invertedID:
+                chromSeq.append(str(queryGenome[i].seq.reverse_complement()))
+                anchorInfo.append([chromo,chromoLen+1,chromoLen+scafSize[i],i,scafSize[i],"-"])
+            else:
+                chromSeq.append(str(queryGenome[i].seq))
+                anchorInfo.append([chromo,chromoLen+1,chromoLen+scafSize[i],i,scafSize[i],"+"])
+            chromoLen = chromoLen + scafSize[i] + nsLen
+    
+        pseudoGenome.append(SeqRecord(seq=Seq((NNs).join(chromSeq)), id = chromo, description=""))
+    
+    anchorInfo = pd.DataFrame(anchorInfo,columns = ["chrom","start","end","contig","length","orientation"])
+    anchorInfo.to_csv(cwdPath+"anchorInfo.txt", sep = "\t")
+    pseudoPath = cwdPath+"pseudoGenome.fasta"
+    write(pseudoGenome,pseudoPath,"fasta")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Use incomplete assembly (in fasta) and alignment information to generate pseudo genome",formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("qry", help="fasta file of incomplete assembly",type= argparse.FileType('r'))
+    parser.add_argument("coords", help="alignment information", type=argparse.FileType('r'))
+    parser.add_argument("-s", help="minimum scaf size (in bp) to use in pseudo genome", type=int, default=50000)
+    parser.add_argument("-a", help="minimum align size (in bp) to use in estimating scaf:chrom pairing", type=int, default=10000)
+    parser.add_argument("-n", help="number of Ns (in bp) to add between two scaffolds", type=int, default=500)
+            
+    if len(sys.argv[1:]) == 0:
+        parser.print_help()
+        sys.exit()
+    
+    cwdPath = os.getcwd()+os.sep
+    args = parser.parse_args()
+    import pandas as pd
+    import numpy as np
+    from pyxFiles.synsearchFunctions import orderFromMummerplot, getscafDict
+    from func.myUsefulFunctions import getValues
+    from Bio.SeqIO import parse, write
+    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+    from glob import glob
+    scaffoldOrder(args)
+
+    
+
+

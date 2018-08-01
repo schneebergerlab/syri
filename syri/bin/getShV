@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Mar  2 15:53:32 2018
+
+@author: goel
+
+function:
+    find SNPs (all, syntenic_snp, trans_snp) with no indels and buff >= value
+
+input:
+    mumSNPIn.txt: alignment information (input to show-coords)
+    delta-file
+    synOut.txt TLOut.txt: information of alignment class
+"""
+import argparse
+import os
+from collections import deque
+
+def getRegions(fin):
+    try:
+        finData = pd.read_table(fin, header = None)
+    except pd.errors.ParserError as e:
+        finData = pd.read_table(fin, header=None, engine ="python")
+    except pd.io.common.EmptyDataError:
+        print(fin+" is empty. Skipping analysing it.")
+        return(pd.DataFrame(columns=["start", "end","chr"]))
+    except Exception as e:
+        print("ERROR: while trying to read ", fin,":", e)
+        return(pd.DataFrame(columns=["start", "end","chr"]))
+    finData = finData.loc[finData[0] == "#"][[2,3,1]]
+    finData.columns = ["start", "end","chr"]
+    return(finData)
+
+def getAligns(fin):
+    try:
+        finData = pd.read_table(fin, header = None)
+    except pd.errors.ParserError as e:
+        finData = pd.read_table(fin, header=None, engine ="python")
+    except pd.io.common.EmptyDataError:
+        print(fin+" is empty. Skipping analysing it.")
+        return(pd.DataFrame(columns=[0,1,2,3,'aChr', 'bChr']))
+    except Exception as e:
+        print("ERROR: while trying to read ", fin,":", e)
+        return(pd.DataFrame(columns=[0,1,2,3,'aChr', 'bChr']))
+    annoIndices = np.where(finData[0] =="#")[0]
+    annoIndices = np.append(annoIndices,len(finData))
+    repCount = annoIndices[1:] - annoIndices[:-1] - 1
+    annoData = finData.loc[finData[0] == "#"].copy()
+    coordsData = finData.loc[finData[0] !="#"].copy()
+    coordsData = coordsData[[0,1,2,3]].astype(dtype = "int64")
+    coordsData["aChr"] = list(np.repeat(annoData[1],repCount))
+    coordsData["bChr"] = list(np.repeat(annoData[5],repCount))
+    invertLoc = coordsData[2] > coordsData[3]
+    coordsData.loc[invertLoc,2] = coordsData.loc[invertLoc,2] + coordsData.loc[invertLoc,3]
+    coordsData.loc[invertLoc,3] = coordsData.loc[invertLoc,2] - coordsData.loc[invertLoc,3]
+    coordsData.loc[invertLoc,2] = coordsData.loc[invertLoc,2] - coordsData.loc[invertLoc,3]
+    return(coordsData)
+
+def getAlignSNPS(snpData, region):
+    regSNPs = deque()
+    chroms = pd.unique(region.aChr)
+    for chrom in chroms:
+        print(chrom)
+        chromsnp = snpData.loc[snpData[12] == chrom]
+        chromreg = region.loc[region.aChr == chrom]
+        for x in chromreg.itertuples(index=False):
+            regSNPs.append(chromsnp.loc[(chromsnp[13] == x[5]) & (chromsnp[0] >= x[0]) & (chromsnp[0] <= x[1]) & (chromsnp[3] >= x[2]) & (chromsnp[3] <= x[3])].copy())
+    regSNPs = pd.concat(regSNPs, axis=0)
+    print(regSNPs.shape)
+    regSNPs = regSNPs.drop_duplicates()
+    return(regSNPs)
+
+def getSNPs(fName, snpData):
+    region = getAligns(fName)
+    fSNPs = getAlignSNPS(snpData,region)
+    return(fSNPs)
+    
+def getStrictSyn(fileNames, fin):
+    try:
+        synSNPs = pd.read_table(fin, header = None)
+    except pd.errors.ParserError as e:
+        synSNPs = pd.read_table(fin, header = None, engine ="python")
+    srReg = pd.DataFrame()
+    for fName in fileNames[1:]:
+        srReg = srReg.append(getRegions(fName))
+    
+    srReg.sort_values(['chr','start','end'], inplace = True)
+    srReg.index= range(srReg.shape[0])
+    
+    chroms = np.unique(synSNPs[12])      
+    strictSyn = [False]*synSNPs.shape[0]
+    for chrom in chroms:
+        print(chrom)
+        srData = srReg.loc[srReg.chr == chrom]
+        synData = synSNPs.loc[synSNPs[12] == chrom]
+        for row in synData.itertuples():
+            if row.Index %10000 ==0:
+                print(row.Index)
+            if any((srData.start <= row[1]) & (srData.end >= row[1])):
+                strictSyn[row.Index] = True
+    strictSynSNPs = synSNPs.loc[~np.array(strictSyn)]
+    strictSynSNPs.to_csv("snps_no_indels_buff"+str(buff)+"_strict_syn", header =None, sep="\t",index = False)
+    
+
+def indels(fileNames, fin):
+    try:
+        indData = pd.read_table(fin, header=None)
+    except pd.errors.ParserError as e:
+        indData = pd.read_table(fin, header=None, engine ="python")
+    indData = indData.loc[(indData[1]==".") |(indData[2] ==".")]
+    for fName in fileNames:
+        try:
+            fInd = getSNPs(fName, indData)
+            fInd.to_csv("indels_"+fName.split("Out.txt")[0], header = None, sep = '\t', index = False)
+        except ValueError:
+            open(fName,"w").close()
+    
+    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("delta", help="location of delta file", type=argparse.FileType('r'))
+    parser.add_argument('-d','--dir',help="path to working directory (in not current directory)", action = 'store', default = os.getcwd()+os.sep)
+    parser.add_argument('-b',help="buff size. Select only those SNPs which are surrounded by exact match for 'b' bases", type=int, default=25)
+
+    args = parser.parse_args()
+    from subprocess import Popen, PIPE
+    import pandas as pd
+    import numpy as np
+    deltaFile = args.delta.name
+    cwdPath = args.dir + os.sep
+    buff = args.b
+    alignFile = open("mumSNPIn.txt","r")
+    snpFile = open("snps.txt","w")
+    
+    p = Popen(["show-snps -HlrTS "+deltaFile],stdin = alignFile,stdout=snpFile,stderr=PIPE,shell=True)
+    p.wait()
+    print("stderr:", p.communicate()[1])
+    snpFile.close()
+    alignFile.close()
+    
+    alignFile = open("mumSNPIn.txt","r")
+    snpFile = open("snps_no_indels.txt","w")
+    p = Popen(["show-snps -HlrTIS "+deltaFile],stdin = alignFile,stdout=snpFile,stderr=PIPE,shell=True)
+    p.wait()
+    print("stderr:", p.communicate()[1])
+    alignFile.close()
+    snpFile.close()        
+    
+    try:
+        snpData = pd.read_table("snps_no_indels.txt", header=None)
+    except pd.errors.ParserError as e:
+        snpData = pd.read_table("snps_no_indels.txt", header=None, engine ="python")
+    snpData = snpData.loc[snpData[4] > buff]
+    snpData = snpData.drop_duplicates()
+    snpData.to_csv("snps_no_indels_buff"+str(buff)+".txt", header = None, sep = "\t", index = False)
+    
+    
+    fileNames = ["synOut.txt", "invOut.txt","TLOut.txt","invTLOut.txt", "dupOut.txt","invDupOut.txt", "ctxOut.txt"]
+    
+    for fName in fileNames:
+        try:
+            fSNPs = getSNPs(fName, snpData)
+            fSNPs.to_csv("snps_no_indels_buff"+str(buff)+"_"+fName.split("Out.txt")[0], header = None, sep = '\t', index = False)
+        except ValueError:
+            open(fName,"w").close()
+            
+    indels(fileNames, "snps.txt")
+    getStrictSyn(fileNames, "snps_no_indels_buff"+str(buff)+"_syn")
+
+        

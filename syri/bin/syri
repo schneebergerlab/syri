@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 10 13:05:51 2017
+
+@author: goel
+"""
+import argparse 
+import os
+   
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("inFile", help="location of coords file", type=argparse.FileType('r'))
+    parser.add_argument("-T","--threshold", help="If alignments have more than 'threshold' bases in common, they would be considered as overlapping", type=int,default=50, name ="adsfa")
+    parser.add_argument("-B","--bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds)", type = int, default = 60)
+    parser.add_argument("-C","--TransUniCount", help="Number of uniques bps for selecting translocation", type = int, default = 1000    )
+    parser.add_argument("-P","--TransUniPercent", help="Percent of unique region requried to select tranalocation. Value should be in range (0,1]", type = float, default = 0.5)
+    parser.add_argument('--nCores', help="number of cores to use (max is number of chromosomes)", type=int, default=1)
+    parser.add_argument('-d','--dir',help="path to working directory (in not current directory)", action = 'store', default = os.getcwd()+os.sep)
+    parser.add_argument("-I","--increaseBy", help="Minimum score increase required to add another alingment to translocation cluster solution", type = int, default = 1000)
+    parser.add_argument("-p","--prefix", help="Prefix to add before the output file Names", type = str, default = "")
+    parser.add_argument("--seed", help="seed for generating random numbers", type = int, default = 1)
+    
+
+    args = parser.parse_args()
+    from syri.pyxFiles.synsearchFunctions import startSyri
+#    print(args)
+    startSyri(args)
+    
+    
