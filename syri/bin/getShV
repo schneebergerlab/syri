@@ -121,6 +121,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("delta", help="location of delta file", type=argparse.FileType('r'))
     parser.add_argument('-d','--dir',help="path to working directory (in not current directory)", action = 'store', default = os.getcwd()+os.sep)
+    parser.add_argument('-sspath',help= "path to show-snps")
     parser.add_argument('-b',help="buff size. Select only those SNPs which are surrounded by exact match for 'b' bases", type=int, default=25)
 
     args = parser.parse_args()

@@ -9,7 +9,7 @@
     - Biopython
 - MUMmer3
 
-## **Installation guide**:
+## Installation guide:
 1. Download the directory
 2. Open it and run:
 
@@ -19,7 +19,9 @@ python3 setup.py install
 
 This will compile cython code.
 
-## **Genome difference identification**:
+All executables would be in ```syri/bin/```.
+
+## Genome difference identification:
 
 ### Pre-requisite:
 Chromosomal assemblies need to be aligned. This can be done using mummer's nucmer
@@ -27,17 +29,63 @@ tool. The nucmer specific parameter would depend on the complexity of the concer
 genomes (amount of repeat regions) and assembly quality (gaps).
 
 ```bash
-## sample nucmer run
+## sample nucmer run, filtering of alignment (optional, but recommended), and transforming delta file into tab-delimited file format.
 nucmer --maxmatch -c 500 -b 500 -l 100 refgenome qrygenome;
 delta-filter -m -i 90 -l 100 out.delta > out_m_i90_l100.delta; 
 show-coords -THrd out_m_i90_l100.delta > out_m_i90_l100.coords;
 ```
 
-Here, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as suchHere, --maxmatch (for nucmer), -m (for delta-filter), -THrd(for show-coords) are critical and should be used as such
-## nucmer
+Here, ```--maxmatch``` (for nucmer), ```-m``` (for delta-filter), ```-THrd``` (for show-coords) are critical and should be used as such to ensure that the output format is correct.
 
-### SR identification:
+### SR identification ```(./syri/bin/syri)```:
+Main tool of this package. This takes ```*.coords``` file as input and process them to annotate structural rearrangements. The output is stored in seven files corresponding to syntenic (synOut.txt) and six classes of SRs inversion (invOut.txt), translocation (TLOut.txt), inverted translocation (invTLOut.txt), duplication (dupOut.txt), inverted duplication (invDupOut.txt), and cross-chromosomal exchange (ctxOut.txt). The files use a two layer structure reporting and annotated block and the alignments which constitute the block.
 
+```
+#	Chr1	8241	610363	-	Chr1	1	601274              
+8241	550541	1	542302  
+549844	587482	541241	578850  
+588093	610363	578947	601274  
+#	Chr1	610355	1160239	-	Chr1	602856	1153904  
+610355	670785	602856	663228  
+671022	768174	663228	760407  
+768166	821005	761285	814172  
+```
+Here, the lines starting with '#' correspond to alignment block, and lines below it (till the beginning of next annotated blocks) are the alignments in this block. For blocks, the columns are: RefChr | RefStart | RefEnd |  - | QryChr |  QryStart |  QryEnd , and for alignments: RefStart | RefEnd | QryStart |  QryEnd.
+
+Command to run ```syri```:
+```bash
+#From terminal:
+syri out_m_i90_l100.coords 
+```
+#### syriynSearch.py:
+
+- Main script to find structural rearrangement between two genomes.
+- run from the folder containing the coords file from mummer:
+    - python \<path to SynSearch.py\> \<coords file name\> \<number of CPU cores to use\>
+- Each chromosomes runs on a separate CPU core, so using 1 CPU will analyse chromosomes sequentially, while using 5 cores (for A.thaliana) will analyse all chromosomes in parallel
+- Output will be created in same directory (6 files per chromosome + 1 file for CTX)
+- Sample input files are in /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/ directory.
+  - Ex: /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_ler_Chr/out_m_i90_l100.coords
+
+### **scaffoldOrder.py**
+- Script to generate pseudo-chromosomes using mummer alignment (coords file) and mummerplot output (.gp file)
+- Run from the folder containing the coords file from mummer:
+    - python \<path to scaffoldOrder.py\>  \<path to thequery genome\> \<coords file name\>
+- Automatically scans the working directory for mummerplot output files. Each chromosome must have a separate mummerplot output
+  - Run mummerplot as: mummerplot -l -f -r \<chrID\> -p \<chrID\> --postscript out.delta
+- Test files are at /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_Ler_inhouse
+
+### **synsearchFunctions.py**
+- collection of functions used by other files
+
+### **myUsefulFunctions.py**
+- collection of generally useful python functions
+
+### **multiSV.py**
+- Script to analyse multiple. Still work in progress. I think the code is very intuitive, so use can try it out on their own.
+
+### **jobStarter.py**
+- Script with example how to run process from within python. Not useful as of now
 
 
 
@@ -99,33 +147,18 @@ Windows:
 
 
 
-  
-### **SynSearch.py**:
-- Main script to find structural rearrangement between two genomes.
-- run from the folder containing the coords file from mummer:
-    - python \<path to SynSearch.py\> \<coords file name\> \<number of CPU cores to use\>
-- Each chromosomes runs on a separate CPU core, so using 1 CPU will analyse chromosomes sequentially, while using 5 cores (for A.thaliana) will analyse all chromosomes in parallel
-- Output will be created in same directory (6 files per chromosome + 1 file for CTX)
-- Sample input files are in /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/ directory.
-  - Ex: /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_ler_Chr/out_m_i90_l100.coords
+<!---
 
-### **scaffoldOrder.py**
-- Script to generate pseudo-chromosomes using mummer alignment (coords file) and mummerplot output (.gp file)
-- Run from the folder containing the coords file from mummer:
-    - python \<path to scaffoldOrder.py\>  \<path to thequery genome\> \<coords file name\>
-- Automatically scans the working directory for mummerplot output files. Each chromosome must have a separate mummerplot output
-  - Run mummerplot as: mummerplot -l -f -r \<chrID\> -p \<chrID\> --postscript out.delta
-- Test files are at /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_Ler_inhouse
-
-### **synsearchFunctions.py**
-- collection of functions used by other files
-
-### **myUsefulFunctions.py**
-- collection of generally useful python functions
-
-### **multiSV.py**
-- Script to analyse multiple. Still work in progress. I think the code is very intuitive, so use can try it out on their own.
-
-### **jobStarter.py**
-- Script with example how to run process from within python. Not useful as of now
-
+Table can be generated like this:
+# **Syntax_block**
+# 
+# RefChr | RefStart | RefEnd |  - | QryChr |  QryStart |  QryEnd 
+# --- | --- | --- | --- | --- | --- | ---
+#  Chr1 |	8241 | 610363 |	- |	Chr1 |	1	 | 601274 
+# 
+# **Syntax_alignment**
+# 
+# | RefStart | RefEnd | QryStart |  QryEnd |
+# |--- | --- | --- | ---|
+# | 8241	| 550541 |	1 |	542302 |
+-->
