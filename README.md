@@ -14,7 +14,7 @@
 2. Open it and run:
 
 ```bash
-python3 setup.py install
+$ python3 setup.py install
 ```
 
 This will compile cython code.
@@ -35,10 +35,42 @@ delta-filter -m -i 90 -l 100 out.delta > out_m_i90_l100.delta;
 show-coords -THrd out_m_i90_l100.delta > out_m_i90_l100.coords;
 ```
 
-Here, ```--maxmatch``` (for nucmer), ```-m``` (for delta-filter), ```-THrd``` (for show-coords) are critical and should be used as such to ensure that the output format is correct.
+Here, `--maxmatch` (for nucmer), `-m` (for delta-filter), `-THrd` (for show-coords) are critical and should be used as such to ensure that the output format is correct.
 
-### SR identification ```(./syri/bin/syri)```:
-Main tool of this package. This takes ```*.coords``` file as input and process them to annotate structural rearrangements. The output is stored in seven files corresponding to syntenic (synOut.txt) and six classes of SRs inversion (invOut.txt), translocation (TLOut.txt), inverted translocation (invTLOut.txt), duplication (dupOut.txt), inverted duplication (invDupOut.txt), and cross-chromosomal exchange (ctxOut.txt). The files use a two layer structure reporting and annotated block and the alignments which constitute the block.
+### SR identification using `syri`:
+This is the main method of this package. It takes `*.coords` file as input and process them to annotate structural rearrangements. 
+syri can be run using the following command in working directory:
+```bash
+$ syri /path/to/coords/file [options]
+```
+<!---where, the accepted parameters are:
+```
+optional arguments:
+  -h, --help          show this help message and exit
+  -b BRUTERUNTIME     Cutoff to restrict brute force methods to take too much
+                      time (in seconds). Smaller values would make algorithm
+                      faster, but could have marginal effects on accuracy. In
+                      general case, would not be required. (default: 60)
+  -c TRANSUNICOUNT    Number of uniques bps for selecting translocation.
+                      Smaller values would select smaller TLs better, but may
+                      increase time and decrease accuracy. (default: 1000)
+  -p TRANSUNIPERCENT  Percent of unique region requried to select
+                      tranalocation. Value should be in range (0,1]. Smaller
+                      values would selection of translocation which are more
+                      overlapped with other regions. (default: 0.5)
+  -nC NCORES          number of cores to use in parallel (max is number of
+                      chromosomes) (default: 1)
+  -d DIR              path to working directory (if not current directory)
+                      (default: /biodata/dep_coupland/grp_schneeberger/project
+                      s/SynSearch/scripts/python/syri/)
+  -i INCREASEBY       Minimum score increase required to add another alingment
+                      to translocation cluster solution (default: 1000)
+  --prefix PREFIX     Prefix to add before the output file Names (default: )
+  -s SEED             seed for generating random numbers (default: 1)
+
+```-->
+
+The output is stored in seven files corresponding to syntenic regions (synOut.txt) and six classes of SRs inversion (invOut.txt), translocation (TLOut.txt), inverted translocation (invTLOut.txt), duplication (dupOut.txt), inverted duplication (invDupOut.txt), and cross-chromosomal exchange (ctxOut.txt). The files use a two layer structure reporting annotated block and the alignments which constitute the block.
 
 ```
 #	Chr1	8241	610363	-	Chr1	1	601274              
@@ -50,23 +82,16 @@ Main tool of this package. This takes ```*.coords``` file as input and process t
 671022	768174	663228	760407  
 768166	821005	761285	814172  
 ```
-Here, the lines starting with '#' correspond to alignment block, and lines below it (till the beginning of next annotated blocks) are the alignments in this block. For blocks, the columns are: RefChr | RefStart | RefEnd |  - | QryChr |  QryStart |  QryEnd , and for alignments: RefStart | RefEnd | QryStart |  QryEnd.
+Here, the lines starting with '#' correspond to alignment block, and lines below it (till the beginning of next annotated block) are the alignments in this block. For blocks, the columns are: RefChr | RefStart | RefEnd |  - | QryChr |  QryStart |  QryEnd , and for alignments: RefStart | RefEnd | QryStart |  QryEnd.
 
-Command to run ```syri```:
+### SV identification using `getsv`:
+This tool uses the output of syri and identifies structure variations between the two genomes, outputs divergent (not aligned) regions, and creates input alignment file which can be used with show-snps (from mummer) to get SNPs and indels.
+
 ```bash
-#From terminal:
-syri out_m_i90_l100.coords 
+#Usage:
+$ getsv [-d /path/to/directory/(if)/not/current/directory]
 ```
-#### syriynSearch.py:
-
-- Main script to find structural rearrangement between two genomes.
-- run from the folder containing the coords file from mummer:
-    - python \<path to SynSearch.py\> \<coords file name\> \<number of CPU cores to use\>
-- Each chromosomes runs on a separate CPU core, so using 1 CPU will analyse chromosomes sequentially, while using 5 cores (for A.thaliana) will analyse all chromosomes in parallel
-- Output will be created in same directory (6 files per chromosome + 1 file for CTX)
-- Sample input files are in /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/ directory.
-  - Ex: /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_ler_Chr/out_m_i90_l100.coords
-
+getsv can simply be run in the working directory (containing output files from syri) without any parameter, or 
 ### **scaffoldOrder.py**
 - Script to generate pseudo-chromosomes using mummer alignment (coords file) and mummerplot output (.gp file)
 - Run from the folder containing the coords file from mummer:

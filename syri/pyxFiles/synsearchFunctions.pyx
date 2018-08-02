@@ -2345,10 +2345,7 @@ class transBlock:
         self.aUni = True if blockAUni > 1000 or blockAUni > 0.5*(self.aEnd-self.aStart) else False
         self.bUni = True if blockBUni > 1000 or blockBUni > 0.5*(self.bEnd-self.bStart) else False
         
-    def checkOverlapWithSynBlocks_A(self,inPlaceBlocks, threshold):
-#        aBlocks = list(np.intersect1d(np.where(inPlaceBlocks.aStart.values < self.aEnd)[0],\
-#                                      np.where(inPlaceBlocks.aEnd.values > self.aStart)[0]))
-        
+    def checkOverlapWithSynBlocks_A(self,inPlaceBlocks, threshold):        
         aBlocks = list(np.where((inPlaceBlocks.aStart.values < self.aEnd) & (inPlaceBlocks.aEnd.values > self.aStart) == True)[0])
         
 

@@ -143,7 +143,7 @@ $(document).ready(function () {
 <li>Download the directory</li>
 <li>Open it and run:</li>
 </ol>
-<pre class="bash"><code>python3 setup.py install</code></pre>
+<pre class="bash"><code>$ python3 setup.py install</code></pre>
 <p>This will compile cython code.</p>
 <p>All executables would be in <code>syri/bin/</code>.</p>
 </div>
@@ -158,9 +158,37 @@ delta-filter -m -i 90 -l 100 out.delta &gt; out_m_i90_l100.delta;
 show-coords -THrd out_m_i90_l100.delta &gt; out_m_i90_l100.coords;</code></pre>
 <p>Here, <code>--maxmatch</code> (for nucmer), <code>-m</code> (for delta-filter), <code>-THrd</code> (for show-coords) are critical and should be used as such to ensure that the output format is correct.</p>
 </div>
-<div id="sr-identification-.syribinsyri" class="section level3">
-<h3>SR identification <code>(./syri/bin/syri)</code>:</h3>
-<p>Main tool of this package. This takes <code>*.coords</code> file as input and process them to annotate structural rearrangements. The output is stored in seven files corresponding to syntenic (synOut.txt) and six classes of SRs inversion (invOut.txt), translocation (TLOut.txt), inverted translocation (invTLOut.txt), duplication (dupOut.txt), inverted duplication (invDupOut.txt), and cross-chromosomal exchange (ctxOut.txt). The files use a two layer structure reporting and annotated block and the alignments which constitute the block.</p>
+<div id="sr-identification-using-syri" class="section level3">
+<h3>SR identification using <code>syri</code>:</h3>
+<p>This is the main method of this package. It takes <code>*.coords</code> file as input and process them to annotate structural rearrangements. syri can be run using the following command in working directory:</p>
+<pre class="bash"><code>$ syri /path/to/coords/file [options]</code></pre>
+<!---where, the accepted parameters are:
+```
+optional arguments:
+  -h, --help          show this help message and exit
+  -b BRUTERUNTIME     Cutoff to restrict brute force methods to take too much
+                      time (in seconds). Smaller values would make algorithm
+                      faster, but could have marginal effects on accuracy. In
+                      general case, would not be required. (default: 60)
+  -c TRANSUNICOUNT    Number of uniques bps for selecting translocation.
+                      Smaller values would select smaller TLs better, but may
+                      increase time and decrease accuracy. (default: 1000)
+  -p TRANSUNIPERCENT  Percent of unique region requried to select
+                      tranalocation. Value should be in range (0,1]. Smaller
+                      values would selection of translocation which are more
+                      overlapped with other regions. (default: 0.5)
+  -nC NCORES          number of cores to use in parallel (max is number of
+                      chromosomes) (default: 1)
+  -d DIR              path to working directory (if not current directory)
+                      (default: /biodata/dep_coupland/grp_schneeberger/project
+                      s/SynSearch/scripts/python/syri/)
+  -i INCREASEBY       Minimum score increase required to add another alingment
+                      to translocation cluster solution (default: 1000)
+  --prefix PREFIX     Prefix to add before the output file Names (default: )
+  -s SEED             seed for generating random numbers (default: 1)
+
+```-->
+<p>The output is stored in seven files corresponding to syntenic regions (synOut.txt) and six classes of SRs inversion (invOut.txt), translocation (TLOut.txt), inverted translocation (invTLOut.txt), duplication (dupOut.txt), inverted duplication (invDupOut.txt), and cross-chromosomal exchange (ctxOut.txt). The files use a two layer structure reporting annotated block and the alignments which constitute the block.</p>
 <pre><code>#   Chr1    8241    610363  -   Chr1    1   601274              
 8241    550541  1   542302  
 549844  587482  541241  578850  
@@ -169,46 +197,14 @@ show-coords -THrd out_m_i90_l100.delta &gt; out_m_i90_l100.coords;</code></pre>
 610355  670785  602856  663228  
 671022  768174  663228  760407  
 768166  821005  761285  814172  </code></pre>
-<p>Here, the lines starting with ‘#’ correspond to alignment block, and lines below it (till the beginning of next annotated blocks) are the alignments in this block. For blocks, the columns are: RefChr | RefStart | RefEnd | - | QryChr | QryStart | QryEnd , and for alignments: RefStart | RefEnd | QryStart | QryEnd. <!---
-# **Syntax_block**
-# 
-# RefChr | RefStart | RefEnd |  - | QryChr |  QryStart |  QryEnd 
-# --- | --- | --- | --- | --- | --- | ---
-#  Chr1 |   8241 | 610363 | - | Chr1 |  1    | 601274 
-# 
-# **Syntax_alignment**
-# 
-# | RefStart | RefEnd | QryStart |  QryEnd |
-# |--- | --- | --- | ---|
-# | 8241    | 550541 |  1 | 542302 |
---></p>
-<div id="syriynsearch.py" class="section level4">
-<h4>syriynSearch.py:</h4>
-<ul>
-<li>Main script to find structural rearrangement between two genomes.</li>
-<li>run from the folder containing the coords file from mummer:
-<ul>
-<li>python &lt;path to SynSearch.py&gt; &lt;coords file name&gt; &lt;number of CPU cores to use&gt;</li>
-</ul></li>
-<li>Each chromosomes runs on a separate CPU core, so using 1 CPU will analyse chromosomes sequentially, while using 5 cores (for A.thaliana) will analyse all chromosomes in parallel</li>
-<li>Output will be created in same directory (6 files per chromosome + 1 file for CTX)</li>
-<li>Sample input files are in /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/ directory.</li>
-<li>Ex: /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_ler_Chr/out_m_i90_l100.coords</li>
-</ul>
+<p>Here, the lines starting with ‘#’ correspond to alignment block, and lines below it (till the beginning of next annotated block) are the alignments in this block. For blocks, the columns are: RefChr | RefStart | RefEnd | - | QryChr | QryStart | QryEnd , and for alignments: RefStart | RefEnd | QryStart | QryEnd.</p>
 </div>
-</div>
-<div id="scaffoldorder.py" class="section level3">
-<h3><strong>scaffoldOrder.py</strong></h3>
-<ul>
-<li>Script to generate pseudo-chromosomes using mummer alignment (coords file) and mummerplot output (.gp file)</li>
-<li>Run from the folder containing the coords file from mummer:
-<ul>
-<li>python &lt;path to scaffoldOrder.py&gt; &lt;path to thequery genome&gt; &lt;coords file name&gt;</li>
-</ul></li>
-<li>Automatically scans the working directory for mummerplot output files. Each chromosome must have a separate mummerplot output</li>
-<li>Run mummerplot as: mummerplot -l -f -r &lt;chrID&gt; -p &lt;chrID&gt; –postscript out.delta</li>
-<li>Test files are at /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_Ler_inhouse</li>
-</ul>
+<div id="sv-identification-using-getsv" class="section level3">
+<h3>SV identification using <code>getsv</code>:</h3>
+<p>This tool uses the output of syri and identifies structure variations between the two genomes, outputs divergent (not aligned) regions, and creates input alignment file which can be used with show-snps (from mummer) to get SNPs and indels.</p>
+<pre class="bash"><code>#Usage:
+$ getsv [-d /path/to/directory/(if)/not/current/directory]</code></pre>
+<p>getsv can simply be run in the working directory (containing output files from syri) without any parameter, or ### <strong>scaffoldOrder.py</strong> - Script to generate pseudo-chromosomes using mummer alignment (coords file) and mummerplot output (.gp file) - Run from the folder containing the coords file from mummer: - python &lt;path to scaffoldOrder.py&gt; &lt;path to thequery genome&gt; &lt;coords file name&gt; - Automatically scans the working directory for mummerplot output files. Each chromosome must have a separate mummerplot output - Run mummerplot as: mummerplot -l -f -r &lt;chrID&gt; -p &lt;chrID&gt; –postscript out.delta - Test files are at /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_Ler_inhouse</p>
 </div>
 <div id="synsearchfunctions.py" class="section level3">
 <h3><strong>synsearchFunctions.py</strong></h3>
@@ -293,6 +289,21 @@ show-coords -THrd out_m_i90_l100.delta &gt; out_m_i90_l100.coords;</code></pre>
 <li>Open folder</li>
 <li>Run <code>python setup.py install</code></li>
 </ul>
+<!---
+
+Table can be generated like this:
+# **Syntax_block**
+# 
+# RefChr | RefStart | RefEnd |  - | QryChr |  QryStart |  QryEnd 
+# --- | --- | --- | --- | --- | --- | ---
+#  Chr1 |   8241 | 610363 | - | Chr1 |  1    | 601274 
+# 
+# **Syntax_alignment**
+# 
+# | RefStart | RefEnd | QryStart |  QryEnd |
+# |--- | --- | --- | ---|
+# | 8241    | 550541 |  1 | 542302 |
+-->
 </div>
 </div>
 </div>
