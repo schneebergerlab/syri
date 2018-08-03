@@ -17,8 +17,6 @@
 $ python3 setup.py install
 ```
 
-This will compile cython code.
-
 All executables would be in ```syri/bin/```.
 
 ## Genome difference identification:
@@ -169,26 +167,13 @@ similarly, indels are divided into files corresponding to different regions (ind
 Outfile file format is same as that from show-snps with parameters -H, -l, -r, -T.
 
 ### Pseudo-genome assembly generation `scaffoldOrder.py`
+SyRI can be used to generate reference guided pseudo-genomes (pseudo-chromosomal assemblies) to analyse genomes for which chromosome level assemblies are not available. Incomplete assembly is aligned to the reference genomes and the alignment information allows anchoring of scaffolds to get pseudo-chromosomes. Though, highly useful, this may result in higher false negatives, as being reference guided some variation will be subdued.
 - Script to generate pseudo-chromosomes using mummer alignment (coords file) and mummerplot output (.gp file)
 - Run from the folder containing the coords file from mummer:
     - python \<path to scaffoldOrder.py\>  \<path to thequery genome\> \<coords file name\>
 - Automatically scans the working directory for mummerplot output files. Each chromosome must have a separate mummerplot output
   - Run mummerplot as: mummerplot -l -f -r \<chrID\> -p \<chrID\> --postscript out.delta
 - Test files are at /netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/testRuns/col_Ler_inhouse
-
-### **synsearchFunctions.py**
-- collection of functions used by other files
-
-### **myUsefulFunctions.py**
-- collection of generally useful python functions
-
-### **multiSV.py**
-- Script to analyse multiple. Still work in progress. I think the code is very intuitive, so use can try it out on their own.
-
-### **jobStarter.py**
-- Script with example how to run process from within python. Not useful as of now
-
-
 
 
 
