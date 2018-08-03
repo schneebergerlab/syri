@@ -14,12 +14,15 @@ import sys
 if __name__ == "__main__":
 
     
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-d','--dir',help="path to working directory (in not current directory)", action = 'store', default = os.getcwd()+os.sep)
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-d','--dir',help="path to working directory (in not current directory)", action = 'store', default = ".")
     parser.add_argument("-p","--prefix", help="Prefix for filenames", type = str, default = "")
     args = parser.parse_args()
-    
-    cwdPath = args.dir + os.sep
+      
+    if args.dir == ".":
+        cwdPath = os.getcwd()+os.sep
+    else:
+        cwdPath = args.dir + os.sep
     prefix = args.prefix
     
     listDir = os.listdir(cwdPath)

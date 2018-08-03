@@ -27,7 +27,7 @@ def startSyri(args):
         coords = pd.read_table(args.inFile.name, header = None, engine = "python")
     nCores = args.nCores
     bRT = args.bruteRunTime
-    threshold = args.threshold
+    threshold = 50 ##args.threshold
     cwdPath = args.dir
     prefix = args.prefix
     tUC = args.TransUniCount

@@ -119,34 +119,44 @@ def indels(fileNames, fin):
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("delta", help="location of delta file", type=argparse.FileType('r'))
-    parser.add_argument('-d','--dir',help="path to working directory (in not current directory)", action = 'store', default = os.getcwd()+os.sep)
-    parser.add_argument('-sspath',help= "path to show-snps")
-    parser.add_argument('-b',help="buff size. Select only those SNPs which are surrounded by exact match for 'b' bases", type=int, default=25)
+    
+    parser.add_argument('align', help="input alignment file", type = argparse.FileType('r'))
+    parser.add_argument("delta", help="delta file", type=argparse.FileType('r'))
+    parser.add_argument('-d','--dir',help="path to working directory (in not current directory)", action = 'store', default = ".")
+    parser.add_argument('-ss',help= "path to show-snps from mummer")
+    parser.add_argument('-b',help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=25)
 
     args = parser.parse_args()
+    
+    import sys
     from subprocess import Popen, PIPE
     import pandas as pd
     import numpy as np
+
+    fin = args.align.name
     deltaFile = args.delta.name
-    cwdPath = args.dir + os.sep
+    cwdPath = args.dir if args.dir != "." else os.getcwd()+os.sep
+    sspath = "show-snps" if args.ss == None else args.ss
     buff = args.b
-    alignFile = open("mumSNPIn.txt","r")
-    snpFile = open("snps.txt","w")
     
-    p = Popen(["show-snps -HlrTS "+deltaFile],stdin = alignFile,stdout=snpFile,stderr=PIPE,shell=True)
+    alignFile = open(fin,"r")
+    snpFile = open("snps.txt","w")
+    p = Popen([sspath + " -HlrTS "+deltaFile],stdin = alignFile,stdout=snpFile,stderr=PIPE,shell=True)
     p.wait()
-    print("stderr:", p.communicate()[1])
+    err = p.communicate()[1].decode("utf-8") 
+    if sspath+": not found" in err:
+        sys.exit("show-snps not found at "+sspath+". Exiting")
     snpFile.close()
     alignFile.close()
     
-    alignFile = open("mumSNPIn.txt","r")
+    alignFile = open(fin,"r")
     snpFile = open("snps_no_indels.txt","w")
-    p = Popen(["show-snps -HlrTIS "+deltaFile],stdin = alignFile,stdout=snpFile,stderr=PIPE,shell=True)
+    p = Popen([sspath +" -HlrTIS "+deltaFile],stdin = alignFile,stdout=snpFile,stderr=PIPE,shell=True)
     p.wait()
-    print("stderr:", p.communicate()[1])
+#    print("stderr:", p.communicate()[1])
     alignFile.close()
-    snpFile.close()        
+    snpFile.close()   
+     
     
     try:
         snpData = pd.read_table("snps_no_indels.txt", header=None)

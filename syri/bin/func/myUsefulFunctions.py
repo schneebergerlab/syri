@@ -5,7 +5,7 @@ Created on Mon Jun 19 15:36:01 2017
 @author: goel
 """
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import operator as op
 from functools import reduce
@@ -32,14 +32,14 @@ def getValues(l, index):
 			
 def getColors(colorPalette, numOfCol):
 	return([colorPalette(i/numOfCol) for i in range(numOfCol)])
-
-def plotDensity(data):
-    density = gaussian_kde(data)
-    xs = np.linspace(min(data), max(data),1000)
-    density.covariance_factor = lambda : .2
-    density._compute_covariance()
-    plt.plot(xs,density(xs))
-    plt.show()
+#
+#def plotDensity(data):
+#    density = gaussian_kde(data)
+#    xs = np.linspace(min(data), max(data),1000)
+#    density.covariance_factor = lambda : .2
+#    density._compute_covariance()
+#    plt.plot(xs,density(xs))
+#    plt.show()
 
 def subList(lst1, lst2):
     return(list(map(op.sub,lst1, lst2)))
