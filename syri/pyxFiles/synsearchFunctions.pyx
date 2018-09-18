@@ -1106,7 +1106,7 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
         return blocksList
 
     def getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold, tUC,tUP, ctx):
-        """This method filters possible translocation blocks to select those which have a posivitive gap based score
+        """This method filters possible translocation blocks to select those which have a positive gap based score
            (output of `getTransLocationsScore`) and those which dont overlap significantly with the inPlaceBlocks.
            
            Parameters
@@ -1302,7 +1302,6 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
     for i in range(len(orderedBlocksList)):
         eNode = [i]
         eNode.extend(list(np.where(outOrderedBlocks.iloc[i] == True)[0]))
-#        getAllLongestPaths(outOG,i,eNode,source, target, weight, "weight")
         shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,source, target, weight, "weight"))   
     shortestOutOG = np.array(shortestOutOG)
     print("starting getTranslocationScore",str(datetime.now()))
@@ -2425,18 +2424,25 @@ class transBlock:
 ### SV identification functions
 #################################################################
         
-def readSVData(cwdPath, prefix):
+def readSVData(cwdPath, prefix, dup = False):
+    if not isinstance(dup, bool):
+        sys.exit("need boolean")
+    if dup:
+        fin = ["synOut.txt","invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt"]
+    else:
+        fin = ["synOut.txt","invOut.txt", "TLOut.txt", "invTLOut.txt","ctxOut.txt"]
+        
     annoCoords = pd.DataFrame()
-    for fileType in ["syn","inv","TL","invTL"]:
+    for fileType in fin[:-1]:
         try:
-            fileData = pd.read_table(cwdPath+prefix+fileType+"Out.txt", header=None, dtype = object)
+            fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object)
         except pd.errors.ParserError as e:
-            fileData = pd.read_table(cwdPath+prefix+fileType+"Out.txt", header=None, dtype = object, engine ="python")
+            fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object, engine ="python")
         except pd.io.common.EmptyDataError:
-            print(fileType, "Out.txt is empty. Skipping analysing it.")
+            print(fileType, " is empty. Skipping analysing it.")
             continue
         except Exception as e:
-            print("ERROR: while trying to read ", fileType, "Out.txt", e)
+            print("ERROR: while trying to read ", fileType, e)
             continue
             
         annoIndices = np.where(fileData[0] =="#")[0]
@@ -2455,7 +2461,7 @@ def readSVData(cwdPath, prefix):
         coordsData["group"] = reps
         coordsData["aChr"] = list(np.repeat(annoData[1],repCount))
         coordsData["bChr"] = list(np.repeat(annoData[5],repCount))
-        coordsData["state"] = fileType
+        coordsData["state"] = fileType.split("Out.txt")[0]
         annoCoords = annoCoords.append(coordsData.copy())
                                    
     try:
@@ -2473,20 +2479,20 @@ def readSVData(cwdPath, prefix):
     coordsData = fileData.loc[fileData[0] =="#"].copy()
     coordsData1 = fileData.loc[fileData[0] !="#", [0,1,2,3]].copy().astype(dtype="int")
     annoIndices = np.append(annoIndices,len(fileData))
-    repCount = annoIndices[1:] - annoIndices[:-1] - 1
-    
+    repCount = annoIndices[1:] - annoIndices[:-1] - 1    
     reps = np.repeat(range(len(annoIndices)-1), repCount)
     stateReps = np.repeat(states, repCount)
-    
-#    coordsData1 = fileData.loc[annoIndices, [0,1,2,3]] #coordsData[[0,1,2,3]].astype(dtype = "int64")
     coordsData1["aChr"] = np.repeat(coordsData[1], repCount).tolist()
     coordsData1["bChr"] = np.repeat(coordsData[5], repCount).tolist()
     coordsData1["group"] = reps
     coordsData1["state"] = stateReps
     coordsData1 = coordsData1[[0,1,2,3,"group","aChr","bChr","state"]]
-    coordsData1 = coordsData1.loc[coordsData1["state"].isin(["translocation","invTranslocation"])]
     coordsData1.loc[coordsData1.state == "translocation","state"] = "ctx"
     coordsData1.loc[coordsData1.state == "invTranslocation","state"] = "invCtx"
+    coordsData1.loc[coordsData1.state == "duplication","state"] = "ctxDup"
+    coordsData1.loc[coordsData1.state == "invDuplication","state"] = "ctxInvDup"
+    if not dup:
+        coordsData1 = coordsData1.loc[coordsData1["state"].isin(["ctx","invCtx"])]
     annoCoords = annoCoords.append(coordsData1)
     annoCoords.columns = ["aStart","aEnd","bStart","bEnd","group","aChr","bChr","state"]
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)

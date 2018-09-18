@@ -66,20 +66,34 @@ def getBed(args, cwdPath):
 def getSnpAnno(args, cwdPath):
     fin = pd.read_table(args.fin, header = None)
     fin.columns = ["chr","pos"]
+    fin.sort_values(["chr","pos"], inplace = True)
     data = readData(args, cwdPath)
-    outData = pd.DataFrame()
+    outData = deque()
+    chroms  = deque()
+    poses = deque()
     if not args.q:
+        chromo = ""
         for row in fin.itertuples():
-            regions = data.loc[(data.refChr== row.chr) & (data.refStart <= row.pos) & (data.refEnd >= row.pos)].copy()
-            regions["inChr"] = row.chr
-            regions["inPos"] = row.pos
-            outData = outData.append(regions)
+            if chromo != row.chr:
+                chrData = data.loc[(data.refChr== row.chr)].copy()
+                chromo = row.chr
+            regions = chrData.loc[(chrData.refStart <= row.pos) & (chrData.refEnd >= row.pos)].copy()
+            chroms.extend([row.chr]*len(regions))
+            poses.extend([row.pos]*len(regions))
+            outData.append(outData.append(regions))
     elif args.q:
+        chromo = ""
         for row in fin.itertuples():
-            regions = data.loc[(data.qryChr== row.chr) & (data.qryStart <= row.pos) & (data.qryEnd >= row.pos)].copy()
-            regions["inChr"] = row.chr
-            regions["inPos"] = row.pos
-            outData = outData.append(regions)    
+            if chromo != row.chr:
+                chrData = data.loc[(data.qryChr== row.chr)].copy()
+                chromo = row.chr
+            regions = chrData.loc[(data.qryStart <= row.pos) & (data.qryEnd >= row.pos)].copy()
+            chroms.extend([row.chr]*len(regions))
+            poses.extend([row.pos]*len(regions))
+            outData.append(outData.append(regions))
+    outData = pd.concat(list(outData))
+    outData["inChr"] = list(chroms)
+    outData["inPos"] = list(poses)
     print(outData.to_csv(sep="\t", index=False,header=False), end = "")
     
     
@@ -123,6 +137,7 @@ if __name__ == "__main__":
             args.f = list(map(open,['synOut.txt', 'invOut.txt', 'TLOut.txt', 'invTLOut.txt', 'dupOut.txt', 'invDupOut.txt', 'ctxOut.txt']))
     
     import pandas as pd
+    from collections import deque
     args.func(args, cwdPath)
     
     

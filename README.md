@@ -5,7 +5,7 @@
     - Numpy
     - Scipy
     - Pandas
-    - Igraph
+    - Igraph (python-igraph)
     - Biopython
 - MUMmer3
 

@@ -91,7 +91,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     import pandas as pd
     import numpy as np
-    from pyxFiles.synsearchFunctions import orderFromMummerplot, getscafDict
+    from syri.pyxFiles.synsearchFunctions import orderFromMummerplot, getscafDict
     from func.myUsefulFunctions import getValues
     from Bio.SeqIO import parse, write
     from Bio.Seq import Seq
