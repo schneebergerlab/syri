@@ -4,6 +4,7 @@ Created on Mon Jun 19 15:54:53 2017
 
 @author: goel
 """
+
 import numpy as np
 from syri.bin.func.myUsefulFunctions import *
 import sys
@@ -17,21 +18,34 @@ from multiprocessing import Pool
 from functools import partial
 import os
 from gc import collect
+from Bio.SeqIO import parse
+import logging
+import psutil
+
+
 cimport numpy as np
 
 np.random.seed(1)
 def startSyri(args):
-    try:
-        coords = pd.read_table(args.inFile.name, header = None)
-    except pd.errors.ParserError as e:
-        coords = pd.read_table(args.inFile.name, header = None, engine = "python")
+    coordsfin = args.inFile.name
     nCores = args.nCores
     bRT = args.bruteRunTime
-    threshold = 50 ##args.threshold
+    threshold = 50  ##args.threshold
     cwdPath = args.dir
     prefix = args.prefix
     tUC = args.TransUniCount
     tUP = args.TransUniPercent
+
+    LOG_FORMAT = "%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s"
+    logging.basicConfig(filename=cwdPath+"test.log", level=logging._nameToLevel[args.log], format=LOG_FORMAT)
+    logger = logging.getLogger("syri")
+
+    logger.debug("memory usage: ", psutil.Process(os.getpid()).memory_info()[0]/2.**30)
+    try:
+        coords = pd.read_table(coordsfin, header = None)
+    except pd.errors.ParserError as e:
+        coords = pd.read_table(coordsfin, header = None, engine = "python")
+
     coords.columns = ["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr"]
     aChromo = set(coords["aChr"])
     bChromo = set(coords["bChr"])
@@ -43,16 +57,17 @@ def startSyri(args):
     uniChromo.sort()
     print(uniChromo)
     with Pool(processes = nCores) as pool:
-        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP), uniChromo) 
+        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP), uniChromo)
     mergeOutputFiles(uniChromo,cwdPath, prefix)
     ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP)
     outSyn(cwdPath, threshold, prefix)
     
 def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
+    logger = logging.getLogger("syri."+chromo)
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
     print(chromo, coordsData.shape)
     print("Identifying Synteny for chromosome", chromo, str(datetime.now()))
-    df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)    
+    df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)
     nrow = df.shape[0]
     blocks = [alingmentBlock(i, np.where(df.iloc[i,] == True)[0], coordsData.iloc[i]) for i in range(nrow)]
     for block in blocks:
@@ -61,18 +76,18 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
             block.children = list(set(block.children) - set(blocks[block.children[i]].children))
             i+=1
         block.children.sort()
-        
+
         for child in block.children:
             blocks[child].addParent(block.id)
-        
+
         scores = [blocks[parent].score for parent in block.parents]
         if len(scores) > 0:
-            block.bestParent(block.parents[scores.index(max(scores))], max(scores)) 
+            block.bestParent(block.parents[scores.index(max(scores))], max(scores))
     synPath = getSynPath(blocks)
     synData = coordsData.iloc[synPath].copy()
     del(coordsData, blocks, df)
     collect()
-    
+
     
     
     ##########################################################################
@@ -171,48 +186,62 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     for i in range(len(allTransCluster)):
         allTransClusterIndices.update(dict.fromkeys(allTransCluster[i], i))
     
-    print("Translocations : making blocks data", chromo, str(datetime.now()))
     allTransBlocksData = []
+    # with open("members.txt","w") as fout:
+    #     for i in allTransCluster:
+    #         fout.write(",".join(map(str, i.member)) + "\n")
+    #     fout.write("\n\n")
+    #     for i in allTransGenomeBGroups:
+    #         fout.write(",".join(map(str, i.member)) + "\n")
+
+    print("Translocations : making blocks data", chromo, str(datetime.now()))
+    print("memory usage: ", psutil.Process(os.getpid()).memory_info()[0]/2.**30)
+
+
     for i in range(allTransBlocks.shape[0]):
-        tempTransBlock = transBlock(allTransBlocks.iat[i,0],\
+        temp_trans_block = transBlock(allTransBlocks.iat[i,0],\
                                     allTransBlocks.iat[i,1],\
                                     allTransBlocks.iat[i,2],\
                                     allTransBlocks.iat[i,3],\
                                     allTransBlocks.iat[i,4],\
                                     allTransClusterIndices[i],\
                                     i)
-        tempTransBlock.addTransGroupIndices(allTransGroupIndices[i])
-        tempTransBlock.checkOverlapWithSynBlocks(inPlaceBlocks, threshold)
-        tempTransBlock.addGenomeGroupMembers(allTransGenomeAGroups, allTransGenomeBGroups)
-        if (tempTransBlock.aUni and tempTransBlock.genomeAUni)	or (tempTransBlock.bUni and tempTransBlock.genomeBUni):
-            tempTransBlock.setStatus(1)
-        allTransBlocksData.append(tempTransBlock)
+        temp_trans_block.addTransGroupIndices(allTransGroupIndices[i])
+        temp_trans_block.checkOverlapWithSynBlocks(inPlaceBlocks, threshold)
+        temp_trans_block.checkoverlaps(allTransGenomeAGroups, allTransGenomeBGroups)
+        if (temp_trans_block.aUni and temp_trans_block.genomeAUni)	or (temp_trans_block.bUni and temp_trans_block.genomeBUni):
+            temp_trans_block.setStatus(1)
+        allTransBlocksData.append(temp_trans_block)
 
-    
+    print("Translocations : finished making blocks data", chromo, str(datetime.now()))
+    logger.debug("memory usage: ", psutil.Process(os.getpid()).memory_info()[0]/2.**30)
+
     for i in range(allTransBlocks.shape[0]):
-        tempTransBlock = allTransBlocksData[i]
-        if not tempTransBlock.aUni and not tempTransBlock.bUni:
+        if i%20000 == 0:
+            logger.debug("transBlockAdded" + i)
+        temp = allTransBlocksData[i]            ## create temporary trans blocks
+        if not temp.aUni and not temp.bUni:
             allTransCluster[allTransClusterIndices[i]].remove(i)
-        elif tempTransBlock.status == 1:
+        elif temp.status == 1:
             continue
-        elif not tempTransBlock.aUni:
-            for j in tempTransBlock.genomeBMembers:
-                if allTransBlocksData[j].bStart - threshold < tempTransBlock.bStart and allTransBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
-                    tempTransBlock.addMEBlock(j)
-        elif not tempTransBlock.bUni:
-            for j in tempTransBlock.genomeAMembers:
-                if allTransBlocksData[j].aStart - threshold < tempTransBlock.aStart and allTransBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
-                    tempTransBlock.addMEBlock(j)
+        elif not temp.aUni:
+            for j in temp.getoverlappingregions(groups = allTransGenomeBGroups,genome="b"):
+                if allTransBlocksData[j].bStart - threshold < temp.bStart and allTransBlocksData[j].bEnd + threshold > temp.bEnd:
+                    temp.addMEBlock(j)
+        elif not temp.bUni:
+            for j in temp.getoverlappingregions(groups = allTransGenomeAGroups,genome="a"):
+                if allTransBlocksData[j].aStart - threshold < temp.aStart and allTransBlocksData[j].aEnd + threshold > temp.aEnd:
+                    temp.addMEBlock(j)
         else:
-            ME_A = []
-            for j in tempTransBlock.genomeAMembers:
-                if allTransBlocksData[j].aStart - threshold < tempTransBlock.aStart and allTransBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
-                    ME_A.append(j)
-            ME_B = []
-            for j in tempTransBlock.genomeBMembers:
-                if allTransBlocksData[j].bStart - threshold < tempTransBlock.bStart and allTransBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
-                    ME_B.append(j)
-            tempTransBlock.setMEList(ME_A, ME_B)
+            me_a = []       ## list of mutually exclusive regions on "a" genome
+            for j in temp.getoverlappingregions(groups = allTransGenomeAGroups,genome="a"):
+                if allTransBlocksData[j].aStart - threshold < temp.aStart and allTransBlocksData[j].aEnd + threshold > temp.aEnd:
+                    me_a.append(j)
+            me_b = []       ## list of mutually exclusive regions on "b" genome
+            for j in temp.getoverlappingregions(groups = allTransGenomeBGroups,genome="b"):
+                if allTransBlocksData[j].bStart - threshold < temp.bStart and allTransBlocksData[j].bEnd + threshold > temp.bEnd:
+                    me_b.append(j)
+            temp.setMEList(me_a, me_b)
 
     print("Translocations : finding solutions ", chromo, str(datetime.now()))
     clusterSolutions = []
@@ -221,11 +250,11 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
             clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT))
     
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
-    clusterBlocks = unlist(clusterSolutionBlocks)
+    #clusterBlocks = unlist(clusterSolutionBlocks)
     
     print("Translocations : processing translocations ", chromo, str(datetime.now()))
     
-    transClasses = getTransClasses(clusterSolutionBlocks, allTransBlocksData)
+    transClasses = getTransClasses(clusterSolutionBlocks, allTransBlocksData, allTransGenomeAGroups, allTransGenomeBGroups)
     
     dupData = allTransBlocks.iloc[transClasses["duplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
     invDupData = allTransBlocks.iloc[transClasses["invDuplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
@@ -344,8 +373,8 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP):
                 dupGenomes[index] = "A"
         return(dupGenomes)
     
-    def printCTX(cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks ,transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks):
-        transClasses = getTransClasses(clusterSolutionBlocks, ctxBlocksData)
+    def printCTX(cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks ,transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks, genomeagroups, genomebgroups):
+        transClasses = getTransClasses(clusterSolutionBlocks, ctxBlocksData, genomeagroups, genomebgroups)
         indices = sorted(unlist(list(transClasses.values())))
         keys = [key for index in indices for key in list(transClasses.keys()) if index in transClasses[key]]
         blocksClasses = dict(zip(indices,keys))
@@ -453,20 +482,20 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP):
         elif tempTransBlock.status == 1:
             continue
         elif not tempTransBlock.aUni:
-            for j in tempTransBlock.genomeBMembers:
+            for j in tempTransBlock.getoverlappingregions(groups = ctxTransGenomeBGroups,genome="b"):
                 if ctxBlocksData[j].bStart - threshold < tempTransBlock.bStart and ctxBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
                     tempTransBlock.addMEBlock(j)
         elif not tempTransBlock.bUni:
-            for j in tempTransBlock.genomeAMembers:
+            for j in tempTransBlock.getoverlappingregions(groups = ctxTransGenomeAGroups,genome="a"):
                 if ctxBlocksData[j].aStart - threshold < tempTransBlock.aStart and ctxBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
                     tempTransBlock.addMEBlock(j)
         else:
             ME_A = []
-            for j in tempTransBlock.genomeAMembers:
+            for j in tempTransBlock.getoverlappingregions(groups = ctxTransGenomeAGroups,genome="a"):
                 if ctxBlocksData[j].aStart - threshold < tempTransBlock.aStart and ctxBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
                     ME_A.append(j)
             ME_B = []
-            for j in tempTransBlock.genomeBMembers:
+            for j in tempTransBlock.getoverlappingregions(groups = ctxTransGenomeBGroups,genome="b"):
                 if ctxBlocksData[j].bStart - threshold < tempTransBlock.bStart and ctxBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
                     ME_B.append(j)
             tempTransBlock.setMEList(ME_A, ME_B)
@@ -483,7 +512,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP):
         
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
     
-    printCTX(cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks ,transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks)
+    printCTX(cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks ,transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks, ctxTransGenomeAGroups, ctxTransGenomeBGroups)
     return 0
 
 cpdef apply_TS(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.int threshold):
@@ -1340,6 +1369,9 @@ def getTransOverlapGroups(transBlocks, orderedBlocks, threshold):
 
 
 def makeTransGroupList(transBlocksData, startC, endC, threshold):
+    """
+    Compare aligned regions and groups overlapping regions
+    """
     transBlocksTable = transBlocksData.sort_values([startC,endC])
     indices = transBlocksTable.index.values
     if len(transBlocksData) > 0:
@@ -1364,7 +1396,7 @@ def makeTransGroupList(transBlocksData, startC, endC, threshold):
 cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold, np.ndarray left, np.ndarray right):
     """Compute whether two alignments can be part of one translation block. For this:
         the alignments should not be separated by any inPlaceBlock on both ends and
-        they should be syntenic with respect to each other.
+        they should be collinear with respect to each other.
        
        Returns
        --------
@@ -1784,8 +1816,8 @@ def invertAlignmentDirection(tempData, scafSize):
     newTempData[8] = c
     return(newTempData)
     
-def getTransClasses(clusterSolutionBlocks, transData):
-    def setTL(j):
+def getTransClasses(clusterSolutionBlocks, transData, agroups, bgroups):
+    def settl(j):
         if transData[j].dir == 1:                   
             transClasses["translocation"].append(j)
         elif transData[j].dir == -1:
@@ -1793,7 +1825,7 @@ def getTransClasses(clusterSolutionBlocks, transData):
         else:
             print("ERROR ERROR ERROR", j)
             
-    def setDup(j):
+    def setdup(j):
         if transData[j].dir == 1:
              transClasses["duplication"].append(j)
         elif transData[j].dir == -1:
@@ -1812,46 +1844,46 @@ def getTransClasses(clusterSolutionBlocks, transData):
                 print("ERROR ERROR ERROR", j)
             elif transData[j].status == 1:
                 if not transData[j].aUni or not transData[j].bUni:
-                    setDup(j)
+                    setdup(j)
                 elif transData[j].aUni and transData[j].bUni:
                     if transData[j].genomeAUni and transData[j].genomeBUni:
-                        setTL(j)
+                        settl(j)
                     elif not transData[j].genomeAUni:
-                        isTrans = 1
-                        for k in transData[j].genomeAMembers:
+                        istrans = 1
+                        for k in transData[j].getoverlappingregions(groups = agroups,genome="a"):
                             if k in i:
                                 if getScore([k], transData) >= getScore([j],transData):
-                                    isTrans = 0
+                                    istrans = 0
                                     break
-                        if isTrans:
-                            setTL(j)
+                        if istrans:
+                            settl(j)
                         else:
-                            setDup(j)
+                            setdup(j)
                     elif not transData[j].genomeBUni:
-                        isTrans = 1
-                        for k in transData[j].genomeBMembers:
+                        istrans = 1
+                        for k in transData[j].getoverlappingregions(groups = bgroups,genome="b"):
                             if k in i:
                                 if getScore([k], transData) >= getScore([j],transData):
-                                    isTrans = 0
+                                    istrans = 0
                                     break
-                        if isTrans:
-                            setTL(j)
+                        if istrans:
+                            settl(j)
                         else:
-                            setDup(j)
+                            setdup(j)
             elif not transData[j].aUni or not transData[j].bUni:
-                setDup(j)
+                setdup(j)
             elif transData[j].aUni and transData[j].bUni:
                 if hasattr(transData[j],"meTo"):
                     if len(np.intersect1d(transData[j].meTo, i)) > 0:
-                        setDup(j)
+                        setdup(j)
                     else:
-                        setTL(j)
+                        settl(j)
                 elif hasattr(transData[j],"meAlist"):
                     if len(np.intersect1d(transData[j].meAlist, i)) > 0 or\
                     len(np.intersect1d(transData[j].meBlist, i)) > 0:
-                        setDup(j)
+                        setdup(j)
                     else:
-                        setTL(j)
+                        settl(j)
                 else:
                      print("ERROR ERROR ERROR", j)
     return transClasses
@@ -2269,24 +2301,32 @@ class transBlock:
         self.transClusterIndex = transClusterIndex
         self.status = 0
         self.overlappingInPlaceBlocks = []
-    
-#    def addGenomeGroupMembers(self,ctxTransGenomeAGroups, ctxTransGenomeBGroups):
-#        self.genomeAMembers = np.array(list(set(ctxTransGenomeAGroups[self.transGroupIndices[0]].member)\
-#                                       - set([self.transBlocksID])), dtype = 'int32')
-#        self.genomeBMembers = np.array(list(set(ctxTransGenomeBGroups[self.transGroupIndices[1]].member)\
-#                                       - set([self.transBlocksID])), dtype = 'int32')
-#        self.genomeAUni = True if len(self.genomeAMembers) == 0 else False
-#        self.genomeBUni = True if len(self.genomeBMembers) == 0 else False
-        
-    def addGenomeGroupMembers(self,ctxTransGenomeAGroups, ctxTransGenomeBGroups):
-        aMem = ctxTransGenomeAGroups[self.transGroupIndices[0]].member.copy()
-        aMem.remove(self.transBlocksID)
-        bMem = ctxTransGenomeBGroups[self.transGroupIndices[1]].member.copy()
-        bMem.remove(self.transBlocksID)
-        self.genomeAMembers = np.array(aMem, dtype = 'int32')
-        self.genomeBMembers = np.array(bMem, dtype = 'int32')
-        self.genomeAUni = True if len(self.genomeAMembers) == 0 else False
-        self.genomeBUni = True if len(self.genomeBMembers) == 0 else False
+
+
+    # def addGenomeGroupMembers(self,ctxTransGenomeAGroups, ctxTransGenomeBGroups):
+    #     aMem = ctxTransGenomeAGroups[self.transGroupIndices[0]].member.copy()
+    #     aMem.remove(self.transBlocksID)
+    #     bMem = ctxTransGenomeBGroups[self.transGroupIndices[1]].member.copy()
+    #     bMem.remove(self.transBlocksID)
+    #     self.genomeAMembers = np.array(aMem, dtype = 'int32')
+    #     self.genomeBMembers = np.array(bMem, dtype = 'int32')
+    #     self.genomeAUni = True if len(self.genomeAMembers) == 0 else False
+    #     self.genomeBUni = True if len(self.genomeBMembers) == 0 else False
+    #
+
+    def checkoverlaps(self, agroups, bgroups):
+        a = self.getoverlappingregions(agroups, "a")
+        b = self.getoverlappingregions(bgroups, "b")
+        self.genomeAUni = True if len(a) == 0 else False
+        self.genomeBUni = True if len(b) == 0 else False
+
+    def getoverlappingregions(self, groups, genome):
+        if genome=="a":
+            reg= groups[self.transGroupIndices[0]].member.copy()
+        elif genome =="b":
+            reg = groups[self.transGroupIndices[1]].member.copy()
+        reg.remove(self.transBlocksID)
+        return reg
 
     def addOrderedData(self, orderedData):
         self.orderedData = orderedData
@@ -2843,7 +2883,10 @@ def getSV(cwdPath, allAlignments, prefix):
     return None                
 
 
-def getNotAligned(cwdPath, prefix):    
+def getNotAligned(cwdPath, prefix, ref, qry):    
+    refSize = {fasta.id: len(fasta.seq) for fasta in parse(ref,'fasta')}
+    qrySize = {fasta.id: len(fasta.seq) for fasta in parse(qry,'fasta')}
+    
     annoCoords = pd.DataFrame()
     for fileType in ["syn","inv", "TL", "invTL","dup", "invDup"]:
         try:
@@ -2879,34 +2922,51 @@ def getNotAligned(cwdPath, prefix):
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
     annoCoords.index = range(len(annoCoords))
   
-    fout = open(cwdPath + prefix+"notAligned.txt","w")
-    df = annoCoords[["aStart","aEnd","aChr"]].copy()
-    df.sort_values(["aChr", "aStart", "aEnd"], inplace = True)
-    for chrom in sorted(annoCoords.aChr.unique()):
-        chromData = df.loc[df.aChr == chrom]
-        maxEnd = chromData.iloc[0,1]
-        for row in chromData.itertuples(index = False):
-            if row.aStart > maxEnd+1:
+    with open(cwdPath + prefix+"notAligned.txt","w") as fout:
+        df = annoCoords[["aStart","aEnd","aChr"]].copy()
+        df.sort_values(["aChr", "aStart", "aEnd"], inplace = True)
+        for chrom in sorted(annoCoords.aChr.unique()):
+            chromData = df.loc[df.aChr == chrom]
+            maxEnd = chromData.iloc[0,1]
+            if chromData.iloc[0,0] > 1:
+                fout.write("\t".join(["R",str(1),
+                                          str(chromData.iloc[0,0] - 1),
+                                          chrom]) + "\n")
+            for row in chromData.itertuples(index = False):
+                if row.aStart > maxEnd+1:
+                    fout.write("\t".join(["R",str(maxEnd+1),
+                                          str(row.aStart - 1),
+                                          chrom]) + "\n")
+                if row.aEnd > maxEnd:
+                    maxEnd = row.aEnd
+            if maxEnd < refSize[chrom]:
                 fout.write("\t".join(["R",str(maxEnd+1),
-                                      str(row.aStart - 1),
-                                      chrom]) + "\n")
-            if row.aEnd > maxEnd:
-                maxEnd = row.aEnd
-    
-    df = annoCoords[["bStart","bEnd","bChr"]].copy()
-    df.sort_values(["bChr", "bStart", "bEnd"], inplace = True)
-    for chrom in sorted(annoCoords.bChr.unique()):
-        chromData = df.loc[df.bChr == chrom]
-        maxEnd = chromData.iloc[0,1]
-        for row in chromData.itertuples(index = False):
-            if row.bStart > maxEnd+1:
+                                          str(refSize[chrom]),
+                                          chrom]) + "\n")
+            
+        
+        df = annoCoords[["bStart","bEnd","bChr"]].copy()
+        df.sort_values(["bChr", "bStart", "bEnd"], inplace = True)
+        for chrom in sorted(annoCoords.bChr.unique()):
+            chromData = df.loc[df.bChr == chrom]
+            maxEnd = chromData.iloc[0,1]
+            if chromData.iloc[0,0] > 1:
+                fout.write("\t".join(["Q",str(1),
+                                          str(chromData.iloc[0,0] - 1),
+                                          chrom]) + "\n")
+            for row in chromData.itertuples(index = False):
+                if row.bStart > maxEnd+1:
+                    fout.write("\t".join(["Q",str(maxEnd+1),
+                                          str(row.bStart - 1),
+                                          chrom]) + "\n")
+                if row.bEnd > maxEnd:
+                    maxEnd = row.bEnd
+            if maxEnd < qrySize[chrom]:
                 fout.write("\t".join(["Q",str(maxEnd+1),
-                                      str(row.bStart - 1),
-                                      chrom]) + "\n")
-            if row.bEnd > maxEnd:
-                maxEnd = row.bEnd
+                                          str(qrySize[chrom]),
+                                          chrom]) + "\n")
                 
-    fout.close()
+#    fout.close()
     return None
 
 

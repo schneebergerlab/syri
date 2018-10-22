@@ -20,6 +20,8 @@ def allMum(args):
 
 if __name__ == "__main__":  
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("ref",help="path to the reference genome", type=argparse.FileType('r'))
+    parser.add_argument("qry",help="path to the query genome", type=argparse.FileType('r'))
     parser.add_argument('-d','--dir',help="path to working directory (in not current directory)", action = 'store', default = ".")
     parser.add_argument("-p","--prefix", help="Prefix for filenames", type = str, default = "")
     parser.add_argument("--all", help="Use duplications too for variant identification",  action = "store_true", default = False)
@@ -48,5 +50,5 @@ if __name__ == "__main__":
     mumSNPIn = allAlignments[["aStart","aEnd","bStart","bEnd","aChr","bChr"]].copy()
     mumSNPIn.to_csv(cwdPath+prefix+"mumSNPIn.txt",sep="\t",header = False, index = False)
     getSV(cwdPath, allAlignments, prefix)
-    getNotAligned(cwdPath, prefix)
+    getNotAligned(cwdPath, prefix, args.ref, args.qry)
         
