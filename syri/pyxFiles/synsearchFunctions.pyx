@@ -37,10 +37,10 @@ def startSyri(args):
     tUP = args.TransUniPercent
 
     LOG_FORMAT = "%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s"
-    logging.basicConfig(filename=cwdPath+"test.log", level=logging._nameToLevel[args.log], format=LOG_FORMAT)
+    logging.basicConfig(filename=cwdPath+args.log_fin.name, level=logging._nameToLevel[args.log], format=LOG_FORMAT)
     logger = logging.getLogger("syri")
 
-    logger.debug("memory usage: ", psutil.Process(os.getpid()).memory_info()[0]/2.**30)
+    logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
     try:
         coords = pd.read_table(coordsfin, header = None)
     except pd.errors.ParserError as e:
@@ -185,11 +185,9 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     allTransClusterIndices = dict()
     for i in range(len(allTransCluster)):
         allTransClusterIndices.update(dict.fromkeys(allTransCluster[i], i))
-    
-    allTransBlocksData = []
+
     # with open("members.txt","w") as fout:
-    #     for i in allTransCluster:
-    #         fout.write(",".join(map(str, i.member)) + "\n")
+    #     for i in allTransCluster:    #         fout.write(",".join(map(str, i.member)) + "\n")
     #     fout.write("\n\n")
     #     for i in allTransGenomeBGroups:
     #         fout.write(",".join(map(str, i.member)) + "\n")
@@ -197,51 +195,106 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     print("Translocations : making blocks data", chromo, str(datetime.now()))
     print("memory usage: ", psutil.Process(os.getpid()).memory_info()[0]/2.**30)
 
+    isSynOverlap = getOverlapWithSynBlocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd),
+                                  np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd),
+                                  np.array(inPlaceBlocks.aStart), np.array(inPlaceBlocks.aEnd),
+                                  np.array(inPlaceBlocks.bStart), np.array(inPlaceBlocks.bEnd), 50,
+                                  allTransBlocks.shape[0], tUC, tUP)
+    genomeGroupLengths = ([len(i.member) for i in allTransGenomeAGroups], [len(i.member) for i in allTransGenomeBGroups])
 
-    for i in range(allTransBlocks.shape[0]):
-        temp_trans_block = transBlock(allTransBlocks.iat[i,0],\
-                                    allTransBlocks.iat[i,1],\
-                                    allTransBlocks.iat[i,2],\
-                                    allTransBlocks.iat[i,3],\
-                                    allTransBlocks.iat[i,4],\
-                                    allTransClusterIndices[i],\
-                                    i)
-        temp_trans_block.addTransGroupIndices(allTransGroupIndices[i])
-        temp_trans_block.checkOverlapWithSynBlocks(inPlaceBlocks, threshold)
-        temp_trans_block.checkoverlaps(allTransGenomeAGroups, allTransGenomeBGroups)
-        if (temp_trans_block.aUni and temp_trans_block.genomeAUni)	or (temp_trans_block.bUni and temp_trans_block.genomeBUni):
-            temp_trans_block.setStatus(1)
-        allTransBlocksData.append(temp_trans_block)
+    allTransBlocksData = [transBlock(i) for i in range(allTransBlocks.shape[0])]
+    count = 0
+    for row in allTransBlocks.itertuples(index = False):
+        allTransBlocksData[count].aStart = row.aStart
+        allTransBlocksData[count].aEnd = row.aEnd
+        allTransBlocksData[count].bStart = row.bStart
+        allTransBlocksData[count].bEnd = row.bEnd
+        allTransBlocksData[count].dir = row.dir
+        allTransBlocksData[count].transClusterIndex = allTransClusterIndices[count]
+        allTransBlocksData[count].transGroupIndices = allTransGroupIndices[count]
+        if isSynOverlap[0][count]:
+            allTransBlocksData[count].aUni = True
+        if isSynOverlap[1][count]:
+            allTransBlocksData[count].bUni = True
+        if genomeGroupLengths[0][allTransBlocksData[count].transGroupIndices[0]] == 1:
+            allTransBlocksData[count].genomeAUni = True
+        if genomeGroupLengths[1][allTransBlocksData[count].transGroupIndices[1]] == 1:
+            allTransBlocksData[count].genomeBUni = True
+        if (allTransBlocksData[count].aUni and allTransBlocksData[count].genomeAUni) or (allTransBlocksData[count].bUni and allTransBlocksData[count].genomeBUni):
+            allTransBlocksData[count].setStatus(1)
+        count+=1
 
-    print("Translocations : finished making blocks data", chromo, str(datetime.now()))
-    logger.debug("memory usage: ", psutil.Process(os.getpid()).memory_info()[0]/2.**30)
+#     allTransBlocksData = []
+#     for i in range(allTransBlocks.shape[0]):
+#         temp_trans_block = transBlock(allTransBlocks.iat[i, 0], \
+#                                       allTransBlocks.iat[i, 1], \
+#                                       allTransBlocks.iat[i, 2], \
+#                                       allTransBlocks.iat[i, 3], \
+#                                       allTransBlocks.iat[i, 4], \
+#                                       allTransClusterIndices[i], \
+#                                       i)
+#         temp_trans_block.addTransGroupIndices(allTransGroupIndices[i])
+#         temp_trans_block.checkOverlapWithSynBlocks(inPlaceBlocks, threshold)
+#         temp_trans_block.checkoverlaps(allTransGenomeAGroups, allTransGenomeBGroups)
+#         if (temp_trans_block.aUni and temp_trans_block.genomeAUni) or (
+#                 temp_trans_block.bUni and temp_trans_block.genomeBUni):
+#             temp_trans_block.setStatus(1)
+#         allTransBlocksData.append(temp_trans_block)
 
-    for i in range(allTransBlocks.shape[0]):
-        if i%20000 == 0:
-            logger.debug("transBlockAdded" + i)
-        temp = allTransBlocksData[i]            ## create temporary trans blocks
-        if not temp.aUni and not temp.bUni:
+    logger.info("Translocations : finished making blocks data on" + chromo)
+    logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
+
+    aUni = np.array([allTransBlocksData[i].aUni for i in range(allTransBlocks.shape[0])], dtype="int")
+    bUni = np.array([allTransBlocksData[i].bUni for i in range(allTransBlocks.shape[0])], dtype="int")
+    status = np.array([allTransBlocksData[i].status for i in range(allTransBlocks.shape[0])], dtype="int")
+    aIndex = np.array([allTransBlocksData[i].transGroupIndices[0] for i in range(allTransBlocks.shape[0])], dtype="int")
+    bIndex = np.array([allTransBlocksData[i].transGroupIndices[1] for i in range(allTransBlocks.shape[0])], dtype="int")
+    aGroups = {i:np.array(allTransGenomeAGroups[i].member, dtype="int") for i in range(len(allTransGenomeAGroups))}
+    bGroups = {i: np.array(allTransGenomeBGroups[i].member, dtype="int") for i in range(len(allTransGenomeBGroups))}
+
+    out = getmeblocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd), np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), 50, allTransBlocks.shape[0], aUni, bUni, status, aIndex, bIndex, aGroups, bGroups)
+
+    for i in range(len(out[0])):
+        if out[0][i]:
             allTransCluster[allTransClusterIndices[i]].remove(i)
-        elif temp.status == 1:
-            continue
-        elif not temp.aUni:
-            for j in temp.getoverlappingregions(groups = allTransGenomeBGroups,genome="b"):
-                if allTransBlocksData[j].bStart - threshold < temp.bStart and allTransBlocksData[j].bEnd + threshold > temp.bEnd:
-                    temp.addMEBlock(j)
-        elif not temp.bUni:
-            for j in temp.getoverlappingregions(groups = allTransGenomeAGroups,genome="a"):
-                if allTransBlocksData[j].aStart - threshold < temp.aStart and allTransBlocksData[j].aEnd + threshold > temp.aEnd:
-                    temp.addMEBlock(j)
-        else:
-            me_a = []       ## list of mutually exclusive regions on "a" genome
-            for j in temp.getoverlappingregions(groups = allTransGenomeAGroups,genome="a"):
-                if allTransBlocksData[j].aStart - threshold < temp.aStart and allTransBlocksData[j].aEnd + threshold > temp.aEnd:
-                    me_a.append(j)
-            me_b = []       ## list of mutually exclusive regions on "b" genome
-            for j in temp.getoverlappingregions(groups = allTransGenomeBGroups,genome="b"):
-                if allTransBlocksData[j].bStart - threshold < temp.bStart and allTransBlocksData[j].bEnd + threshold > temp.bEnd:
-                    me_b.append(j)
-            temp.setMEList(me_a, me_b)
+
+    for i in out[1].keys():
+        if len(out[1][i]) > 0:
+            allTransBlocksData[i].addMEBlock(list(out[1][i]))
+
+    for i in out[2].keys():
+        allTransBlocksData[i].setMEList(list(out[2][i][0]),list(out[2][i][1]))
+
+    del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
+    collect()
+
+    # Code for finding mutually exclusive blocks
+    # for i in range(allTransBlocks.shape[0]):
+    #     # if i%20000 == 0:
+    #     #     logger.debug("transBlockAdded" + str(i))
+    #     temp = allTransBlocksData[i]            ## create temporary trans blocks
+    #     if not temp.aUni and not temp.bUni:
+    #         allTransCluster[allTransClusterIndices[i]].remove(i)
+    #     elif temp.status == 1:
+    #         continue
+    #     elif not temp.aUni:
+    #         for j in temp.getoverlappingregions(groups = allTransGenomeBGroups,genome="b"):
+    #             if allTransBlocksData[j].bStart - threshold < temp.bStart and allTransBlocksData[j].bEnd + threshold > temp.bEnd:
+    #                 temp.addMEBlock(j)
+    #     elif not temp.bUni:
+    #         for j in temp.getoverlappingregions(groups = allTransGenomeAGroups,genome="a"):
+    #             if allTransBlocksData[j].aStart - threshold < temp.aStart and allTransBlocksData[j].aEnd + threshold > temp.aEnd:
+    #                 temp.addMEBlock(j)
+    #     else:
+    #         me_a = []       ## list of mutually exclusive regions on "a" genome
+    #         for j in temp.getoverlappingregions(groups = allTransGenomeAGroups,genome="a"):
+    #             if allTransBlocksData[j].aStart - threshold < temp.aStart and allTransBlocksData[j].aEnd + threshold > temp.aEnd:
+    #                 me_a.append(j)
+    #         me_b = []       ## list of mutually exclusive regions on "b" genome
+    #         for j in temp.getoverlappingregions(groups = allTransGenomeBGroups,genome="b"):
+    #             if allTransBlocksData[j].bStart - threshold < temp.bStart and allTransBlocksData[j].bEnd + threshold > temp.bEnd:
+    #                 me_b.append(j)
+    #         temp.setMEList(me_a, me_b)
 
     print("Translocations : finding solutions ", chromo, str(datetime.now()))
     clusterSolutions = []
@@ -1543,7 +1596,66 @@ def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
             transCluster.append(list(newGroup))
     return(transCluster)
 
+cpdef getOverlapWithSynBlocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim=1] aEnd, np.ndarray[np.int_t, ndim=1] bStart, np.ndarray[np.int_t, ndim=1] bEnd, np.ndarray[np.int_t, ndim=1] in_aStart, np.ndarray[np.int_t, ndim=1] in_aEnd, np.ndarray[np.int_t, ndim=1] in_bStart, np.ndarray[np.int_t, ndim=1] in_bEnd, np.int_t threshold, np.int_t count, np.int_t tUC, np.float_t tUP):
 
+    assert(len(aStart) == len(aEnd) == len(bStart)== len(bEnd) == count)
+    assert(len(in_aStart) == len(in_aEnd) == len(in_bStart)== len(in_bEnd))
+
+    cdef Py_ssize_t i, j, n = len(in_aStart)
+    cdef np.int_t blockAUni, blockBUni, start, end
+    cdef np.ndarray[np.int_t, ndim = 1] aUni = np.zeros(count, dtype="int"), bUni= np.zeros(count, dtype="int")
+    cdef np.ndarray[np.int_t, ndim=1] ablocks, bblocks
+
+    for i in range(count):
+        ablocks = np.zeros(n, dtype="int")
+        bblocks = np.zeros(n, dtype="int")
+        blockAUni = 0
+        blockBUni = 0
+        for j in range(n):
+            if (in_aStart[j] < aEnd[i]) and (in_aEnd[j] > aStart[i]):
+                ablocks[j] = 1
+            if (in_bStart[j] < bEnd[i]) and (in_bEnd[j] > bStart[i]):
+                bblocks[j] = 1
+
+        start = aStart[i]
+        end = aEnd[i]
+        for j in range(len(ablocks)):
+            if ablocks[j] == 1:
+                if (in_aStart[j] - start < threshold) and (end - in_aEnd[j] < threshold):
+                    start = end
+                    break
+                elif in_aStart[j] < start and in_aEnd[j] < end:
+                    start = in_aEnd[j]
+                else:
+                    blockAUni+= in_aStart[j]-start
+                    if in_aEnd[j] < end:
+                        start = in_aEnd[j]
+                    else:
+                        start = end
+                        break
+        blockAUni+= (end-start)
+        start = bStart[i]
+        end = bEnd[i]
+        for j in range(len(bblocks)):
+            if bblocks[j] == 1:
+                if in_bStart[j] - start < threshold and end - in_bEnd[j] < threshold:
+                    start = end
+                    break
+                elif in_bStart[j] < start and in_bEnd[j] < end:
+                    start = in_bEnd[j]
+                else:
+                    blockBUni += in_bStart[j] - start
+                    if in_bEnd[j] < end:
+                        start = in_bEnd[j]
+                    else:
+                        start = end
+                        break
+        blockBUni += end - start
+        if (blockAUni > tUC) or (blockAUni > tUP*(aEnd[i]-aStart[i])):
+            aUni[i]=1
+        if (blockBUni > tUC) or (blockBUni > tUP*(bEnd[i]-bStart[i])):
+            bUni[i]=1
+    return aUni, bUni
 
 def getBestClusterSubset(cluster, transBlocksData, bRT):
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
@@ -2290,17 +2402,36 @@ class transGroups:
         self.member.append(index)
         
 class transBlock:
-    def __init__(self,aStart, aEnd, bStart, bEnd, Dir, transClusterIndex, i):
-        self.aStart = aStart
-        self.aEnd = aEnd
-        self.bStart = bStart
-        self.bEnd = bEnd
-        self.dir = Dir
-#        self.orderedBlocksIndex = orderedBlocksIndex
+#     def __init__(self,aStart, aEnd, bStart, bEnd, Dir, transClusterIndex, i):
+#         self.aStart = aStart
+#         self.aEnd = aEnd
+#         self.bStart = bStart
+#         self.bEnd = bEnd
+#         self.dir = Dir
+# #        self.orderedBlocksIndex = orderedBlocksIndex
+#         self.transBlocksID = i
+#         self.transClusterIndex = transClusterIndex
+#         self.status = 0
+#         self.overlappingInPlaceBlocks = []
+#         self.aUni = False
+#         self.bUni = False
+
+    def __init__(self, i):
+        self.aStart = None
+        self.aEnd = None
+        self.bStart = None
+        self.bEnd = None
+        self.dir = None
+        #        self.orderedBlocksIndex = orderedBlocksIndex
         self.transBlocksID = i
-        self.transClusterIndex = transClusterIndex
+        self.transClusterIndex = None
         self.status = 0
         self.overlappingInPlaceBlocks = []
+        self.aUni = False
+        self.bUni = False
+        self.transGroupIndices = None
+        self.genomeAUni = False
+        self.genomeBUni = False
 
 
     # def addGenomeGroupMembers(self,ctxTransGenomeAGroups, ctxTransGenomeBGroups):
@@ -2330,10 +2461,7 @@ class transBlock:
 
     def addOrderedData(self, orderedData):
         self.orderedData = orderedData
-        
-    def addTransGroupIndices(self, indices):
-        self.transGroupIndices = indices
-        
+
     def checkOverlapWithSynBlocks(self,inPlaceBlocks, threshold):
         aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, self.aStart, self.aEnd, self.bStart, self.bEnd)
 
@@ -2459,6 +2587,122 @@ class transBlock:
     def setStatus(self,stat):
         """stat = 1 ==> transBlock is important/necessary/unique"""
         self.status = stat
+
+# cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim=1] aEnd, np.ndarray[np.int_t, ndim=1] bStart, np.ndarray[np.int_t, ndim=1] bEnd, np.int_t threshold, np.int_t count, np.ndarray[np.int_t, ndim=1] aUni, np.ndarray[np.int_t, ndim=1] bUni, np.ndarray[np.int_t, ndim=1] status, np.ndarray[np.int_t, ndim=1] aIndex, np.ndarray[np.int_t, ndim=1] bIndex, aGroups, bGroups):
+#     # Function take the coordinates and cluster information of all translocated blocks and identifies mutually exclusive
+#     #  blocks by comparing the coordinates of each block to the coordinates of the member blocks in its cluster
+#     cdef np.ndarray[np.int_t, ndim=1] members
+#     cdef np.int_t i, j
+#     rem = deque()
+#     meblock = {}            ## for blocks which are overlapping with inplace blocks
+#     melist = {}             ## for blocks which are not overlapping with inplace blocks
+#
+#     assert(len(aStart) == len(aEnd) == len(bStart)== len(bEnd))
+#     assert(count == len(aUni)== len(bUni)== len(status)== len(aIndex)== len(bIndex))
+#
+#     for i in range(count):
+#         if i%50000 == 0:
+#             print("Number of mutually exclusive blocks identified", i)
+#         if not aUni[i] and not bUni[i]:
+#             rem.append(i)
+#         elif status[i] == 1:
+#             continue
+#         elif not aUni[i]:
+#             meb = deque()               ## vector of mutually exclusive block
+#             members = bGroups[bIndex[i]]
+#             for j in members:
+#                 if j!=i:
+#                     if bStart[j] - threshold < bStart[i] and bEnd[j] + threshold > bEnd[i]:
+#                         meb.append(j)
+#             meblock[i] = meb
+#         elif not bUni[i]:
+#             meb = deque()                ## vector of mutually exclusive block
+#             members = aGroups[aIndex[i]]
+#             for j in members:
+#                 if j!=i:
+#                     if aStart[j] - threshold < aStart[i] and aEnd[j]+threshold > aEnd[i]:
+#                         meb.append(j)
+#             meblock[i] = meb
+#         else:
+#             meb_a = deque()             ## vector of mutually exclusive block on A genome
+#             meb_b = deque()             ## vector of mutually exclusive block on B genome
+#             members = aGroups[aIndex[i]]
+#             for j in members:
+#                 if j!=i:
+#                     if aStart[j] - threshold < aStart[i] and aEnd[j] + threshold > aEnd[i]:
+#                         meb_a.append(j)
+#
+#             members = bGroups[bIndex[i]]
+#             for j in members:
+#                 if j != i:
+#                     if bStart[j] - threshold < bStart[i] and bEnd[j] + threshold > bEnd[i]:
+#                         meb_b.append(j)
+#             melist[i] = (meb_a, meb_b)
+#     return rem, meblock, melist
+
+# %%cython
+# import numpy as np
+# cimport numpy as np
+# # from collections import deque
+cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim=1] aEnd, np.ndarray[np.int_t, ndim=1] bStart, np.ndarray[np.int_t, ndim=1] bEnd, np.int_t threshold, np.int_t count, np.ndarray[np.int_t, ndim=1] aUni, np.ndarray[np.int_t, ndim=1] bUni, np.ndarray[np.int_t, ndim=1] status, np.ndarray[np.int_t, ndim=1] aIndex, np.ndarray[np.int_t, ndim=1] bIndex, aGroups, bGroups):
+    # Function take the coordinates and cluster information of all translocated blocks and identifies mutually exclusive
+    #  blocks by comparing the coordinates of each block to the coordinates of the member blocks in its cluster
+    cdef np.ndarray[np.int_t, ndim=1] members, temp
+    cdef np.ndarray[np.npy_bool, ndim=1, cast=True] meb, meb_a, meb_b, rem = np.zeros(count, dtype="bool")
+
+    cdef np.int_t i, j, index
+    # rem = deque()
+    meblock = {}            ## for blocks which are overlapping with inplace blocks
+    melist = {}             ## for blocks which are not overlapping with inplace blocks
+
+    assert(len(aStart) == len(aEnd) == len(bStart)== len(bEnd))
+    assert(count == len(aUni)== len(bUni)== len(status)== len(aIndex)== len(bIndex))
+
+    for i in range(count):
+        if i%50000 == 0:
+            print("Number of mutually exclusive blocks identified", i)
+        if not aUni[i] and not bUni[i]:
+            rem[i] = True
+        elif status[i] == 1:
+            continue
+        elif not aUni[i]:
+            members = bGroups[bIndex[i]]
+            meb = np.zeros(len(members), dtype="bool")              ## vector of mutually exclusive block
+            for index in range(len(members)):
+                j = members[index]
+                if j!=i:
+                    if bStart[j] - threshold < bStart[i] and bEnd[j] + threshold > bEnd[i]:
+                        meb[index]=True
+            meblock[i] = members[meb]
+        elif not bUni[i]:
+            members = aGroups[aIndex[i]]
+            meb = np.zeros(len(members), dtype="bool")               ## vector of mutually exclusive block
+            for index in range(len(members)):
+                j = members[index]
+                if j!=i:
+                    if aStart[j] - threshold < aStart[i] and aEnd[j]+threshold > aEnd[i]:
+                        meb[index] = True
+            meblock[i] = members[meb]
+        else:
+            members = aGroups[aIndex[i]]
+            meb_a = np.zeros(len(members), dtype="bool")             ## vector of mutually exclusive block on A genome
+            for index in range(len(members)):
+                j = members[index]
+                if j!=i:
+                    if aStart[j] - threshold < aStart[i] and aEnd[j] + threshold > aEnd[i]:
+                        meb_a[index] = True
+            temp = members[meb_a]
+
+            members = bGroups[bIndex[i]]
+            meb_b = np.zeros(len(members), dtype="bool")             ## vector of mutually exclusive block on B genome
+            for index in range(len(members)):
+                j = members[index]
+                if j != i:
+                    if bStart[j] - threshold < bStart[i] and bEnd[j] + threshold > bEnd[i]:
+                        meb_b[index] = True
+            melist[i] = (temp, members[meb_b])
+    return rem, meblock, melist
+
 #%%
 #################################################################
 ### SV identification functions

@@ -26,6 +26,7 @@ if __name__ == "__main__":
     parser.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
     parser.add_argument("-s", dest="seed", help="seed for generating random numbers", type=int, default=1)
     parser.add_argument("-log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
+    parser.add_argument("-lf", dest="log_fin", type=argparse.FileType("w"))
 
     args = parser.parse_args()
     from syri.pyxFiles.synsearchFunctions import startSyri
