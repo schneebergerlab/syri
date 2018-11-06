@@ -22,7 +22,6 @@ from Bio.SeqIO import parse
 import logging
 import psutil
 
-
 cimport numpy as np
 
 np.random.seed(1)
@@ -35,38 +34,72 @@ def startSyri(args):
     prefix = args.prefix
     tUC = args.TransUniCount
     tUP = args.TransUniPercent
+    chrmatch = args.chrmatch
 
-    LOG_FORMAT = "%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s"
-    logging.basicConfig(filename=cwdPath+args.log_fin.name, level=logging._nameToLevel[args.log], format=LOG_FORMAT)
+    # LOG_FORMAT = "%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s"
+    # logging.basicConfig(filename=cwdPath+args.log_fin.name, level=args.log, format=LOG_FORMAT)
     logger = logging.getLogger("syri")
-
+    logger.warning("starting")
     logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
     try:
         coords = pd.read_table(coordsfin, header = None)
-    except pd.errors.ParserError as e:
+    except pd.errors.ParserError:
         coords = pd.read_table(coordsfin, header = None, engine = "python")
-
     coords.columns = ["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr"]
-    aChromo = set(coords["aChr"])
-    bChromo = set(coords["bChr"])
-    if aChromo != bChromo:
-        badChromo = list(aChromo - bChromo) + list(bChromo - aChromo)
-        warn(", ".join(badChromo) + " present in only one genome. Removing corresponding alignments")
-        coords = coords.loc[~coords.aChr.isin(badChromo) & ~coords.bChr.isin(badChromo)]
+
+## Ensure that chromosome IDs are same for the two genomes.
+## Either find best query match for every reference genome.
+## Or if --no-chrmatch is set then remove non-matching chromosomes.
+    if np.unique(coords.aChr).tolist() != np.unique(coords.bChr).tolist():
+        logger.warning('Chromosomes IDs do not match.')
+        if not chrmatch:
+            logger.warning("Matching them automatically. For each reference genome, most similar query genome will be selected")
+            chromMaps = defaultdict(dict)
+            for i in pd.unique(coords.bChr):
+                for j in pd.unique(coords.aChr):
+                    a = np.array(coords.loc[(coords.bChr == i) & (coords.aChr == j), ["aStart", "aEnd"]])
+                    a = mergeRanges(a)
+                    chromMaps[j][i] = len(a) + (a[:, 1] - a[:, 0]).sum()
+
+            for chrom in pd.unique(coords.aChr):
+                maxid = max(chromMaps[chrom].items(), key=lambda x: x[1])[0]
+                logger.info("setting {} as {}".format(maxid, chrom))
+                coords.loc[coords.bChr == maxid, "bChr"] = chrom
+        else:
+            logger.warning("--no-chrmatch is set. Not matching chromosomes automatically.")
+            aChromo = set(coords["aChr"])
+            bChromo = set(coords["bChr"])
+            badChromo = list(aChromo - bChromo) + list(bChromo - aChromo)
+            logger.warning(", ".join(badChromo) + " present in only one genome. Removing corresponding alignments")
+            coords = coords.loc[~coords.aChr.isin(badChromo) & ~coords.bChr.isin(badChromo)]
+
+
     uniChromo = list(pd.unique(coords.aChr))
     uniChromo.sort()
-    print(uniChromo)
+    logger.info('Analysing chromosomes: {}'.format(uniChromo))
+    # Identify intra-chromosomal events (synteny, inversions, intra-trans, intra-dup) for each chromosome as a separate
+    # process in parallel
     with Pool(processes = nCores) as pool:
         pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP), uniChromo)
+
+    # Merge output of all chromosomes
     mergeOutputFiles(uniChromo,cwdPath, prefix)
-    ctxBlocks = getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
+
+    #Identify cross-chromosomal events in all chromosomes simultaneously
+    getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
+
+    # Recalculate syntenic blocks by considering the blocks introduced by CX events
     outSyn(cwdPath, threshold, prefix)
+
     
 def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     logger = logging.getLogger("syri."+chromo)
+
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
-    print(chromo, coordsData.shape)
-    print("Identifying Synteny for chromosome", chromo, str(datetime.now()))
+
+    logger.info(chromo+" " + str(coordsData.shape))
+    logger.info("Identifying Synteny for chromosome " + chromo + " " + str(datetime.now()))
+
     df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)
     nrow = df.shape[0]
     blocks = [alingmentBlock(i, np.where(df.iloc[i,] == True)[0], coordsData.iloc[i]) for i in range(nrow)]
@@ -88,12 +121,10 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     del(coordsData, blocks, df)
     collect()
 
-    
-    
     ##########################################################################
     #   Finding Inversions
     ##########################################################################
-    print("Identifying Inversions for chromosome", chromo, str(datetime.now()))
+    logger.info("Identifying Inversions for chromosome " + chromo + " " + str(datetime.now()))
 
     invertedCoordsOri, profitable, bestInvPath, invData, synInInv, badSyn = getInversions(coords,chromo, threshold, synData, synPath)
     
@@ -101,7 +132,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     ##########################################################
     #### Identify Translocation and duplications
     ##########################################################
-    print("Identifying translocation and duplication for chromosome", chromo, str(datetime.now()))
+    logger.info("Identifying translocation and duplication for chromosome " + chromo + " " + str(datetime.now()))
 
     chromBlocks = coords[(coords.aChr == chromo) & (coords.bChr == chromo)]
     inPlaceIndices = sorted(list(synData.index.values) + list(invData.index.values))
@@ -164,9 +195,9 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     else:
         invTransBlocks = []
 
-    print("Translocations : found orderedBlocks", chromo, str(datetime.now()))
-   
-    print("Translocations : merging blocks ", chromo, str(datetime.now()))
+    logger.debug("Translocations : found orderedBlocks " + chromo + " " +  str(datetime.now()))
+    logger.debug("Translocations : merging blocks " + chromo + " " + str(datetime.now()))
+
     allTransBlocks, allTransIndexOrder = mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks)
     allTransGenomeAGroups = makeTransGroupList(allTransBlocks, "aStart", "aEnd", threshold)
     allTransGenomeBGroups = makeTransGroupList(allTransBlocks, "bStart", "bEnd", threshold)
@@ -202,10 +233,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     #                               allTransBlocks.shape[0], tUC, tUP)
 
 
-
-
-
-    allTransBlocks.to_csv(cwdPath+"allTransBlocks.txt", sep="\t", index = False)
+    # allTransBlocks.to_csv(cwdPath+"allTransBlocks.txt", sep="\t", index = False)
 
     auni = getOverlapWithSynBlocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd),np.array([chromo]*allTransBlocks.shape[0]), np.array(inPlaceBlocks.aStart), np.array(inPlaceBlocks.aEnd), np.array([chromo]*inPlaceBlocks.shape[0]), 50, allTransBlocks.shape[0], tUC, tUP)
     sortedInPlace = inPlaceBlocks.sort_values(["bStart","bEnd"])
@@ -1241,7 +1269,7 @@ cpdef np.ndarray getTranslocationScore_ctx(np.ndarray aStart, np.ndarray aEnd, n
     return transScores
 
 
-
+# noinspection PyUnreachableCode
 def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, tUC, tUP, ctx = False):
     if not isinstance(ctx, bool):
         print("CTX status must be a boolean")
@@ -1491,13 +1519,10 @@ def getTransOverlapGroups(transBlocks, orderedBlocks, threshold):
     genomeAGroups = makeTransGroupList(transBlocksTable, "aStart","aEnd", threshold)
     transBlocksTable.sort_values(["bStart","bEnd"], inplace = True)
     genomeBGroups = makeTransGroupList(transBlocksTable, "bStart","bEnd", threshold)
-    return(genomeAGroups, genomeBGroups)
+    return genomeAGroups, genomeBGroups
 
 
 def makeTransGroupList(transBlocksData, startC, endC, threshold):
-    """
-    Compare aligned regions and groups overlapping regions
-    """
     transBlocksTable = transBlocksData.sort_values([startC,endC])
     indices = transBlocksTable.index.values
     if len(transBlocksData) > 0:
@@ -1534,8 +1559,8 @@ cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aE
     assert(aStart.dtype==np.int and aEnd.dtype==np.int and bStart.dtype==np.int and bEnd.dtype==np.int and bDir.dtype==np.int and aChr.dtype==np.object and bChr.dtype==np.object and index.dtype==np.int and left.dtype==np.int and right.dtype==np.int)
     cdef Py_ssize_t i,j, n = len(aStart)
     assert(n == len(aEnd) == len(bStart) == len(bEnd) == len(index) == len(bDir) == len(aChr) == len(bChr) == len(left) == len(right))
-    cdef np.ndarray[object, ndim =2 ] outOrderedBlocks =  np.array([[np.nan]*n]*n, dtype=object)
-    cdef np.ndarray allRanges = np.array([range(left[i]+1,right[i]) for i in range(n)])
+    cdef np.ndarray[object, ndim=2] outOrderedBlocks =  np.array([[np.nan]*n]*n, dtype=object)
+    cdef np.ndarray allRanges = np.array([range(left[i]+1, right[i]) for i in range(n)])
     for i in range(n):
         for j in range(i,n):
             #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
@@ -1889,7 +1914,7 @@ def getScore(outBlocks, transBlocksData):
 
 def count_uniq_elems(coordinates): 
     a = coordinates[coordinates[:,0].argsort()]
-    subs = a[1:,0] - a[:-1,1]    
+    subs = a[1:,0] - a[:-1,1]                               ## overlapping regions
     overf = (a[:-1,1] - a[1:,1])
     return (a[:,1] - a[:,0]).sum() + subs[subs < 0].sum() + overf[overf > 0].sum()
 
@@ -2577,23 +2602,23 @@ class transBlock:
 
         blockAUni = 0
 
-        start = self.aStart
+        astart = self.aStart
         end = self.aEnd
         for aBlock in aBlocks:
-            if inPlaceBlocks.iat[aBlock,0] - start < threshold and\
+            if inPlaceBlocks.iat[aBlock,0] - astart < threshold and\
                 end - inPlaceBlocks.iat[aBlock,1] < threshold:
-                start = end
+                astart = end
                 break
-            elif inPlaceBlocks.iat[aBlock,0] < start and inPlaceBlocks.iat[aBlock,1] < end:
-                start = inPlaceBlocks.iat[aBlock,1]
+            elif inPlaceBlocks.iat[aBlock,0] < astart and inPlaceBlocks.iat[aBlock, 1] < end:
+                astart = inPlaceBlocks.iat[aBlock, 1]
             else:
-                blockAUni += inPlaceBlocks.iat[aBlock,0] - start
+                blockAUni += inPlaceBlocks.iat[aBlock,0] - astart
                 if inPlaceBlocks.iat[aBlock,1] < end:
-                    start = inPlaceBlocks.iat[aBlock,1]
+                    astart = inPlaceBlocks.iat[aBlock, 1]
                 else:
-                    start = end
+                    astart = end
                     break
-        blockAUni += end - start
+        blockAUni += end - astart
 
         self.overlappingInPlaceBlocks.append(aBlocks)
         self.aUni = True if blockAUni > 1000 or blockAUni > 0.5*(self.aEnd-self.aStart) else False
@@ -2775,7 +2800,8 @@ cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim
 #################################################################
 ### SV identification functions
 #################################################################
-        
+
+# noinspection PyUnreachableCode
 def readSVData(cwdPath, prefix, dup = False):
     if not isinstance(dup, bool):
         sys.exit("need boolean")
@@ -2851,351 +2877,678 @@ def readSVData(cwdPath, prefix, dup = False):
     annoCoords.index = range(len(annoCoords))
     return annoCoords
 
+#
+# def getSV(cwdPath, allAlignments, prefix, offset):
+#     fout = open(cwdPath+prefix+"sv.txt","w")
+#     allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
+#     allBlocks = pd.unique(allAlignments.id)
+#
+#     for i in allBlocks:
+#         blocksAlign = allAlignments.loc[allAlignments.id == i].copy()
+#         ordered = 1 if "inv" not in blocksAlign.state.iloc[0] else 0
+#         for j in range(len(blocksAlign) - 1):
+#             m = blocksAlign.iat[j+1,0] - blocksAlign.iat[j,1] - 1
+#             if ordered:
+#                 n = blocksAlign.iat[j+1,2] - blocksAlign.iat[j,3] - 1
+#             else:
+#                 n = blocksAlign.iat[j,3] - blocksAlign.iat[j+1,2] - 1
+#
+#
+#             ## No overlap of reference genome
+#             if m == 0:
+#
+#                 ## No overlap in query genome
+#                 if n == 0:
+#                     continue
+#
+#                 elif n > 0:
+#                     if ordered:
+#                         fout.write("\t".join(["InDel",
+#                                               str(blocksAlign.iat[j,1]),
+#                                               str(blocksAlign.iat[j+1,0]),
+#                                               str(blocksAlign.iat[j,3] + 1),
+#                                               str(blocksAlign.iat[j+1, 2] - 1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#                     else:
+#                         fout.write("\t".join(["InDel",
+#                                               str(blocksAlign.iat[j,1]),
+#                                               str(blocksAlign.iat[j+1,0]),
+#                                               str(blocksAlign.iat[j,3] - 1),
+#                                               str(blocksAlign.iat[j+1, 2] + 1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#
+#                 elif n < 0:
+#                     if ordered:
+#                         j_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
+#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])
+#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
+#                         fout.write("\t".join(["CNV",
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#                     else:
+#                         j_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
+#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
+#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
+#                         fout.write("\t".join(["CNV",
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#
+#             elif m == 1:
+#
+#                 if n == 0:
+#                     if ordered:
+#                         fout.write("\t".join(["InDel",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#                     else:
+#                         fout.write("\t".join(["InDel",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               str(blocksAlign.iat[j+1, 2]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#
+#                 elif n==1:
+#                     if ordered:
+#                         fout.write("\t".join(["SNP",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]+1),
+#                                               str(blocksAlign.iat[j+1,2]-1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#                     else:
+#                         fout.write("\t".join(["SNP",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]-1),
+#                                               str(blocksAlign.iat[j+1,2]+1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#                 elif n>1:
+#                     if ordered:
+#                         fout.write("\t".join(["InDel+SNP",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]+1),
+#                                               str(blocksAlign.iat[j+1,2]-1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "SNP:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
+#                     else:
+#                         fout.write("\t".join(["InDel+SNP",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]-1),
+#                                               str(blocksAlign.iat[j+1,2]+1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "SNP:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
+#                 elif n<0:
+#                     if ordered:
+#                         j_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
+#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])
+#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
+#                         fout.write("\t".join(["CNV+InDel",
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
+#                     else:
+#                         j_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
+#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
+#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
+#                         fout.write("\t".join(["CNV+InDel",
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
+#
+#             elif m>1:
+#
+#                 if n==0:
+#                     if ordered:
+#                         fout.write("\t".join(["InDel",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#                     else:
+#                         fout.write("\t".join(["InDel",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#                 elif n==1:
+#                     if ordered:
+#                         fout.write("\t".join(["InDel+SNP",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]+1),
+#                                               str(blocksAlign.iat[j+1,2]-1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "SNP:Q:"+str(blocksAlign.iat[j,3]+1)+"-"+str(blocksAlign.iat[j+1,2]-1)]) + "\n")
+#                     else:
+#                         fout.write("\t".join(["InDel+SNP",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]-1),
+#                                               str(blocksAlign.iat[j+1,2]+1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "SNP:Q:"+str(blocksAlign.iat[j,3]-1)+"-"+str(blocksAlign.iat[j+1,2]+1)]) + "\n")
+#                 elif n>1:
+#                     if ordered:
+#                         fout.write("\t".join(["HDR",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]+1),
+#                                               str(blocksAlign.iat[j+1,2]-1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) +"\n")
+#                     else:
+#                         fout.write("\t".join(["HDR",
+#                                               str(blocksAlign.iat[j,1]+1),
+#                                               str(blocksAlign.iat[j+1,0]-1),
+#                                               str(blocksAlign.iat[j,3]-1),
+#                                               str(blocksAlign.iat[j+1,2]+1),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) +"\n")
+#                 elif n<0:
+#                     if ordered:
+#                         j_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
+#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])
+#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
+#                         fout.write("\t".join(["CNV+InDel",
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
+#                     else:
+#                         j_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
+#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
+#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
+#                         fout.write("\t".join(["CNV+InDel",
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
+#
+#             elif m<0:
+#
+#                 j_prop = abs(m) / (blocksAlign.iat[j,1] - blocksAlign.iat[j,0])
+#                 j1_prop = abs(m) / (blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])
+#
+#                 if n==0:
+#                     if ordered:
+#                         sCoord = round(blocksAlign.iat[j,3] - j_prop*(blocksAlign.iat[j,3] - blocksAlign.iat[j,2])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,2] + j1_prop*(blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])).astype(int)
+#                         fout.write("\t".join(["CNV",
+#                                               str(blocksAlign.iat[j+1,0]),
+#                                               str(blocksAlign.iat[j,1]),
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#                     else:
+#                         sCoord = round(blocksAlign.iat[j,3] + j_prop*(blocksAlign.iat[j,2] - blocksAlign.iat[j,3])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,2] - j1_prop*(blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])).astype(int)
+#                         fout.write("\t".join(["CNV",
+#                                               str(blocksAlign.iat[j+1,0]),
+#                                               str(blocksAlign.iat[j,1]),
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6]]) + "\n")
+#
+#                 if n>0:
+#                     if ordered:
+#                         sCoord = round(blocksAlign.iat[j,3] - j_prop*(blocksAlign.iat[j,3] - blocksAlign.iat[j,2])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,2] + j1_prop*(blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])).astype(int)
+#                         fout.write("\t".join(["CNV+InDel",
+#                                               str(blocksAlign.iat[j+1,0]),
+#                                               str(blocksAlign.iat[j,1]),
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "InDel:Q:"+str(blocksAlign.iat[j,3]+1)+"-"+str(blocksAlign.iat[j+1,2]-1)]) + "\n")
+#                     else:
+#                         sCoord = round(blocksAlign.iat[j,3] + j_prop*(blocksAlign.iat[j,2] - blocksAlign.iat[j,3])).astype(int)
+#                         eCoord = round(blocksAlign.iat[j+1,2] - j1_prop*(blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])).astype(int)
+#                         fout.write("\t".join(["CNV+InDel",
+#                                               str(blocksAlign.iat[j+1,0]),
+#                                               str(blocksAlign.iat[j,1]),
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "InDel:Q:"+str(blocksAlign.iat[j,3]-1)+"-"+str(blocksAlign.iat[j+1,2]+1)]) + "\n")
+#
+#                 if n<0:
+#                     maxOverlap = max(abs(m),abs(n))
+#                     if abs(m-n) < 0.1*maxOverlap: ## no SV if the overlap on both genomes is of similar size
+#                         continue
+#
+#                     if abs(m) > abs(n):
+#                         if ordered:
+#                             sCoord = round(blocksAlign.iat[j,3] - j_prop*(blocksAlign.iat[j,3] - blocksAlign.iat[j,2])).astype(int)
+#                             eCoord = round(blocksAlign.iat[j+1,2] + j1_prop*(blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])).astype(int)
+#                             fout.write("\t".join(["CNV+Tandem",
+#                                               str(blocksAlign.iat[j+1,0]),
+#                                               str(blocksAlign.iat[j,1]),
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "Tandem:Q:"+str(blocksAlign.iat[j,3]+1)+"-"+str(eCoord)]) + "\n")
+#
+#                         else:
+#                             sCoord = round(blocksAlign.iat[j,3] + j_prop*(blocksAlign.iat[j,2] -blocksAlign.iat[j,3])).astype(int)
+#                             eCoord = round(blocksAlign.iat[j+1,2] - j1_prop*(blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,2])).astype(int)
+#                             fout.write("\t".join(["CNV+Tandem",
+#                                               str(blocksAlign.iat[j+1,0]),
+#                                               str(blocksAlign.iat[j,1]),
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "Tandem:Q:"+str(blocksAlign.iat[j,3]-1)+"-"+str(eCoord)]) + "\n")
+#                     else:
+#                         if ordered:
+#                             k_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
+#                             k1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j,2])
+#                             sCoord = round(blocksAlign.iat[j,1] - k_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
+#                             eCoord = round(blocksAlign.iat[j+1,0] + k1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
+#                             fout.write("\t".join(["CNV+Tandem",
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "Tandem:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(eCoord)]) + "\n")
+#                         else:
+#                             k_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
+#                             k1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
+#                             sCoord = round(blocksAlign.iat[j,1] - k_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
+#                             eCoord = round(blocksAlign.iat[j+1,0] + k1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
+#                             fout.write("\t".join(["CNV+Tandem",
+#                                               str(sCoord),
+#                                               str(eCoord),
+#                                               str(blocksAlign.iat[j+1,2]),
+#                                               str(blocksAlign.iat[j,3]),
+#                                               blocksAlign.iat[0,5],
+#                                               blocksAlign.iat[0,6],
+#                                               "Tandem:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(eCoord)]) + "\n")
+#
+#     fout.close()
+#     return None
 
-def getSV(cwdPath, allAlignments, prefix):
-    fout = open(cwdPath+prefix+"sv.txt","w")
-    allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
+
+def getSV(cwdPath, allAlignments, prefix, offset):
+    offset = -abs(offset)
+    fout = open(cwdPath + prefix + "sv.txt", "w")
+    allAlignments["id"] = allAlignments.group.astype(
+        "str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
     allBlocks = pd.unique(allAlignments.id)
 
     for i in allBlocks:
         blocksAlign = allAlignments.loc[allAlignments.id == i].copy()
         ordered = 1 if "inv" not in blocksAlign.state.iloc[0] else 0
         for j in range(len(blocksAlign) - 1):
-            m = blocksAlign.iat[j+1,0] - blocksAlign.iat[j,1] - 1
+            m = blocksAlign.iat[j + 1, 0] - blocksAlign.iat[j, 1] - 1
             if ordered:
-                n = blocksAlign.iat[j+1,2] - blocksAlign.iat[j,3] - 1
+                n = blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j, 3] - 1
             else:
-                n = blocksAlign.iat[j,3] - blocksAlign.iat[j+1,2] - 1
-                
-            if m == 0:
-        
-                if n == 0:
+                n = blocksAlign.iat[j, 3] - blocksAlign.iat[j + 1, 2] - 1
+
+            if offset <= m <= 0:  ## No significant overlap of reference genome
+
+                if offset <= n <= 0:  ## No significant overlap in query genome
                     continue
-                
+
                 elif n > 0:
                     if ordered:
-                        fout.write("\t".join(["InDel",
-                                              str(blocksAlign.iat[j,1]),
-                                              str(blocksAlign.iat[j+1,0]),
-                                              str(blocksAlign.iat[j,3] + 1),
-                                              str(blocksAlign.iat[j+1, 2] - 1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
+                        fout.write("\t".join(["INS",
+                                              str(blocksAlign.iat[j, 1]),
+                                              str(blocksAlign.iat[j + 1, 0]),
+                                              str(blocksAlign.iat[j, 3] + 1),
+                                              str(blocksAlign.iat[j + 1, 2] - 1),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
                     else:
-                        fout.write("\t".join(["InDel",
-                                              str(blocksAlign.iat[j,1]),
-                                              str(blocksAlign.iat[j+1,0]),
-                                              str(blocksAlign.iat[j,3] - 1),
-                                              str(blocksAlign.iat[j+1, 2] + 1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
-                
-                elif n < 0:
+                        fout.write("\t".join(["INS",
+                                              str(blocksAlign.iat[j, 1]),
+                                              str(blocksAlign.iat[j + 1, 0]),
+                                              str(blocksAlign.iat[j, 3] - 1),
+                                              str(blocksAlign.iat[j + 1, 2] + 1),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+
+                elif n < offset:
                     if ordered:
-                        j_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
-                        j1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])
-                        sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-                        fout.write("\t".join(["CNV",
+                        j_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
+                        j1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
+                        sCoord = round(
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
+                            int)
+                        eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                        fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              str(blocksAlign.iat[j,3]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              str(blocksAlign.iat[j, 3]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
                     else:
-                        j_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
-                        j1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
-                        sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-                        fout.write("\t".join(["CNV",
+                        j_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
+                        j1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
+                        sCoord = round(
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
+                            int)
+                        eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                        fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              str(blocksAlign.iat[j,3]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
-                    
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              str(blocksAlign.iat[j, 3]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+
             elif m == 1:
-                
-                if n == 0:
+
+                if offset <= n <= 0:
                     if ordered:
-                        fout.write("\t".join(["InDel",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
+                        fout.write("\t".join(["DEL",
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3]),
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
                     else:
-                        fout.write("\t".join(["InDel",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]),
-                                              str(blocksAlign.iat[j+1, 2]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
-                        
-                elif n==1:
+                        fout.write("\t".join(["DEL",
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3]),
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+
+                elif n == 1:
                     if ordered:
                         fout.write("\t".join(["SNP",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]+1),
-                                              str(blocksAlign.iat[j+1,2]-1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3] + 1),
+                                              str(blocksAlign.iat[j + 1, 2] - 1),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
                     else:
                         fout.write("\t".join(["SNP",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]-1),
-                                              str(blocksAlign.iat[j+1,2]+1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
-                elif n>1:
-                    if ordered:
-                        fout.write("\t".join(["InDel+SNP",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]+1),
-                                              str(blocksAlign.iat[j+1,2]-1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "SNP:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-                    else:
-                        fout.write("\t".join(["InDel+SNP",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]-1),
-                                              str(blocksAlign.iat[j+1,2]+1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "SNP:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-                elif n<0:
-                    if ordered:
-                        j_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
-                        j1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])
-                        sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-                        fout.write("\t".join(["CNV+InDel",
-                                              str(sCoord),
-                                              str(eCoord),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              str(blocksAlign.iat[j,3]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-                    else:
-                        j_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
-                        j1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
-                        sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-                        fout.write("\t".join(["CNV+InDel",
-                                              str(sCoord),
-                                              str(eCoord),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              str(blocksAlign.iat[j,3]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-        
-            elif m>1:
-                
-                if n==0:
-                    if ordered:
-                        fout.write("\t".join(["InDel",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
-                    else:
-                        fout.write("\t".join(["InDel",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
-                elif n==1:
-                    if ordered:
-                        fout.write("\t".join(["InDel+SNP",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]+1),
-                                              str(blocksAlign.iat[j+1,2]-1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "SNP:Q:"+str(blocksAlign.iat[j,3]+1)+"-"+str(blocksAlign.iat[j+1,2]-1)]) + "\n")
-                    else:
-                        fout.write("\t".join(["InDel+SNP",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]-1),
-                                              str(blocksAlign.iat[j+1,2]+1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "SNP:Q:"+str(blocksAlign.iat[j,3]-1)+"-"+str(blocksAlign.iat[j+1,2]+1)]) + "\n")
-                elif n>1:
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3] - 1),
+                                              str(blocksAlign.iat[j + 1, 2] + 1),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+                elif n > 1:
                     if ordered:
                         fout.write("\t".join(["HDR",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]+1),
-                                              str(blocksAlign.iat[j+1,2]-1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) +"\n")
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3] + 1),
+                                              str(blocksAlign.iat[j + 1, 2] - 1),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
                     else:
                         fout.write("\t".join(["HDR",
-                                              str(blocksAlign.iat[j,1]+1),
-                                              str(blocksAlign.iat[j+1,0]-1),
-                                              str(blocksAlign.iat[j,3]-1),
-                                              str(blocksAlign.iat[j+1,2]+1),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) +"\n")
-                elif n<0:
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3] - 1),
+                                              str(blocksAlign.iat[j + 1, 2] + 1),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+
+                elif n < offset:
                     if ordered:
-                        j_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
-                        j1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])
-                        sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-                        fout.write("\t".join(["CNV+InDel",
+                        j_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
+                        j1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
+                        sCoord = round(
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
+                            int)
+                        eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                        fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              str(blocksAlign.iat[j,3]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              str(blocksAlign.iat[j, 3]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
                     else:
-                        j_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
-                        j1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
-                        sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-                        fout.write("\t".join(["CNV+InDel",
+                        j_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
+                        j1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
+                        sCoord = round(
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
+                            int)
+                        eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                        fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              str(blocksAlign.iat[j,3]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-            
-            elif m<0:
-                
-                j_prop = abs(m) / (blocksAlign.iat[j,1] - blocksAlign.iat[j,0])
-                j1_prop = abs(m) / (blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])
-                
-                if n==0:
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              str(blocksAlign.iat[j, 3]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+
+            elif m > 1:
+                if offset <= n <= 0:
                     if ordered:
-                        sCoord = round(blocksAlign.iat[j,3] - j_prop*(blocksAlign.iat[j,3] - blocksAlign.iat[j,2])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,2] + j1_prop*(blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])).astype(int)
-                        fout.write("\t".join(["CNV",
-                                              str(blocksAlign.iat[j+1,0]),
-                                              str(blocksAlign.iat[j,1]),
-                                              str(sCoord),
-                                              str(eCoord),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
+                        fout.write("\t".join(["DEL",
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3]),
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
                     else:
-                        sCoord = round(blocksAlign.iat[j,3] + j_prop*(blocksAlign.iat[j,2] - blocksAlign.iat[j,3])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,2] - j1_prop*(blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])).astype(int)
-                        fout.write("\t".join(["CNV",
-                                              str(blocksAlign.iat[j+1,0]),
-                                              str(blocksAlign.iat[j,1]),
-                                              str(sCoord),
-                                              str(eCoord),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6]]) + "\n")
-                
-                if n>0:
+                        fout.write("\t".join(["DEL",
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3]),
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+                elif n > 0:
                     if ordered:
-                        sCoord = round(blocksAlign.iat[j,3] - j_prop*(blocksAlign.iat[j,3] - blocksAlign.iat[j,2])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,2] + j1_prop*(blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])).astype(int)
-                        fout.write("\t".join(["CNV+InDel",
-                                              str(blocksAlign.iat[j+1,0]),
-                                              str(blocksAlign.iat[j,1]),
-                                              str(sCoord),
-                                              str(eCoord),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "InDel:Q:"+str(blocksAlign.iat[j,3]+1)+"-"+str(blocksAlign.iat[j+1,2]-1)]) + "\n")
+                        fout.write("\t".join(["HDR",
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3] + 1),
+                                              str(blocksAlign.iat[j + 1, 2] - 1),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
                     else:
-                        sCoord = round(blocksAlign.iat[j,3] + j_prop*(blocksAlign.iat[j,2] - blocksAlign.iat[j,3])).astype(int)
-                        eCoord = round(blocksAlign.iat[j+1,2] - j1_prop*(blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])).astype(int)
-                        fout.write("\t".join(["CNV+InDel",
-                                              str(blocksAlign.iat[j+1,0]),
-                                              str(blocksAlign.iat[j,1]),
+                        fout.write("\t".join(["HDR",
+                                              str(blocksAlign.iat[j, 1] + 1),
+                                              str(blocksAlign.iat[j + 1, 0] - 1),
+                                              str(blocksAlign.iat[j, 3] - 1),
+                                              str(blocksAlign.iat[j + 1, 2] + 1),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+                elif n < offset:
+                    if ordered:
+                        j_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
+                        j1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
+                        sCoord = round(
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
+                            int)
+                        eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                        fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "InDel:Q:"+str(blocksAlign.iat[j,3]-1)+"-"+str(blocksAlign.iat[j+1,2]+1)]) + "\n")
-    
-                if n<0:
-                    maxOverlap = max(abs(m),abs(n))
-                    if abs(m-n) < 0.1*maxOverlap: ## no SV if the overlap on both genomes is of similar size
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              str(blocksAlign.iat[j, 3]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+                    else:
+                        j_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
+                        j1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
+                        sCoord = round(
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
+                            int)
+                        eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                        fout.write("\t".join(["CPL",
+                                              str(sCoord),
+                                              str(eCoord),
+                                              str(blocksAlign.iat[j + 1, 2]),
+                                              str(blocksAlign.iat[j, 3]),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+
+            elif m < offset:
+
+                j_prop = abs(m) / (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])
+                j1_prop = abs(m) / (blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])
+
+                if n >= offset:
+                    if ordered:
+                        sCoord = round(
+                            blocksAlign.iat[j, 3] - j_prop * (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])).astype(
+                            int)
+                        eCoord = round(blocksAlign.iat[j + 1, 2] + j1_prop * (
+                                    blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])).astype(int)
+                        fout.write("\t".join(["CPG",
+                                              str(blocksAlign.iat[j + 1, 0]),
+                                              str(blocksAlign.iat[j, 1]),
+                                              str(sCoord),
+                                              str(eCoord),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+                    else:
+                        sCoord = round(
+                            blocksAlign.iat[j, 3] + j_prop * (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])).astype(
+                            int)
+                        eCoord = round(blocksAlign.iat[j + 1, 2] - j1_prop * (
+                                    blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])).astype(int)
+                        fout.write("\t".join(["CPG",
+                                              str(blocksAlign.iat[j + 1, 0]),
+                                              str(blocksAlign.iat[j, 1]),
+                                              str(sCoord),
+                                              str(eCoord),
+                                              blocksAlign.iat[0, 5],
+                                              blocksAlign.iat[0, 6]]) + "\n")
+
+                if n < offset:
+                    maxOverlap = max(abs(m), abs(n))
+                    if abs(m - n) < 0.1 * maxOverlap:  ## no SV if the overlap on both genomes is of similar size
                         continue
-                    
+
                     if abs(m) > abs(n):
-                        if ordered:                   
-                            sCoord = round(blocksAlign.iat[j,3] - j_prop*(blocksAlign.iat[j,3] - blocksAlign.iat[j,2])).astype(int)
-                            eCoord = round(blocksAlign.iat[j+1,2] + j1_prop*(blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])).astype(int)
-                            fout.write("\t".join(["CNV+Tandem",
-                                              str(blocksAlign.iat[j+1,0]),
-                                              str(blocksAlign.iat[j,1]),
-                                              str(sCoord),
-                                              str(eCoord),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "Tandem:Q:"+str(blocksAlign.iat[j,3]+1)+"-"+str(eCoord)]) + "\n")
-                        
+                        if ordered:
+                            sCoord = round(blocksAlign.iat[j, 3] - j_prop * (
+                                        blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])).astype(int)
+                            eCoord = round(blocksAlign.iat[j + 1, 2] + j1_prop * (
+                                        blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])).astype(int)
+                            fout.write("\t".join(["TDM",
+                                                  str(blocksAlign.iat[j + 1, 0]),
+                                                  str(blocksAlign.iat[j, 1]),
+                                                  str(sCoord),
+                                                  str(eCoord),
+                                                  blocksAlign.iat[0, 5],
+                                                  blocksAlign.iat[0, 6]]) + "\n")
+
                         else:
-                            sCoord = round(blocksAlign.iat[j,3] + j_prop*(blocksAlign.iat[j,2] -blocksAlign.iat[j,3])).astype(int)
-                            eCoord = round(blocksAlign.iat[j+1,2] - j1_prop*(blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,2])).astype(int)
-                            fout.write("\t".join(["CNV+Tandem",
-                                              str(blocksAlign.iat[j+1,0]),
-                                              str(blocksAlign.iat[j,1]),
-                                              str(sCoord),
-                                              str(eCoord),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "Tandem:Q:"+str(blocksAlign.iat[j,3]-1)+"-"+str(eCoord)]) + "\n")
+                            sCoord = round(blocksAlign.iat[j, 3] + j_prop * (
+                                        blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])).astype(int)
+                            eCoord = round(blocksAlign.iat[j + 1, 2] - j1_prop * (
+                                        blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 2])).astype(int)
+                            fout.write("\t".join(["TDM",
+                                                  str(blocksAlign.iat[j + 1, 0]),
+                                                  str(blocksAlign.iat[j, 1]),
+                                                  str(sCoord),
+                                                  str(eCoord),
+                                                  blocksAlign.iat[0, 5],
+                                                  blocksAlign.iat[0, 6]]) + "\n")
                     else:
                         if ordered:
-                            k_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
-                            k1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j,2])
-                            sCoord = round(blocksAlign.iat[j,1] - k_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-                            eCoord = round(blocksAlign.iat[j+1,0] + k1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-                            fout.write("\t".join(["CNV+Tandem",
-                                              str(sCoord),
-                                              str(eCoord),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              str(blocksAlign.iat[j,3]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "Tandem:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(eCoord)]) + "\n")
+                            k_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
+                            k1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j, 2])
+                            sCoord = round(blocksAlign.iat[j, 1] - k_prop * (
+                                        blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                            eCoord = round(blocksAlign.iat[j + 1, 0] + k1_prop * (
+                                        blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                            fout.write("\t".join(["TDM",
+                                                  str(sCoord),
+                                                  str(eCoord),
+                                                  str(blocksAlign.iat[j + 1, 2]),
+                                                  str(blocksAlign.iat[j, 3]),
+                                                  blocksAlign.iat[0, 5],
+                                                  blocksAlign.iat[0, 6]]) + "\n")
                         else:
-                            k_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
-                            k1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
-                            sCoord = round(blocksAlign.iat[j,1] - k_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-                            eCoord = round(blocksAlign.iat[j+1,0] + k1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-                            fout.write("\t".join(["CNV+Tandem",
-                                              str(sCoord),
-                                              str(eCoord),
-                                              str(blocksAlign.iat[j+1,2]),
-                                              str(blocksAlign.iat[j,3]),
-                                              blocksAlign.iat[0,5],
-                                              blocksAlign.iat[0,6],
-                                              "Tandem:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(eCoord)]) + "\n")
-                            
+                            k_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
+                            k1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
+                            sCoord = round(blocksAlign.iat[j, 1] - k_prop * (
+                                        blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                            eCoord = round(blocksAlign.iat[j + 1, 0] + k1_prop * (
+                                        blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                            fout.write("\t".join(["TDM",
+                                                  str(sCoord),
+                                                  str(eCoord),
+                                                  str(blocksAlign.iat[j + 1, 2]),
+                                                  str(blocksAlign.iat[j, 3]),
+                                                  blocksAlign.iat[0, 5],
+                                                  blocksAlign.iat[0, 6]]) + "\n")
+
     fout.close()
-    return None                
+    return None
 
 
-def getNotAligned(cwdPath, prefix, ref, qry):    
+def getNotAligned(cwdPath, prefix, ref, qry):
     refSize = {fasta.id: len(fasta.seq) for fasta in parse(ref,'fasta')}
     qrySize = {fasta.id: len(fasta.seq) for fasta in parse(qry,'fasta')}
     

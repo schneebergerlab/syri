@@ -10,27 +10,64 @@ import argparse
 import os
 import sys
 
-print(sys.executable)
 
 if __name__ == "__main__":
+    print(sys.executable)
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("inFile", help="location of coords file", type=argparse.FileType('r'))
-#    parser.add_argument("-n", dest="threshold", help="Threshold to differentiate estimate whether the",\type=int,default=50)
-    parser.add_argument("-b",dest = "bruteRunTime",help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.",type = int, default = 60)
-    parser.add_argument("-c",dest ="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type = int, default = 1000)
-    parser.add_argument("-p",dest = "TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would selection of translocation which are more overlapped with \
-     other regions.", type = float, default = 0.5)
-    parser.add_argument('-nC', dest = "nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
-    parser.add_argument('-d',dest = 'dir',help="path to working directory (if not current directory)", action='store', default=os.getcwd()+os.sep)
+# parser.add_argument("-n", dest="threshold", help="Threshold to differentiate estimate whether the",\type=int,
+    # default=50)
+    parser.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
+    parser.add_argument("-c", dest="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type=int, default=1000)
+    parser.add_argument("-p", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would selection of translocation which are more overlapped with \
+     other regions.", type=float, default=0.5)
+    parser.add_argument('-nC', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
+    parser.add_argument('-d', dest='dir', help="path to working directory (if not current directory)", action='store', default=os.getcwd()+os.sep)
     parser.add_argument("-i", dest="increaseBy", help="Minimum score increase required to add another alignment to translocation cluster solution", type=int, default=1000)
     parser.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
     parser.add_argument("-s", dest="seed", help="seed for generating random numbers", type=int, default=1)
     parser.add_argument("-log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
-    parser.add_argument("-lf", dest="log_fin", type=argparse.FileType("w"))
+    parser.add_argument("-lf", dest="log_fin", type=argparse.FileType("w"), default="syri.log")
+    parser.add_argument("--no-chrmatch", dest='chrmatch', help="Do not allow SyRI to automatically match chr ids between the two genomes if they are not equal", default=False, action='store_true')
 
     args = parser.parse_args()
+
+    import logging
+    import logging.config
+
+    logging.config.dictConfig({
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'log_file': {
+                'format': "%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s",
+            },
+            'stdout': {
+                'format': "%(name)s — %(levelname)s — %(message)s",
+            },
+        },
+        'handlers': {
+            'stdout': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'stdout',
+                'level': 'WARNING',
+            },
+            'log_file': {
+                'class': 'logging.FileHandler',
+                'filename': args.log_fin.name,
+                'mode': 'a',
+                'formatter': 'log_file',
+                'level': args.log,
+            },
+        },
+        'loggers': {
+            '': {
+                'level': args.log,
+                'handlers': ['stdout', 'log_file'],
+            },
+        },
+    })
+
     from syri.pyxFiles.synsearchFunctions import startSyri
 #    print(args)
     startSyri(args)
-    
-    
