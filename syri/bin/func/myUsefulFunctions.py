@@ -20,7 +20,7 @@ def unlist(nestedList):
             outList.extend(unlist(i))
         else:
             outList.append(i)
-    return(outList)
+    return outList
 
 
 def getValues(l, index):
@@ -29,22 +29,22 @@ def getValues(l, index):
 
 
 def getColors(colorPalette, numOfCol):
-	return([colorPalette(i/numOfCol) for i in range(numOfCol)])
+    return [colorPalette(i/numOfCol) for i in range(numOfCol)]
 
 
 def subList(lst1, lst2):
-    return(list(map(op.sub,lst1, lst2)))
+    return list(map(op.sub, lst1, lst2))
 
 
 def intersect(*lists):
     import numpy as np
-    return reduce(np.intersect1d,list(lists))
+    return reduce(np.intersect1d, list(lists))
 
 
-def extractSeq(filePath, seqID, start = 0, end = -1):
-    querySeq = [fasta for fasta in SeqIO.parse(filePath,'fasta') if fasta.id == seqID][0]
+def extractSeq(filePath, seqID, start=0, end=-1):
+    querySeq = [fasta for fasta in SeqIO.parse(filePath, 'fasta') if fasta.id == seqID][0]
     querySeq.seq = querySeq.seq[start:end+1]
-    SeqIO.write(querySeq,seqID+"_"+str(start)+"_"+str(end)+".fasta","fasta")
+    SeqIO.write(querySeq, seqID+"_"+str(start)+"_"+str(end)+".fasta", "fasta")
 
 
 def fileRemove(fName):
@@ -64,6 +64,8 @@ def mergeRanges(ranges):
     """
     from collections import deque
     import numpy as np
+    if len(ranges) < 2:
+        return ranges
     ranges = ranges[ranges[:, 0].argsort()]
     min_value = ranges[0, 0]
     max_value = ranges[0, 1]
@@ -77,5 +79,3 @@ def mergeRanges(ranges):
             max_value = i[1]
     out_range.append([min_value, max_value])
     return np.array(out_range)
-
-

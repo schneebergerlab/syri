@@ -12,12 +12,6 @@ import os
 import sys
 
 
-def allMum(args):
-    allAlignments = readSVData(cwdPath, prefix)
-    mumSNPIn = allAlignments[["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].copy()
-    mumSNPIn.to_csv(cwdPath+prefix+"all_mum.txt", sep="\t", header=False, index=False)
-
-
 if __name__ == "__main__":  
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("ref", help="path to the reference genome", type=argparse.FileType('r'))
@@ -45,9 +39,9 @@ if __name__ == "__main__":
         if prefix+file not in listDir:
             sys.exit(file + " is not present in the directory. Exiting")
         
-    from syri.pyxFiles.synsearchFunctions import readSVData, getSV, getNotAligned
+    from syri.pyxFiles.synsearchFunctions import readSRData, getSV, getNotAligned
 
-    allAlignments = readSVData(cwdPath, prefix, args.all)       
+    allAlignments = readSRData(cwdPath, prefix, args.all)
     mumSNPIn = allAlignments[["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].copy()
     mumSNPIn.to_csv(cwdPath+prefix+"mumSNPIn.txt", sep="\t", header=False, index=False)
     getSV(cwdPath, allAlignments, prefix, args.offset)

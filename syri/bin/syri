@@ -7,11 +7,11 @@ Created on Wed May 10 13:05:51 2017
 @author: goel
 """
 import argparse
-import os
-import sys
-
 
 if __name__ == "__main__":
+    import os
+    import sys
+
     print(sys.executable)
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("inFile", help="location of coords file", type=argparse.FileType('r'))

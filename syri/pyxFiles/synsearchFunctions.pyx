@@ -55,13 +55,13 @@ def startSyri(args):
         if not chrmatch:
             logger.warning("Matching them automatically. For each reference genome, most similar query genome will be selected")
             chromMaps = defaultdict(dict)
-            for i in pd.unique(coords.bChr):
-                for j in pd.unique(coords.aChr):
+            for i in np.unique(coords.bChr):
+                for j in np.unique(coords.aChr):
                     a = np.array(coords.loc[(coords.bChr == i) & (coords.aChr == j), ["aStart", "aEnd"]])
                     a = mergeRanges(a)
                     chromMaps[j][i] = len(a) + (a[:, 1] - a[:, 0]).sum()
 
-            for chrom in pd.unique(coords.aChr):
+            for chrom in np.unique(coords.aChr):
                 maxid = max(chromMaps[chrom].items(), key=lambda x: x[1])[0]
                 logger.info("setting {} as {}".format(maxid, chrom))
                 coords.loc[coords.bChr == maxid, "bChr"] = chrom
@@ -74,8 +74,7 @@ def startSyri(args):
             coords = coords.loc[~coords.aChr.isin(badChromo) & ~coords.bChr.isin(badChromo)]
 
 
-    uniChromo = list(pd.unique(coords.aChr))
-    uniChromo.sort()
+    uniChromo = list(np.unique(coords.aChr))
     logger.info('Analysing chromosomes: {}'.format(uniChromo))
     # Identify intra-chromosomal events (synteny, inversions, intra-trans, intra-dup) for each chromosome as a separate
     # process in parallel
@@ -223,8 +222,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     #     for i in allTransGenomeBGroups:
     #         fout.write(",".join(map(str, i.member)) + "\n")
 
-    print("Translocations : making blocks data", chromo, str(datetime.now()))
-    print("memory usage: ", psutil.Process(os.getpid()).memory_info()[0]/2.**30)
+    logger.debug("Translocations : making blocks data " + chromo +" " + str(datetime.now()))
+    logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
 
     # isSynOverlap = getOverlapWithSynBlocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd),
     #                               np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd),
@@ -234,10 +233,10 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
 
 
     # allTransBlocks.to_csv(cwdPath+"allTransBlocks.txt", sep="\t", index = False)
-
-    auni = getOverlapWithSynBlocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd),np.array([chromo]*allTransBlocks.shape[0]), np.array(inPlaceBlocks.aStart), np.array(inPlaceBlocks.aEnd), np.array([chromo]*inPlaceBlocks.shape[0]), 50, allTransBlocks.shape[0], tUC, tUP)
-    sortedInPlace = inPlaceBlocks.sort_values(["bStart","bEnd"])
-    buni = getOverlapWithSynBlocks(np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), np.array([chromo]*allTransBlocks.shape[0]), np.array(sortedInPlace.bStart), np.array(sortedInPlace.bEnd), np.array([chromo]*inPlaceBlocks.shape[0]), 50, allTransBlocks.shape[0], tUC, tUP)
+    if len(allTransBlocks) > 0:
+        auni = getOverlapWithSynBlocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd),np.array([chromo]*allTransBlocks.shape[0]), np.array(inPlaceBlocks.aStart), np.array(inPlaceBlocks.aEnd), np.array([chromo]*inPlaceBlocks.shape[0]), 50, allTransBlocks.shape[0], tUC, tUP)
+        sortedInPlace = inPlaceBlocks.sort_values(["bStart","bEnd"])
+        buni = getOverlapWithSynBlocks(np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), np.array([chromo]*allTransBlocks.shape[0]), np.array(sortedInPlace.bStart), np.array(sortedInPlace.bEnd), np.array([chromo]*inPlaceBlocks.shape[0]), 50, allTransBlocks.shape[0], tUC, tUP)
 
     genomeGroupLengths = ([len(i.member) for i in allTransGenomeAGroups], [len(i.member) for i in allTransGenomeBGroups])
 
@@ -280,7 +279,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
 #             temp_trans_block.setStatus(1)
 #         allTransBlocksData.append(temp_trans_block)
 
-    logger.info("Translocations : finished making blocks data on" + chromo)
+    logger.debug("Translocations : finished making blocks data on" + chromo)
     logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
 
     aUni = np.array([allTransBlocksData[i].aUni for i in range(allTransBlocks.shape[0])], dtype="int")
@@ -291,21 +290,22 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     aGroups = {i:np.array(allTransGenomeAGroups[i].member, dtype="int") for i in range(len(allTransGenomeAGroups))}
     bGroups = {i: np.array(allTransGenomeBGroups[i].member, dtype="int") for i in range(len(allTransGenomeBGroups))}
 
-    out = getmeblocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd), np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), 50, allTransBlocks.shape[0], aUni, bUni, status, aIndex, bIndex, aGroups, bGroups)
+    if len(allTransBlocks) > 0:
+        out = getmeblocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd), np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), 50, allTransBlocks.shape[0], aUni, bUni, status, aIndex, bIndex, aGroups, bGroups)
 
-    for i in range(len(out[0])):
-        if out[0][i]:
-            allTransCluster[allTransClusterIndices[i]].remove(i)
+        for i in range(len(out[0])):
+            if out[0][i]:
+                allTransCluster[allTransClusterIndices[i]].remove(i)
 
-    for i in out[1].keys():
-        if len(out[1][i]) > 0:
-            allTransBlocksData[i].addMEBlock(list(out[1][i]))
+        for i in out[1].keys():
+            if len(out[1][i]) > 0:
+                allTransBlocksData[i].addMEBlock(list(out[1][i]))
 
-    for i in out[2].keys():
-        allTransBlocksData[i].setMEList(list(out[2][i][0]),list(out[2][i][1]))
+        for i in out[2].keys():
+            allTransBlocksData[i].setMEList(list(out[2][i][0]),list(out[2][i][1]))
 
-    del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
-    collect()
+        del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
+        collect()
 
     # Code for finding mutually exclusive blocks
     # for i in range(allTransBlocks.shape[0]):
@@ -549,14 +549,14 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
     for i in range(len(ctxCluster)):
         ctxClusterIndices.update(dict.fromkeys(ctxCluster[i], i))
 
-
-    auni = getOverlapWithSynBlocks(np.array(ctxTransBlocks.aStart), np.array(ctxTransBlocks.aEnd),
+    if len(ctxTransBlocks) > 0:
+        auni = getOverlapWithSynBlocks(np.array(ctxTransBlocks.aStart), np.array(ctxTransBlocks.aEnd),
                                      np.array(ctxTransBlocks.aChr), np.array(annoCoords.aStart),
                                      np.array(annoCoords.aEnd), np.array(annoCoords.aChr), 50,
                                      ctxTransBlocks.shape[0], tUC, tUP)
 
-    sortedInPlace = annoCoords.sort_values(["bStart", "bEnd"])
-    buni = getOverlapWithSynBlocks(np.array(ctxTransBlocks.bStart), np.array(ctxTransBlocks.bEnd),
+        sortedInPlace = annoCoords.sort_values(["bStart", "bEnd"])
+        buni = getOverlapWithSynBlocks(np.array(ctxTransBlocks.bStart), np.array(ctxTransBlocks.bEnd),
                                    np.array(ctxTransBlocks.bChr), np.array(sortedInPlace.bStart),
                                    np.array(sortedInPlace.bEnd), np.array(sortedInPlace.bChr), 50,
                                      ctxTransBlocks.shape[0], tUC, tUP)
@@ -2802,7 +2802,7 @@ cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim
 #################################################################
 
 # noinspection PyUnreachableCode
-def readSVData(cwdPath, prefix, dup = False):
+def readSRData(cwdPath, prefix, dup = False):
     if not isinstance(dup, bool):
         sys.exit("need boolean")
     if dup:
@@ -2814,16 +2814,16 @@ def readSVData(cwdPath, prefix, dup = False):
     for fileType in fin[:-1]:
         try:
             fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object)
-        except pd.errors.ParserError as e:
+        except pd.errors.ParserError as _e:
             fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object, engine ="python")
         except pd.io.common.EmptyDataError:
             print(fileType, " is empty. Skipping analysing it.")
             continue
-        except Exception as e:
-            print("ERROR: while trying to read ", fileType, e)
+        except Exception as _e:
+            print("ERROR: while trying to read ", fileType, _e)
             continue
             
-        annoIndices = np.where(fileData[0] =="#")[0]
+        annoIndices = np.where(fileData[0] == "#")[0]
         annoIndices = np.append(annoIndices,len(fileData))
         repCount = annoIndices[1:] - annoIndices[:-1] - 1
         
@@ -2837,8 +2837,8 @@ def readSVData(cwdPath, prefix, dup = False):
         reps = np.repeat(reps, repCount)
         
         coordsData["group"] = reps
-        coordsData["aChr"] = list(np.repeat(annoData[1],repCount))
-        coordsData["bChr"] = list(np.repeat(annoData[5],repCount))
+        coordsData["aChr"] = list(np.repeat(annoData[1], repCount))
+        coordsData["bChr"] = list(np.repeat(annoData[5], repCount))
         coordsData["state"] = fileType.split("Out.txt")[0]
         annoCoords = annoCoords.append(coordsData.copy())
                                    
@@ -3225,6 +3225,14 @@ def readSVData(cwdPath, prefix, dup = False):
 
 
 def getSV(cwdPath, allAlignments, prefix, offset):
+    """
+    inverted regions are output in reverse as well
+    :param cwdPath:
+    :param allAlignments:
+    :param prefix:
+    :param offset:
+    :return:
+    """
     offset = -abs(offset)
     fout = open(cwdPath + prefix + "sv.txt", "w")
     allAlignments["id"] = allAlignments.group.astype(
@@ -3233,6 +3241,15 @@ def getSV(cwdPath, allAlignments, prefix, offset):
 
     for i in allBlocks:
         blocksAlign = allAlignments.loc[allAlignments.id == i].copy()
+        if len(pd.unique(blocksAlign["aChr"])) > 1 or len(pd.unique(blocksAlign["aChr"])) > 1:
+            sys.exit("More than one chromosome found for a SR")
+        fout.write("\t".join(["#",
+                              str(blocksAlign[["aStart","aEnd"]].min().min()),
+                              str(blocksAlign[["aStart", "aEnd"]].max().max()),
+                              str(blocksAlign[["bStart", "bEnd"]].min().min()),
+                              str(blocksAlign[["bStart", "bEnd"]].max().max()),
+                              pd.unique(blocksAlign["aChr"])[0],
+                              pd.unique(blocksAlign["bChr"])[0]]) + "\n")
         ordered = 1 if "inv" not in blocksAlign.state.iloc[0] else 0
         for j in range(len(blocksAlign) - 1):
             m = blocksAlign.iat[j + 1, 0] - blocksAlign.iat[j, 1] - 1
@@ -3506,7 +3523,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                             sCoord = round(blocksAlign.iat[j, 3] + j_prop * (
                                         blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])).astype(int)
                             eCoord = round(blocksAlign.iat[j + 1, 2] - j1_prop * (
-                                        blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 2])).astype(int)
+                                        blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])).astype(int)
                             fout.write("\t".join(["TDM",
                                                   str(blocksAlign.iat[j + 1, 0]),
                                                   str(blocksAlign.iat[j, 1]),
@@ -3517,7 +3534,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                     else:
                         if ordered:
                             k_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
-                            k1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j, 2])
+                            k1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
                             sCoord = round(blocksAlign.iat[j, 1] - k_prop * (
                                         blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
                             eCoord = round(blocksAlign.iat[j + 1, 0] + k1_prop * (
@@ -3633,6 +3650,313 @@ def getNotAligned(cwdPath, prefix, ref, qry):
                 
 #    fout.close()
     return None
+
+##################################################################
+### Generate formatted output
+##################################################################
+
+def formatOutput(cwdpath):
+    """
+    :param cwdpath: Path containing all input files
+    :return: A TSV file containing genomic annotation for the entire genome
+    """
+
+    import pandas as pd
+    import re
+    import sys
+    from collections import defaultdict
+
+    files = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt"]
+    entries = defaultdict()
+
+    re_dup = re.compile("dup", re.I)
+    align_num = 1
+    sr_num = 0
+    for file in files:
+        sr_type = file.split("O")[0]
+        if sr_type == "TL":
+            sr_type = "trans"
+        elif sr_type == "invTL":
+            sr_type = "invtrans"
+        elif sr_type == "invDup":
+            sr_type = "invdup"
+
+        with open(cwdpath + file, "r") as fin:
+            for line in fin:
+                line = line.strip().split("\t")
+                if line[0] == "#":
+                    sr_num += 1
+                    if file == 'ctxOut.txt':
+                        if line[8] == "translocation":
+                            sr_type = "trans"
+                        elif line[8] == "invTranslocation":
+                            sr_type = "invtrans"
+                        elif line[8] == "duplication":
+                            sr_type = "dup"
+                        elif line[8] == "invDuplication":
+                            sr_type = "invdup"
+                    entries[sr_type + str(sr_num)] = {
+                        'achr': line[1],
+                        'astart': line[2],
+                        'aend': line[3],
+                        'bchr': line[5],
+                        'bstart': line[6],
+                        'bend': line[7],
+                        'vartype': sr_type,
+                        'parent': "-",
+                        'dupclass': "-"
+                    }
+                    if re_dup.search(file):
+                        entries[sr_type + str(sr_num)]["dupclass"] = "copygain" if line[9] == "B" else "copyloss"
+                    if file == "ctxOut.txt":
+                        entries[sr_type + str(sr_num)]["vartype"] = sr_type
+                        if re_dup.search(line[8]):
+                            entries[sr_type + str(sr_num)]["dupclass"] = "copygain" if line[9] == "B" else "copyloss"
+                else:
+                    entries["align" + str(align_num)] = {
+                        'achr': entries[sr_type + str(sr_num)]['achr'],
+                        'astart': line[0],
+                        'aend': line[1],
+                        'bchr': entries[sr_type + str(sr_num)]['bchr'],
+                        'bstart': line[2],
+                        'bend': line[3],
+                        'vartype': sr_type + "_align",
+                        'parent': sr_type + str(sr_num),
+                        'dupclass': "-"
+                    }
+                    align_num += 1
+
+    anno = pd.DataFrame.from_dict(entries, orient="index")
+    anno.loc[:, ['astart', 'aend', 'bstart', 'bend']] = anno.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype(
+        'int')
+    anno['id'] = anno.index.values
+    anno = anno.loc[:, ['achr', 'astart', 'aend', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+    anno.sort_values(['achr', 'astart', 'aend'], inplace=True)
+
+    _svdata = pd.read_table(cwdpath + "sv.txt", header=None)
+    _svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr']
+
+    entries = defaultdict()
+    count = 1
+    for row in _svdata.itertuples(index=False):
+        if row.vartype == "#":
+            _parent = anno.loc[(anno.achr == row.achr) &
+                               (anno.astart == row.astart) &
+                               (anno.aend == row.aend) &
+                               (anno.bchr == row.bchr) &
+                               (anno.bstart == row.bstart) &
+                               (anno.bend == row.bend) &
+                               (anno.parent == "-"), "id"]
+            if len(_parent) != 1:
+                print(row, _parent)
+                sys.exit("Error in finding parent for SV")
+            else:
+                _parent = _parent.to_string(index=False, header=False)
+            continue
+        entries[row.vartype + str(count)] = {
+            'achr': row.achr,
+            'astart': row.astart,
+            'aend': row.aend,
+            'bchr': row.bchr,
+            'bstart': row.bstart,
+            'bend': row.bend,
+            'vartype': row.vartype,
+            'parent': _parent,
+            'id': row.vartype + str(count),
+            'dupclass': "-"
+        }
+        count += 1
+
+    sv = pd.DataFrame.from_dict(entries, orient="index")
+    sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+    sv = sv.loc[:, ['achr', 'astart', 'aend', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+    sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
+
+    # out = pd.concat([anno, sv])
+    # out.sort_values(['achr', 'astart', 'aend'], inplace=True)
+
+    notal = pd.read_table(cwdpath + "notAligned.txt", header=None)
+    notal.columns = ["gen", "start", "end", "chr"]
+    notal[["start", "end"]] = notal[["start", "end"]].astype("int")
+    entries = defaultdict()
+    _c = 0
+    for row in notal.itertuples(index=False):
+        _c += 1
+        if row.gen == "R":
+            entries["notal" + str(_c)] = {
+                'achr': row.chr,
+                'astart': row.start,
+                'aend': row.end,
+                'bchr': "-",
+                'bstart': "-",
+                'bend': "-",
+                'vartype': "notal",
+                'parent': "-",
+                'id': "notal" + str(_c),
+                'dupclass': "-"
+            }
+        elif row.gen == "Q":
+            entries["notal" + str(_c)] = {
+                'achr': "-",
+                'astart': "-",
+                'aend': "-",
+                'bchr': row.chr,
+                'bstart': row.start,
+                'bend': row.end,
+                'vartype': "notal",
+                'parent': "-",
+                'id': "notal" + str(_c),
+                'dupclass': "-"
+            }
+    notal = pd.DataFrame.from_dict(entries, orient="index")
+    # notal.loc[:, ['astart', 'aend', 'bstart', 'bend']] = notal.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+    notal = notal.loc[:, ['achr', 'astart', 'aend', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+    notal.sort_values(['achr', 'astart', 'aend'], inplace=True)
+
+    def p_indel():
+        vtype = "INS" if indel == 1 else "DEL"
+        entries[vtype + str(count)] = {
+            'achr': _ac,
+            'astart': _as,
+            'aend': _ae,
+            'bchr': _bc,
+            'bstart': _bs,
+            'bend': _be,
+            'vartype': vtype,
+            'parent': _p,
+            # 'aseq': "-",
+            # 'bseq': "-",
+            'id': vtype + str(count),
+            'dupclass': "-"
+        }
+
+    entries = defaultdict()
+    with open("test_snps.txt", "r") as fin:
+        indel = 0                           # marker for indel status. 0 = no_indel, 1 = insertion, -1 = deletion
+        _as = -1                            # astart
+        _ae = -1
+        _bs = -1
+        _be = -1
+        _ac = -1
+        _bc = -1
+        _p = -1
+
+        for line in fin:
+            line = line.strip().split("\t")
+            try:
+                if line[0] == "#" and len(line) == 7:
+                    if indel != 0:
+                        p_indel()
+                        indel = 0
+                    _parent = anno.loc[(anno.achr == line[5]) &
+                                       (anno.astart == int(line[1])) &
+                                       (anno.aend == int(line[2])) &
+                                       (anno.bchr == line[6]) &
+                                       (anno.bstart == int(line[3])) &
+                                       (anno.bend == int(line[4])) &
+                                       (anno.parent == "-"), "id"]
+                    if len(_parent) != 1:
+                        print(line, _parent)
+                        sys.exit("Error in finding parent for SV")
+                    else:
+                        _parent = _parent.to_string(index=False, header=False)
+                    continue
+                elif line[1] != "." and line[2] != "." and len(line) == 12:
+                    if indel != 0:
+                        p_indel()
+                        indel = 0
+                    count += 1
+                    entries["SNP" + str(count)] = {
+                        'achr': line[10],
+                        'astart': int(line[0]),
+                        'aend': int(line[0]),
+                        'bchr': line[11],
+                        'bstart': int(line[3]),
+                        'bend': int(line[3]),
+                        'vartype': "SNP",
+                        'parent': _parent,
+                        # 'aseq': line[1],
+                        # 'bseq': line[2],
+                        'id': "SNP" + str(count),
+                        'dupclass': "-"
+                    }
+                elif indel == 0:
+                    count += 1
+                    _as = int(line[0])
+                    _ae = int(line[0])
+                    _bs = int(line[3])
+                    _be = int(line[3])
+                    _ac = line[10]
+                    _bc = line[11]
+                    _p = _parent
+                    indel = 1 if line[1] == "." else -1
+                elif indel == 1:
+                    if int(line[0]) != _as or line[1] != "." or line[10] != _ac:
+                        p_indel()
+                        count += 1
+                        _as = int(line[0])
+                        _ae = int(line[0])
+                        _bs = int(line[3])
+                        _be = int(line[3])
+                        _ac = line[10]
+                        _bc = line[11]
+                        _p = _parent
+                        indel = 1 if line[1] == "." else -1
+                    else:
+                        _be = int(line[3])
+                elif indel == -1:
+                    if int(line[3]) != _bs or line[2] != "." or line[11] != _bc:
+                        p_indel()
+                        count += 1
+                        _as = int(line[0])
+                        _ae = int(line[0])
+                        _bs = int(line[3])
+                        _be = int(line[3])
+                        _ac = line[10]
+                        _bc = line[11]
+                        _p = _parent
+                        indel = 1 if line[1] == "." else -1
+                    else:
+                        _ae = int(line[0])
+            except IndexError:
+                print(line)
+
+    snpdata = pd.DataFrame.from_dict(entries, orient="index")
+    snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+    snpdata['id'] = snpdata.index.values
+    snpdata = snpdata.loc[:, ['achr', 'astart', 'aend', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+    snpdata.sort_values(['achr', 'astart', 'aend'], inplace=True)
+
+    events = anno.loc[anno.parent == "-"]
+    with open("syri.out", "w") as fout:
+        notA = notal.loc[notal.achr != "-"].copy()
+        notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
+        notB = notal.loc[notal.bchr != "-"].copy()
+        notB.loc[:, ["bstart", "bend"]] = notB.loc[:, ["bstart", "bend"]].astype("int")
+        for row in events.itertuples(index=False):
+            _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1)]
+            _notB = notB.loc[(notB.bchr == row.bchr) & (notB.bend == row.bstart-1)]
+            if len(_notA) == 0:
+                pass
+            elif len(_notA) == 1:
+                fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+            else:
+                sys.exit("too many notA regions")
+
+            if len(_notB) == 0:
+                pass
+            elif len(_notB) == 1:
+                fout.write("\t".join(list(map(str, _notB.iloc[0]))) + "\n")
+            else:
+                sys.exit("too many notB regions")
+            fout.write("\t".join(list(map(str, row))) + "\n")
+
+            outdata = pd.concat([anno.loc[anno.parent == row.id], sv.loc[sv.parent == row.id], snpdata.loc[(snpdata.parent == row.id)]])
+            outdata.sort_values(["astart", "aend"], inplace=True)
+            fout.write(outdata.to_csv(sep="\t", index=False, header=False))
+
+    return 0
+
 
 
 ##################################################################
