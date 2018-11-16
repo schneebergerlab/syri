@@ -151,11 +151,8 @@ if __name__ == "__main__":
     allBlocks = pd.unique(allAlignments.id)
 
     count = 0
-    with open(cwdPath + prefix + "test_snps2.txt", "w") as fout:
+    with open(cwdPath + prefix + "snps.txt", "w") as fout:
         for i in allBlocks:
-            count += 1
-            if count == 5:
-                break
             blocksAlign = allAlignments.loc[allAlignments.id == i].copy()
             if len(pd.unique(blocksAlign["aChr"])) > 1 or len(pd.unique(blocksAlign["aChr"])) > 1:
                 sys.exit("More than one chromosome found for a SR")

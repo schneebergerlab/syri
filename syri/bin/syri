@@ -12,23 +12,43 @@ if __name__ == "__main__":
     import os
     import sys
 
-    print(sys.executable)
+    # print(sys.executable)
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("inFile", help="location of coords file", type=argparse.FileType('r'))
+    optional = parser._action_groups.pop()
+    required = parser.add_argument_group("required arguments")
+    required.add_argument("-r", help="Genome A. Will be considered as reference", type=argparse.FileType('r'), required=True)
+    required.add_argument("-q", help="Genome B. Will be considered as reference", type=argparse.FileType('r'), required=True)
+    required.add_argument("-d", help="Delta-file", type=argparse.FileType('r'), required=True)
+    required.add_argument("-c", help="Alignment coords input", type=argparse.FileType('r'), required=True)
 # parser.add_argument("-n", dest="threshold", help="Threshold to differentiate estimate whether the",\type=int,
     # default=50)
-    parser.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
-    parser.add_argument("-c", dest="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type=int, default=1000)
-    parser.add_argument("-p", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would selection of translocation which are more overlapped with \
+    optional.add_argument("-log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
+    optional.add_argument("-lf", dest="log_fin", help="Name of log file", type=argparse.FileType("w"), default="syri.log")
+    optional.add_argument('-dir', dest='dir', help="path to working directory (if not current directory)", action='store')
+    optional.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
+    optional.add_argument("-seed", dest="seed", help="seed for generating random numbers", type=int, default=1)
+    optional.add_argument("--no-chrmatch", dest='chrmatch', help="Do not allow SyRI to automatically match chromosome ids between the two genomes if they are not equal", default=False, action='store_true')
+    optional.add_argument('-nc', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
+    optional.add_argument('-k', dest="keep", help="Keep internediate output files", default=False, action="store_true")
+    parser._action_groups.append(optional)
+
+    # Parameters for identification of structural rearrangements
+    srargs = parser.add_argument_group("SR identification")
+    srargs.add_argument("-nosr", dest="sr", help="Set to skip structural rearrangement identification", action="store_false")
+    srargs.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
+    srargs.add_argument("-unic", dest="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type=int, default=1000)
+    srargs.add_argument("-unip", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would selection of translocation which are more overlapped with \
      other regions.", type=float, default=0.5)
-    parser.add_argument('-nC', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
-    parser.add_argument('-d', dest='dir', help="path to working directory (if not current directory)", action='store', default=os.getcwd()+os.sep)
-    parser.add_argument("-i", dest="increaseBy", help="Minimum score increase required to add another alignment to translocation cluster solution", type=int, default=1000)
-    parser.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
-    parser.add_argument("-s", dest="seed", help="seed for generating random numbers", type=int, default=1)
-    parser.add_argument("-log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
-    parser.add_argument("-lf", dest="log_fin", type=argparse.FileType("w"), default="syri.log")
-    parser.add_argument("--no-chrmatch", dest='chrmatch', help="Do not allow SyRI to automatically match chr ids between the two genomes if they are not equal", default=False, action='store_true')
+    srargs.add_argument("-inc", dest="increaseBy", help="Minimum score increase required to add another alignment to translocation cluster solution", type=int, default=1000)
+
+    # Parameters for identification of short variations
+    shvargs = parser.add_argument_group("ShV identification")
+    shvargs.add_argument("-nosv", dest="sv", help="Set to skip structural variation identification", action="store_false")
+    shvargs.add_argument("-nosnp", dest="snp", help="Set to skip SNP/Indel (within alignment) identification", action="store_false")
+    shvargs.add_argument("--all", help="Use duplications too for variant identification",  action="store_true", default=False)
+    shvargs.add_argument("--allow-offset", dest='offset', help='BPs allowed to overlap', default=0, type=int, action="store")
+    shvargs.add_argument('-ss', help="path to show-snps from mummer", default="show-snps")
+    shvargs.add_argument('-buff', help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=25)
 
     args = parser.parse_args()
 
@@ -69,5 +89,5 @@ if __name__ == "__main__":
     })
 
     from syri.pyxFiles.synsearchFunctions import startSyri
-#    print(args)
-    startSyri(args)
+    if args.nosr != False:
+        startSyri(args)
