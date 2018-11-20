@@ -26,7 +26,7 @@ cimport numpy as np
 
 np.random.seed(1)
 def startSyri(args):
-    coordsfin = args.inFile.name
+    coordsfin = args.infile.name
     nCores = args.nCores
     bRT = args.bruteRunTime
     threshold = 50  ##args.threshold
@@ -97,7 +97,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
 
     logger.info(chromo+" " + str(coordsData.shape))
-    logger.info("Identifying Synteny for chromosome " + chromo + " " + str(datetime.now()))
+    logger.info("Identifying Synteny for chromosome " + chromo)
 
     df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)
     nrow = df.shape[0]
@@ -123,7 +123,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     ##########################################################################
     #   Finding Inversions
     ##########################################################################
-    logger.info("Identifying Inversions for chromosome " + chromo + " " + str(datetime.now()))
+    logger.info("Identifying Inversions for chromosome " + chromo)
 
     invertedCoordsOri, profitable, bestInvPath, invData, synInInv, badSyn = getInversions(coords,chromo, threshold, synData, synPath)
     
@@ -131,7 +131,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     ##########################################################
     #### Identify Translocation and duplications
     ##########################################################
-    logger.info("Identifying translocation and duplication for chromosome " + chromo + " " + str(datetime.now()))
+    logger.info("Identifying translocation and duplication for chromosome " + chromo)
 
     chromBlocks = coords[(coords.aChr == chromo) & (coords.bChr == chromo)]
     inPlaceIndices = sorted(list(synData.index.values) + list(invData.index.values))
@@ -158,7 +158,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     inPlaceBlocks.index = range(inPlaceBlocks.shape[0])
     outPlaceBlocks = chromBlocks[~chromBlocks.index.isin(inPlaceIndices)]
     
-    print("Translocations : found blocks", chromo, str(datetime.now()))
+    logger.debug("Translocations : found blocks" + chromo)
     ## Should not filter redundant alignments as they "can" be part of bigger translocations
     ## filtering them may lead to removal of those translocations
     
@@ -194,8 +194,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     else:
         invTransBlocks = []
 
-    logger.debug("Translocations : found orderedBlocks " + chromo + " " +  str(datetime.now()))
-    logger.debug("Translocations : merging blocks " + chromo + " " + str(datetime.now()))
+    logger.debug("Translocations : found orderedBlocks " + chromo)
+    logger.debug("Translocations : merging blocks " + chromo)
 
     allTransBlocks, allTransIndexOrder = mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks)
     allTransGenomeAGroups = makeTransGroupList(allTransBlocks, "aStart", "aEnd", threshold)
@@ -209,7 +209,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
         for block in allTransGenomeBGroups[i].member:
             allTransGroupIndices[block].append(i)
     
-    print("Translocations : getting clusters ", chromo, str(datetime.now()))
+    logger.debug("Translocations : getting clusters " + chromo)
     allTransCluster = getTransCluster(allTransGroupIndices, allTransGenomeAGroups, allTransGenomeBGroups)
     
     allTransClusterIndices = dict()
@@ -335,7 +335,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     #                 me_b.append(j)
     #         temp.setMEList(me_a, me_b)
 
-    print("Translocations : finding solutions ", chromo, str(datetime.now()))
+    logger.debug("Translocations : finding solutions "+ chromo + str(datetime.now()))
     clusterSolutions = []
     for i in range(len(allTransCluster)):
         if len(allTransCluster[i]) > 0:
@@ -344,7 +344,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
     #clusterBlocks = unlist(clusterSolutionBlocks)
     
-    print("Translocations : processing translocations ", chromo, str(datetime.now()))
+    logger.debug("Translocations : processing translocations " + chromo + str(datetime.now()))
     
     transClasses = getTransClasses(clusterSolutionBlocks, allTransBlocksData, allTransGenomeAGroups, allTransGenomeBGroups)
     
@@ -434,7 +434,8 @@ def getBlocks(orderedBlocks, annoCoords, threshold, tUC, tUP):
     
     
 def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores):
-    print("Identifying cross-chromosomal translocation and duplication for chromosome", str(datetime.now()))
+    logger = logging.getLogger("getCTX")
+    logger.info("Identifying cross-chromosomal translocation and duplication for chromosome" + str(datetime.now()))
 
     def getDupCTX(indices, allTransBlocksData, transClasses):
         dupGenomes = {}
@@ -487,7 +488,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
         fout.close()
         
         
-    print("Reading Coords", str(datetime.now()))
+    logger.debug("Reading Coords" + str(datetime.now()))
 
     annoCoords = readAnnoCoords(cwdPath, uniChromo, prefix)
     ctxData = coords.loc[coords['aChr'] != coords['bChr']].copy()
@@ -502,25 +503,25 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
     ctxData["bIndex"] = range(ctxData.shape[0])    
     ctxData.sort_values("aIndex", inplace = True)
     
-    print("CTX identification: ctxdata size", ctxData.shape, str(datetime.now()))
+    logger.debug("CTX identification: ctxdata size" + str(ctxData.shape))
 
     orderedBlocks = ctxData[ctxData.bDir == 1]
     invertedBlocks = ctxData[ctxData.bDir == -1]
     
     ## Create connectivity tree for directed blocks
     
-    print("Making Tree", str(datetime.now()))
+    logger.debug("Making Tree")
 
     nCores = nCores if nCores < 2 else 2
 
-    with Pool(processes = 2) as pool:
+    with Pool(processes = nCores) as pool:
         blks = pool.map(partial(getBlocks, annoCoords=annoCoords, threshold=threshold, tUC=tUC, tUP=tUP), [orderedBlocks,invertedBlocks])
     transBlocks = blks[0]
     invTransBlocks = blks[1]
     del(blks)
     collect()        
-    print("finding Blocks", str(datetime.now()))
-    print("Preparing for cluster analysis", str(datetime.now()))
+    logger.debug("finding Blocks")
+    logger.debug("Preparing for cluster analysis")
 
     ctxTransBlocks, ctxTransIndexOrder = mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks, ctx = True)
    
@@ -654,10 +655,10 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
     #                 ME_B.append(j)
     #         tempTransBlock.setMEList(ME_A, ME_B)
 
-    print("Finding clusters", str(datetime.now()))
+    logger.debug("Finding clusters")
 
     clusterSolutions = []
-    for i in tqdm(range(len(ctxCluster))):
+    for i in range(len(ctxCluster)):
         tempCluster = ctxCluster[i].copy()
         if len(tempCluster) == 0:
             continue
@@ -922,6 +923,7 @@ def getNeighbours(neighbourSyn, j):
 
 
 def getInversions(coords,chromo, threshold, synData, synPath):
+    logger = logging.getLogger("getinversion."+chromo)
     
     class inversion:
         def __init__(self, cost, revenue, neighbours, invPos):
@@ -949,26 +951,26 @@ def getInversions(coords,chromo, threshold, synData, synPath):
     else:
         invTree = pd.DataFrame([], index = range(len(invertedCoords)), columns = invertedCoords.index.values)
         
-    print("found inv Tree", chromo, str(datetime.now()))   
+    logger.debug("found inv Tree " + chromo)
     
     #######################################################################
     ###### Create list of inverted alignments
     #######################################################################
 
-    invBlocks = getInvBlocks(invTree, invertedCoordsOri)
-    print("found inv blocks", chromo, str(datetime.now()))   
+    invblocks = getInvBlocks(invTree, invertedCoordsOri)
+    logger.debug("found inv blocks " + chromo)
 
     #########################################################################
     ###### Finding profitable inversions (group of inverted blocks)
     #########################################################################
          
-    shortest = getShortest(invBlocks)
-    print("found shortest", chromo, str(datetime.now()))   
+    shortest = getShortest(invblocks)
+    logger.debug("found shortest " + chromo )
 
 #    revenue = getRevenue(invBlocks, shortest, invertedCoordsOri)
     
-    revenue = getRevenue(invBlocks, shortest, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values)
-    print("found revenue", chromo, str(datetime.now()))   
+    revenue = getRevenue(invblocks, shortest, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values)
+    logger.debug("found revenue " + chromo)
 
     ## Get syntenic neighbouring blocks of inversions
 
@@ -977,19 +979,19 @@ def getInversions(coords,chromo, threshold, synData, synPath):
     
     neighbourSyn = getNeighbourSyn(invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.index.values, invertedCoordsOri.bDir.values, synData.aStart.values, synData.aEnd.values, synData.bStart.values, synData.bEnd.values, synData.index.values, synData.bDir.values, threshold)
         
-    print("found neighbours", chromo, str(datetime.now()))
+    logger.debug("found neighbours " + chromo)
 
     synBlockScore = [(i.aLen + i.bLen)*i.iden for index, i in synData.iterrows()]
     
     ## Calculate cost adding an inversion, i.e sum of all synblocks which need to be removed to accomodate teh synblocks
     cost = getCost(synPath, shortest, neighbourSyn, synBlockScore, synData, invertedCoordsOri)
-    print("found cost", chromo, str(datetime.now()))
+    logger.debug("found cost " + chromo)
     
     ## Calculate profit (or loss) associated with the addition of an inversion
     profit = []
     for i in range(len(revenue)):
         profit = profit + [[revenue[i][j] - cost[i][j] for j in range(len(revenue[i]))]]
-    print("found profit", chromo, str(datetime.now()))
+    logger.debug("found profit " + chromo)
     
     ## Create list of all profitable inversions
     
@@ -998,9 +1000,9 @@ def getInversions(coords,chromo, threshold, synData, synPath):
                              getNeighbours(neighbourSyn, shortest[i][j]),shortest[i][j])
                              for i in range(len(profit)) for j in range(len(profit[i]))\
                                  if profit[i][j] > (0.1*cost[i][j])]     ##Select only those inversions for which the profit is more than  10% of the cost
-    print("found profitable ", chromo, str(datetime.now()))
+    logger.debug("found profitable " + chromo)
     
-    del(invBlocks, revenue, neighbourSyn, shortest, synBlockScore)
+    del(invblocks, revenue, neighbourSyn, shortest, synBlockScore)
     collect()
     #####################################################################
     #### Find optimal set of inversions from all profitable inversions
@@ -1046,24 +1048,24 @@ def getInversions(coords,chromo, threshold, synData, synPath):
         bestInvPath = []
 
     
-    print("found bestInvPath", chromo, str(datetime.now()))
+    logger.debug("found bestInvPath " + chromo)
 
-    invBlocksIndex = unlist([profitable[i].invPos for i in bestInvPath])
+    invBlocksIndex = unlist([profitable[_i].invPos for _i in bestInvPath])
     invData = invertedCoordsOri.iloc[invBlocksIndex]
     
     badSyn = []
     synInInv = []
-    for i in bestInvPath:
-        invNeighbour = profitable[i].neighbours
+    for _i in bestInvPath:
+        invNeighbour = profitable[_i].neighbours
 #        synInInv = list(range(invNeighbour[0]+1, invNeighbour[1]))
-        invPos = profitable[i].invPos
+        invPos = profitable[_i].invPos
         invCoord = [invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2]]
-        for j in range(invNeighbour[0]+1, invNeighbour[1]):
-            sd = synData.iloc[j][["aStart","aEnd","bStart","bEnd"]]
+        for _j in range(invNeighbour[0]+1, invNeighbour[1]):
+            sd = synData.iloc[_j][["aStart","aEnd","bStart","bEnd"]]
             if (invCoord[0] - sd[0] < threshold) and (sd[1] - invCoord[1] < threshold) and (invCoord[2] - sd[2] < threshold) and (sd[3] - invCoord[2] < threshold):
-                synInInv.append(j)
+                synInInv.append(_j)
             else:
-                badSyn.append(j)
+                badSyn.append(_j)
 
     return(invertedCoordsOri, profitable, bestInvPath,invData, synInInv, badSyn)
                
@@ -1271,6 +1273,7 @@ cpdef np.ndarray getTranslocationScore_ctx(np.ndarray aStart, np.ndarray aEnd, n
 
 # noinspection PyUnreachableCode
 def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, tUC, tUP, ctx = False):
+    logger = logging.getLogger("findOrderedTranslocations")
     if not isinstance(ctx, bool):
         print("CTX status must be a boolean")
         sys.exit()
@@ -1487,16 +1490,16 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
         eNode.extend(list(np.where(outOrderedBlocks.iloc[i] == True)[0]))
         shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,source, target, weight, "weight"))   
     shortestOutOG = np.array(shortestOutOG)
-    print("starting getTranslocationScore",str(datetime.now()))
+    logger.debug("starting getTranslocationScore")
     if not ctx:
         transScores = getTranslocationScore(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, shortestOutOG)
     elif ctx:
         transScores = getTranslocationScore_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, orderedBlocks.bDir.values, shortestOutOG)
-        print("finished getTranslocationScore",str(datetime.now()))
+        logger.debug("finished getTranslocationScore")
         
 #    transScores = getTranslocationScore(shortestOutOG, orderedBlocks, ctx)
     transBlocks = getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold, tUC, tUP, ctx)
-    print("finished getTransBlocks",str(datetime.now()))
+    logger.debug("finished getTransBlocks")
 
     return(transBlocks)
         
@@ -2740,6 +2743,7 @@ class transBlock:
 cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim=1] aEnd, np.ndarray[np.int_t, ndim=1] bStart, np.ndarray[np.int_t, ndim=1] bEnd, np.int_t threshold, np.int_t count, np.ndarray[np.int_t, ndim=1] aUni, np.ndarray[np.int_t, ndim=1] bUni, np.ndarray[np.int_t, ndim=1] status, np.ndarray[np.int_t, ndim=1] aIndex, np.ndarray[np.int_t, ndim=1] bIndex, aGroups, bGroups):
     # Function take the coordinates and cluster information of all translocated blocks and identifies mutually exclusive
     #  blocks by comparing the coordinates of each block to the coordinates of the member blocks in its cluster
+    logger = logging.getLogger("getmeblocks")
     cdef np.ndarray[np.int_t, ndim=1] members, temp
     cdef np.ndarray[np.npy_bool, ndim=1, cast=True] meb, meb_a, meb_b, rem = np.zeros(count, dtype="bool")
 
@@ -2753,7 +2757,7 @@ cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim
 
     for i in range(count):
         if i%50000 == 0:
-            print("Number of mutually exclusive blocks identified", i)
+            logger.debug("Number of mutually exclusive blocks identified " + str(i))
         if not aUni[i] and not bUni[i]:
             rem[i] = True
         elif status[i] == 1:
@@ -3565,6 +3569,93 @@ def getSV(cwdPath, allAlignments, prefix, offset):
     return None
 
 
+def runss(_id, _sspath, _delta, allAlignments):
+    from subprocess import Popen, PIPE
+
+    _block = allAlignments.loc[allAlignments.id == _id].copy()
+
+    if 1 < len(pd.unique(_block["aChr"])) or 1 < len(pd.unique(_block["bChr"])):
+            sys.exit("More than one chromosome found for a SR")
+    _p = Popen([_sspath + " -HrTS " + _delta], stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
+    _out = _p.communicate(input=_block[["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].to_string(index=False, header=False).encode())
+    return "\t".join(["#",
+                      str(_block[["aStart", "aEnd"]].min().min()),
+                      str(_block[["aStart", "aEnd"]].max().max()),
+                      str(_block[["bStart", "bEnd"]].min().min()),
+                      str(_block[["bStart", "bEnd"]].max().max()),
+                      pd.unique(_block["aChr"])[0],
+                      pd.unique(_block["bChr"])[0]])+ "\n" + _out[0].decode("UTF-8")
+
+def getshv(args):
+
+    # fin = "mumSNPIn.txt" if args.align.name is None else args.align.name
+    cwdpath = args.dir
+    prefix = args.prefix
+    nc = args.nCores
+    buff = args.buff
+    sspath = args.sspath
+    delta = args.delta.name
+
+    allAlignments = readSRData(cwdpath, prefix, True) # args.all)
+    allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
+    allBlocks = pd.unique(allAlignments.id)
+
+    blocklists = [allBlocks[_i:(_i+nc)] for _i in range(0, len(allBlocks), nc)]
+    # count = 0
+    with open(cwdpath + prefix + "snps.txt", "w") as fout:
+        for _id in blocklists:
+            with Pool(processes=nc) as pool:
+                out = pool.map(partial(runss, _sspath=sspath, _delta=delta, allAlignments=allAlignments), _id)
+            for _snp in out:
+                fout.write(_snp)
+
+    if buff > 0:
+        with open("snps.txt", "r") as fin:
+            with open("snps_buff"+str(buff)+".txt", "w") as fout:
+                for line in fin:
+                    if line[0] == "#":
+                        fout.write(line)
+                    else:
+                        _l = line.strip().split("\t")
+                        if _l[1] != "." and _l[2] != "." and int(_l[4]) < buff:
+                            continue
+                        else:
+                            fout.write(line)
+
+    # with open("snps_no_indels_test.txt", "w") as fout:
+    #     with open("snps.txt","r") as fin:
+    #         for line in fin:
+    #             if line[0]=="#":
+    #                 fout.write(line)
+    #             else:
+    #                 l = line.strip().split("\t")
+    #                 if l[1] == "." or l[2] == ".":
+    #                     continue
+    #                 else:
+    #                     fout.write(line)
+    #
+    # try:
+    #     snpData = pd.read_table("snps_no_indels.txt", header=None)
+    # except pd.errors.ParserError as e:
+    #     snpData = pd.read_table("snps_no_indels.txt", header=None, engine="python")
+    # snpData = snpData.loc[snpData[4] > buff]
+    # snpData = snpData.drop_duplicates()
+    # snpData.to_csv("snps_no_indels_buff"+str(buff)+".txt", header=None, sep="\t", index=False)
+    #
+    # fileNames = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt"]
+    #
+    # for fName in fileNames:
+    #     fSNPs = getSNPs(fName, snpData)
+    #     try:
+    #         fSNPs.to_csv("snps_no_indels_buff"+str(buff)+"_"+fName.split("Out.txt")[0], header=None, sep='\t', index=False)
+    #     except ValueError:
+    #         open(fName, "w").close()
+    #
+    # indels(fileNames, "snps.txt")
+    # getStrictSyn(fileNames, "snps_no_indels_buff"+str(buff)+"_syn")
+
+    return None
+
 def getNotAligned(cwdPath, prefix, ref, qry):
     refSize = {fasta.id: len(fasta.seq) for fasta in parse(ref,'fasta')}
     qrySize = {fasta.id: len(fasta.seq) for fasta in parse(qry,'fasta')}
@@ -3741,7 +3832,7 @@ def extractseq(_gen, _pos):
     for fasta in parse(_gen, 'fasta'):
         if fasta.id in _pos.keys():
             chrs[fasta.id] = {_i:fasta.seq[_i-1] for _i in _pos[fasta.id]}
-    return(chrs)
+    return chrs
 
 def getTSV(cwdpath, ref):
     """
@@ -3752,7 +3843,7 @@ def getTSV(cwdpath, ref):
     import pandas as pd
     import sys
     from collections import defaultdict
-
+    logger = logging.getLogger("getTSV")
     anno = getsrtable(cwdpath)
 
     _svdata = pd.read_table(cwdpath + "sv.txt", header=None)
@@ -3770,8 +3861,9 @@ def getTSV(cwdpath, ref):
                                (anno.bend == row.bend) &
                                (anno.parent == "-"), "id"]
             if len(_parent) != 1:
-                print(row, _parent)
-                sys.exit("Error in finding parent for SV")
+                logger.error("Error in finding parent for SV")
+                logger.error(row.to_string() + "\t" + _parent.to_string())
+                sys.exit()
             else:
                 _parent = _parent.to_string(index=False, header=False)
             continue
@@ -3887,8 +3979,9 @@ def getTSV(cwdpath, ref):
                                        (anno.bend == int(line[4])) &
                                        (anno.parent == "-"), "id"]
                     if len(_parent) != 1:
-                        print(line, _parent)
-                        sys.exit("Error in finding parent for SV")
+                        logger.error("Error in finding parent for SNP")
+                        logger.error("\t".join(line) + "\t" + _parent.to_string())
+                        sys.exit()
                     else:
                         _parent = _parent.to_string(index=False, header=False)
                     continue
@@ -3957,8 +4050,10 @@ def getTSV(cwdpath, ref):
                     else:
                         _ae = int(line[0])
                         _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-            except IndexError:
-                print(line)
+            except IndexError as _e:
+                logger.error(_e)
+                logger.error("\t".join(line))
+                sys.exit()
 
     snpdata = pd.DataFrame.from_dict(entries, orient="index")
     snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
@@ -4006,8 +4101,6 @@ def getTSV(cwdpath, ref):
         snpdata.loc[_inv, "bstart"] = snpdata.loc[_inv, "bstart"] + 1
         snpdata.loc[_inv, "bend"] = snpdata.loc[_inv, "bend"] + 1
 
-
-
     events = anno.loc[anno.parent == "-"]
     with open("syri.out", "w") as fout:
         notA = notal.loc[notal.achr != "-"].copy()
@@ -4024,7 +4117,8 @@ def getTSV(cwdpath, ref):
                 elif len(_notA) == 1:
                     fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
                 else:
-                    sys.exit("too many notA regions")
+                    logger.error("too many notA regions")
+                    sys.exit()
 
             _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
             notA.loc[(notA.achr == row.achr) & (notA.aend == row.aend + 1), 'selected'] = 1
@@ -4034,7 +4128,8 @@ def getTSV(cwdpath, ref):
             elif len(_notA) == 1:
                 fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
             else:
-                sys.exit("too many notA regions")
+                logger.error("too many notA regions")
+                sys.exit()
 
             # if len(_notB) == 0:
             #     pass

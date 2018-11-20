@@ -14,6 +14,7 @@ input:
     synOut.txt TLOut.txt: information of alignment class
 """
 
+
 def getRegions(_fin):
     try:
         finData = pd.read_table(_fin, header=None)
