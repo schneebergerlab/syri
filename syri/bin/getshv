@@ -6,7 +6,7 @@ Created on Fri Mar  2 15:53:32 2018
 @author: goel
 
 function:
-    find SNPs (all, syntenic_snp, trans_snp) with no indels and buff >= value
+    find SNPs (all, syntenic_snp, trans_snp) with no indels and buff > value
 
 input:
     mumSNPIn.txt: alignment information (input to show-coords)
@@ -24,7 +24,7 @@ def getRegions(_fin):
         print(_fin + " is empty. Skipping analysing it.")
         return pd.DataFrame(columns=["start", "end", "chr"])
     except Exception as _e:
-        print("ERROR: while trying to read ", _fin, ":", e)
+        print("ERROR: while trying to read ", _fin, ":", _e)
         return pd.DataFrame(columns=["start", "end", "chr"])
     finData = finData.loc[finData[0] == "#"][[2, 3, 1]]
     finData.columns = ["start", "end", "chr"]
@@ -40,7 +40,7 @@ def getAligns(_fin):
         print(_fin + " is empty. Skipping analysing it.")
         return pd.DataFrame(columns=[0, 1, 2, 3, 'aChr', 'bChr'])
     except Exception as _e:
-        print("ERROR: while trying to read ", _fin, ":", e)
+        print("ERROR: while trying to read ", _fin, ":", _e)
         return pd.DataFrame(columns=[0, 1, 2, 3, 'aChr', 'bChr'])
     annoIndices = np.where(finData[0] == "#")[0]
     annoIndices = np.append(annoIndices, len(finData))
@@ -62,10 +62,10 @@ def getAlignSNPS(snpd, region):
     chroms = pd.unique(region.aChr)
     for chrom in chroms:
         print(chrom)
-        chromsnp = snpd.loc[snpd[12] == chrom]
+        chromsnp = snpd.loc[snpd[10] == chrom]
         chromreg = region.loc[region.aChr == chrom]
         for x in chromreg.itertuples(index=False):
-            regSNPs.append(chromsnp.loc[(chromsnp[13] == x[5]) & (chromsnp[0] >= x[0]) & (chromsnp[0] <= x[1]) & (chromsnp[3] >= x[2]) & (chromsnp[3] <= x[3])].copy())
+            regSNPs.append(chromsnp.loc[(chromsnp[11] == x[5]) & (chromsnp[0] >= x[0]) & (chromsnp[0] <= x[1]) & (chromsnp[3] >= x[2]) & (chromsnp[3] <= x[3])].copy())
     regSNPs = pd.concat(regSNPs, axis=0)
     print(regSNPs.shape)
     regSNPs = regSNPs.drop_duplicates()
@@ -89,12 +89,12 @@ def getStrictSyn(_fnames, _fin):
     srReg.sort_values(['chr', 'start', 'end'], inplace=True)
     srReg.index = range(srReg.shape[0])
     
-    chroms = np.unique(synSNPs[12])      
+    chroms = np.unique(synSNPs[10])
     strictSyn = [False]*synSNPs.shape[0]
     for chrom in chroms:
         print(chrom)
         srData = srReg.loc[srReg.chr == chrom]
-        synData = synSNPs.loc[synSNPs[12] == chrom]
+        synData = synSNPs.loc[synSNPs[10] == chrom]
         for row in synData.itertuples():
             if row.Index % 10000 == 0:
                 print(row.Index)
@@ -106,9 +106,9 @@ def getStrictSyn(_fnames, _fin):
 
 def indels(_fnames, _fin):
     try:
-        indData = pd.read_table(_fin, header=None)
+        indData = pd.read_table(_fin, header=None, comment="#")
     except pd.errors.ParserError as _e:
-        indData = pd.read_table(_fin, header=None, engine="python")
+        indData = pd.read_table(_fin, header=None, engine="python", comment="#")
     indData = indData.loc[(indData[1] == ".") | (indData[2] == ".")]
     for _fname in _fnames:
         try:
@@ -120,93 +120,37 @@ def indels(_fnames, _fin):
     
 if __name__ == "__main__":
     import argparse
-
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('align', help="input alignment file", type=argparse.FileType('r'))
-    parser.add_argument("delta", help="delta file", type=argparse.FileType('r'))
+    parser.add_argument('snps', help="snps.txt containing snps, indels, no need to be filetered for buff", type=argparse.FileType('r'))
     parser.add_argument('-d', '--dir', help="path to working directory (in not current directory)", action='store', default=".")
-    parser.add_argument('-ss', help="path to show-snps from mummer", default="show-snps")
-    parser.add_argument('-b', help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=25)
-    parser.add_argument("-p", "--prefix", help="Prefix for filenames", type=str, default="")
+    parser.add_argument('-b', dest='buff', help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=25)
+    parser.add_argument("-p", dest="prefix", help="Prefix for filenames", type=str, default="")
     args = parser.parse_args()
 
     import os
-
-    fin = args.align.name
-    deltaFile = args.delta.name
-    cwdPath = args.dir if args.dir != "." else os.getcwd()+os.sep
-    sspath = args.ss
-    buff = args.b
-    prefix = args.p
-
-    import sys
-    from subprocess import Popen, PIPE
     import pandas as pd
     import numpy as np
     from collections import deque
-    from syri.pyxFiles.synsearchFunctions import readSRData
 
-    allAlignments = readSRData(cwdPath, prefix, args.all)
-    allAlignments["id"] = allAlignments.group.astype(
-        "str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
-    allBlocks = pd.unique(allAlignments.id)
+    fin = args.snps
+    cwdPath = args.dir if args.dir != "." else os.getcwd()+os.sep
+    buff = args.buff
+    prefix = args.prefix
 
-    count = 0
-    with open(cwdPath + prefix + "snps.txt", "w") as fout:
-        for i in allBlocks:
-            blocksAlign = allAlignments.loc[allAlignments.id == i].copy()
-            if len(pd.unique(blocksAlign["aChr"])) > 1 or len(pd.unique(blocksAlign["aChr"])) > 1:
-                sys.exit("More than one chromosome found for a SR")
+    snpData = pd.read_table(fin, header=None, comment="#")
 
-            fout.write("\t".join(["#",
-                                  str(blocksAlign[["aStart", "aEnd"]].min().min()),
-                                  str(blocksAlign[["aStart", "aEnd"]].max().max()),
-                                  str(blocksAlign[["bStart", "bEnd"]].min().min()),
-                                  str(blocksAlign[["bStart", "bEnd"]].max().max()),
-                                  pd.unique(blocksAlign["aChr"])[0],
-                                  pd.unique(blocksAlign["bChr"])[0]]) + "\n")
-
-            p = Popen([sspath + " -HrTS " + deltaFile], stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
-            out = p.communicate(input=blocksAlign[["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].to_string(index=False, header=False).encode())
-            fout.write(out[0].decode("UTF-8"))
-
-    # alignFile = open(fin, "r")
-    # snpFile = open("snps.txt", "w")
-    # # p = Popen([sspath+" -HlrTS "+deltaFile], stdin=alignFile, stdout=snpFile, stderr=PIPE, shell=True)
-    #
-    # p = Popen([sspath + " -HrTS " + deltaFile], stdin=alignFile, stdout=snpFile, stderr=PIPE, shell=True)
-    # p.wait()
-    # err = p.communicate()[1].decode("utf-8")
-    # if sspath+": not found" in err:
-    #     sys.exit("show-snps not found at "+sspath+". Exiting")
-    # snpFile.close()
-    # alignFile.close()
-    
-    alignFile = open(fin, "r")
-    snpFile = open("snps_no_indels.txt", "w")
-    # p = Popen([sspath+" -HlrTIS "+deltaFile], stdin=alignFile, stdout=snpFile, stderr=PIPE, shell=True)
-    p = Popen([sspath+" -HrTIS "+deltaFile], stdin=alignFile, stdout=snpFile, stderr=PIPE, shell=True)
-
-    p.wait()
-    alignFile.close()
-    snpFile.close()   
-
-    try:
-        snpData = pd.read_table("snps_no_indels.txt", header=None)
-    except pd.errors.ParserError as e:
-        snpData = pd.read_table("snps_no_indels.txt", header=None, engine="python")
-    snpData = snpData.loc[snpData[4] > buff]
+    snpData = snpData.loc[(snpData[1] != ".") & (snpData[2] != ".") & (snpData[4] > buff)]
     snpData = snpData.drop_duplicates()
     snpData.to_csv("snps_no_indels_buff"+str(buff)+".txt", header=None, sep="\t", index=False)
 
     fileNames = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt"]
     
-    for fName in fileNames:
+    for fname in fileNames:
         try:
-            fSNPs = getSNPs(fName, snpData)
-            fSNPs.to_csv("snps_no_indels_buff"+str(buff)+"_"+fName.split("Out.txt")[0], header=None, sep='\t', index=False)
+            fSNPs = getSNPs(fname, snpData)
+            fSNPs.to_csv("snps_no_indels_buff"+str(buff)+"_"+fname.split("Out.txt")[0], header=None, sep='\t', index=False)
         except ValueError:
-            open(fName, "w").close()
+            open(fname, "w").close()
             
     indels(fileNames, "snps.txt")
     getStrictSyn(fileNames, "snps_no_indels_buff"+str(buff)+"_syn")

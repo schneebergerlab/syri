@@ -14,7 +14,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     optional = parser._action_groups.pop()
     required = parser.add_argument_group("Input Files")
-    required.add_argument("-c", dest="infile", help="File containing alignment coordinates in a tsv format", type=argparse.FileType('r'))#, required=True)
+    required.add_argument("-c", dest="infile", help="File containing alignment coordinates in a tsv format", type=argparse.FileType('r'), required=True)
     required.add_argument("-r", dest="ref", help="Genome A (which is considered as reference for the alignments). Required for short variation identification.", type=argparse.FileType('r'))
     required.add_argument("-q", dest="qry", help="Genome B (which is considered as query for the alignments). Required for short variation identification.", type=argparse.FileType('r'))
     required.add_argument("-d", dest="delta", help=".delta file from mummer. Required for snps/small indels identification", type=argparse.FileType('r'))
@@ -28,6 +28,9 @@ if __name__ == "__main__":
     optional.add_argument("-seed", dest="seed", help="seed for generating random numbers", type=int, default=1)
     optional.add_argument('-nc', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
     optional.add_argument('-k', dest="keep", help="Keep internediate output files", default=False, action="store_true")
+    optional.add_argument('-o', dest="fout", help="Output file name", default="syri", type=str)
+    optional.add_argument('-novcf', dest="novcf", help="Do not combine all files into one output file", default=False, action="store_true")
+
     parser._action_groups.append(optional)
 
     # Parameters for identification of structural rearrangements
@@ -135,18 +138,16 @@ if __name__ == "__main__":
     ###################################################################
     # Combine Output
     ###################################################################
-    from syri.pyxFiles.synsearchFunctions import getTSV, getVCF
-    getTSV(args.dir, args.ref)
-    getVCF("syri.out", "syri.vcf")
+    if not args.novcf:
+        from syri.pyxFiles.synsearchFunctions import getTSV, getVCF
+        getTSV(args.dir, args.ref)
+        getVCF("syri.out", "syri.vcf")
 
-    # from syri.bin.func.myUsefulFunctions import fileRemove
+    from syri.bin.func.myUsefulFunctions import fileRemove
 
     if not args.keep:
-
-        pass
-
-
-
+        for fin in ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", "sv.txt", "notAligned.txt", "snps.txt"]:
+            fileRemove(args.prefix + fin)
 
     print("Finished")
 

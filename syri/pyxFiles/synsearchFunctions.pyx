@@ -50,21 +50,31 @@ def startSyri(args):
 ## Ensure that chromosome IDs are same for the two genomes.
 ## Either find best query match for every reference genome.
 ## Or if --no-chrmatch is set then remove non-matching chromosomes.
+
     if np.unique(coords.aChr).tolist() != np.unique(coords.bChr).tolist():
         logger.warning('Chromosomes IDs do not match.')
         if not chrmatch:
-            logger.warning("Matching them automatically. For each reference genome, most similar query genome will be selected")
-            chromMaps = defaultdict(dict)
-            for i in np.unique(coords.bChr):
-                for j in np.unique(coords.aChr):
-                    a = np.array(coords.loc[(coords.bChr == i) & (coords.aChr == j), ["aStart", "aEnd"]])
-                    a = mergeRanges(a)
-                    chromMaps[j][i] = len(a) + (a[:, 1] - a[:, 0]).sum()
+            if len(np.unique(coords.aChr)) != len(np.unique(coords.bChr)):
+                logger.error("Unequal number of chromosomes in the genomes. Exiting")
+                sys.exit()
+            else:
+                logger.warning("Matching them automatically. For each reference genome, most similar query genome will be selected")
+                chromMaps = defaultdict(dict)
+                for i in np.unique(coords.bChr):
+                    for j in np.unique(coords.aChr):
+                        a = np.array(coords.loc[(coords.bChr == i) & (coords.aChr == j), ["aStart", "aEnd"]])
+                        a = mergeRanges(a)
+                        chromMaps[j][i] = len(a) + (a[:, 1] - a[:, 0]).sum()
 
-            for chrom in np.unique(coords.aChr):
-                maxid = max(chromMaps[chrom].items(), key=lambda x: x[1])[0]
-                logger.info("setting {} as {}".format(maxid, chrom))
-                coords.loc[coords.bChr == maxid, "bChr"] = chrom
+                assigned = []
+                for chrom in np.unique(coords.aChr):
+                    maxid = max(chromMaps[chrom].items(), key=lambda x: x[1])[0]
+                    if maxid in assigned:
+                        logger.error("{} in genome B is best match for two chromosomes in genome A. Cannot assign chromosomes automatically.".format(maxid))
+                        sys.exit()
+                    assigned.append(maxid)
+                    logger.info("setting {} as {}".format(maxid, chrom))
+                    coords.loc[coords.bChr == maxid, "bChr"] = chrom
         else:
             logger.warning("--no-chrmatch is set. Not matching chromosomes automatically.")
             aChromo = set(coords["aChr"])
@@ -234,7 +244,16 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
 
     # allTransBlocks.to_csv(cwdPath+"allTransBlocks.txt", sep="\t", index = False)
     if len(allTransBlocks) > 0:
-        auni = getOverlapWithSynBlocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd),np.array([chromo]*allTransBlocks.shape[0]), np.array(inPlaceBlocks.aStart), np.array(inPlaceBlocks.aEnd), np.array([chromo]*inPlaceBlocks.shape[0]), 50, allTransBlocks.shape[0], tUC, tUP)
+        auni = getOverlapWithSynBlocks(np.array(allTransBlocks.aStart),
+                                       np.array(allTransBlocks.aEnd),
+                                       np.array([chromo]*allTransBlocks.shape[0]),
+                                       np.array(inPlaceBlocks.aStart),
+                                       np.array(inPlaceBlocks.aEnd),
+                                       np.array([chromo]*inPlaceBlocks.shape[0]),
+                                       50,
+                                       allTransBlocks.shape[0],
+                                       tUC,
+                                       tUP)
         sortedInPlace = inPlaceBlocks.sort_values(["bStart","bEnd"])
         buni = getOverlapWithSynBlocks(np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), np.array([chromo]*allTransBlocks.shape[0]), np.array(sortedInPlace.bStart), np.array(sortedInPlace.bEnd), np.array([chromo]*inPlaceBlocks.shape[0]), 50, allTransBlocks.shape[0], tUC, tUP)
 
@@ -611,23 +630,24 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
     aGroups = {i: np.array(ctxTransGenomeAGroups[i].member, dtype="int") for i in range(len(ctxTransGenomeAGroups))}
     bGroups = {i: np.array(ctxTransGenomeBGroups[i].member, dtype="int") for i in range(len(ctxTransGenomeBGroups))}
 
-    out = getmeblocks(np.array(ctxTransBlocks.aStart), np.array(ctxTransBlocks.aEnd), np.array(ctxTransBlocks.bStart),
-                      np.array(ctxTransBlocks.bEnd), 50, ctxTransBlocks.shape[0], aUni, bUni, status, aIndex, bIndex,
-                      aGroups, bGroups)
+    if len(ctxTransBlocks) > 0:
+        out = getmeblocks(np.array(ctxTransBlocks.aStart), np.array(ctxTransBlocks.aEnd), np.array(ctxTransBlocks.bStart),
+                          np.array(ctxTransBlocks.bEnd), 50, ctxTransBlocks.shape[0], aUni, bUni, status, aIndex, bIndex,
+                          aGroups, bGroups)
 
-    for i in range(len(out[0])):
-        if out[0][i]:
-            ctxCluster[ctxClusterIndices[i]].remove(i)
+        for i in range(len(out[0])):
+            if out[0][i]:
+                ctxCluster[ctxClusterIndices[i]].remove(i)
 
-    for i in out[1].keys():
-        if len(out[1][i]) > 0:
-            ctxBlocksData[i].addMEBlock(list(out[1][i]))
+        for i in out[1].keys():
+            if len(out[1][i]) > 0:
+                ctxBlocksData[i].addMEBlock(list(out[1][i]))
 
-    for i in out[2].keys():
-        ctxBlocksData[i].setMEList(list(out[2][i][0]),list(out[2][i][1]))
+        for i in out[2].keys():
+            ctxBlocksData[i].setMEList(list(out[2][i][0]),list(out[2][i][1]))
 
-    del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
-    collect()
+        del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
+        collect()
 
     # for i in range(len(ctxBlocksData)):
     #     tempTransBlock = ctxBlocksData[i]
@@ -1183,7 +1203,7 @@ def mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks,
         transBlocksData.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
         orderedIndex = transBlocksData.index.values
         transBlocksData.index = range(transBlocksData.shape[0])
-        return(transBlocksData, orderedIndex)
+        return transBlocksData, orderedIndex
         
 
 def findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd):
@@ -1278,18 +1298,17 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
         print("CTX status must be a boolean")
         sys.exit()
     def makeBlocksList(blocksTree, blocksData):
-        nrow = blocksTree.shape[0]
-        blocksList = [alingmentBlock(i, np.where(blocksTree.iloc[i] == True)[0],blocksData.iloc[i]) for i in range(nrow)]
-        for block in blocksList:
-            i = 0
-            while(i < len(block.children)):
-                block.children = list(set(block.children) - set(blocksList[block.children[i]].children))
-                i+=1
-            block.children.sort()
+        _blocksList = [alingmentBlock(_i, np.where(blocksTree.iloc[_i] == True)[0],blocksData.iloc[_i]) for _i in range(blocksTree.shape[0])]
+        for _block in _blocksList:
+            _i = 0
+            while _i < len(_block.children):
+                _block.children = list(set(_block.children) - set(_blocksList[_block.children[_i]].children))
+                _i+=1
+            _block.children.sort()
             
-            for child in block.children:
-                blocksList[child].addParent(block.id)
-        return blocksList
+            for _child in _block.children:
+                _blocksList[_child].addParent(_block.id)
+        return _blocksList
 
     def getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold, tUC,tUP, ctx):
         """This method filters possible translocation blocks to select those which have a positive gap based score
@@ -1471,8 +1490,8 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
                     blockAUni += almntData[almnt]['aScore']
                     blockBUni += almntData[almnt]['bScore']
          
-        #Trans block is selected IFF either the unique region on any genome is larger than 1kb
-        # or length of unique region on a genome is larger than 0.5 times the length of
+        #Trans block is selected IFF either the unique region on any genome is larger than tUC
+        # or length of unique region on a genome is larger than tUP times the length of
         # the overlapping region on that genome
                 if blockAUni > tUC or blockBUni > tUC or blockAUni > tUP*blockAlength or blockBUni > tUP*blockBlength:
                     outBlocks.append(block)
@@ -1501,7 +1520,7 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
     transBlocks = getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold, tUC, tUP, ctx)
     logger.debug("finished getTransBlocks")
 
-    return(transBlocks)
+    return transBlocks
         
     #%%            
 def getTransOverlapGroups(transBlocks, orderedBlocks, threshold):
@@ -1564,6 +1583,7 @@ cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aE
     assert(n == len(aEnd) == len(bStart) == len(bEnd) == len(index) == len(bDir) == len(aChr) == len(bChr) == len(left) == len(right))
     cdef np.ndarray[object, ndim=2] outOrderedBlocks =  np.array([[np.nan]*n]*n, dtype=object)
     cdef np.ndarray allRanges = np.array([range(left[i]+1, right[i]) for i in range(n)])
+
     for i in range(n):
         for j in range(i,n):
             #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
@@ -1580,7 +1600,7 @@ cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aE
 #                outOrderedBlocks[i][j] = True
             else:
                 outOrderedBlocks[i][j] = False
-    return(outOrderedBlocks)
+    return outOrderedBlocks
     
 cpdef np.ndarray[np.npy_bool, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold):
     """Compute whether two alignments can be part of one translation block. For this:
@@ -2805,7 +2825,6 @@ cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim
 ### SV identification functions
 #################################################################
 
-# noinspection PyUnreachableCode
 def readSRData(cwdPath, prefix, dup = False):
     if not isinstance(dup, bool):
         sys.exit("need boolean")
@@ -3596,7 +3615,7 @@ def getshv(args):
     sspath = args.sspath
     delta = args.delta.name
 
-    allAlignments = readSRData(cwdpath, prefix, True) # args.all)
+    allAlignments = readSRData(cwdpath, prefix, args.all)
     allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
     allBlocks = pd.unique(allAlignments.id)
 
@@ -3621,39 +3640,6 @@ def getshv(args):
                             continue
                         else:
                             fout.write(line)
-
-    # with open("snps_no_indels_test.txt", "w") as fout:
-    #     with open("snps.txt","r") as fin:
-    #         for line in fin:
-    #             if line[0]=="#":
-    #                 fout.write(line)
-    #             else:
-    #                 l = line.strip().split("\t")
-    #                 if l[1] == "." or l[2] == ".":
-    #                     continue
-    #                 else:
-    #                     fout.write(line)
-    #
-    # try:
-    #     snpData = pd.read_table("snps_no_indels.txt", header=None)
-    # except pd.errors.ParserError as e:
-    #     snpData = pd.read_table("snps_no_indels.txt", header=None, engine="python")
-    # snpData = snpData.loc[snpData[4] > buff]
-    # snpData = snpData.drop_duplicates()
-    # snpData.to_csv("snps_no_indels_buff"+str(buff)+".txt", header=None, sep="\t", index=False)
-    #
-    # fileNames = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt"]
-    #
-    # for fName in fileNames:
-    #     fSNPs = getSNPs(fName, snpData)
-    #     try:
-    #         fSNPs.to_csv("snps_no_indels_buff"+str(buff)+"_"+fName.split("Out.txt")[0], header=None, sep='\t', index=False)
-    #     except ValueError:
-    #         open(fName, "w").close()
-    #
-    # indels(fileNames, "snps.txt")
-    # getStrictSyn(fileNames, "snps_no_indels_buff"+str(buff)+"_syn")
-
     return None
 
 def getNotAligned(cwdPath, prefix, ref, qry):

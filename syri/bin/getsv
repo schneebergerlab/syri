@@ -37,7 +37,7 @@ if __name__ == "__main__":
     
     for file in fin:
         if prefix+file not in listDir:
-            sys.exit(file + " is not present in the directory. Exiting")
+            sys.exit(prefix+file + " is not present in the directory. Exiting")
         
     from syri.pyxFiles.synsearchFunctions import readSRData, getSV, getNotAligned
 

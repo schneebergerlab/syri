@@ -67,6 +67,11 @@ def mergeRanges(ranges):
     if len(ranges) < 2:
         return ranges
     ranges = ranges[ranges[:, 0].argsort()]
+    for i in ranges:
+        if i[0] > i[1]:
+            garb = i[0]
+            i[0] = i[1]
+            i[1] = garb
     min_value = ranges[0, 0]
     max_value = ranges[0, 1]
     out_range = deque()
