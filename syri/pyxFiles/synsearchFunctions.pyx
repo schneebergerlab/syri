@@ -36,8 +36,6 @@ def startSyri(args):
     tUP = args.TransUniPercent
     chrmatch = args.chrmatch
 
-    # LOG_FORMAT = "%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s"
-    # logging.basicConfig(filename=cwdPath+args.log_fin.name, level=args.log, format=LOG_FORMAT)
     logger = logging.getLogger("syri")
     logger.warning("starting")
     logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
@@ -47,9 +45,9 @@ def startSyri(args):
         coords = pd.read_table(coordsfin, header = None, engine = "python")
     coords.columns = ["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr"]
 
-## Ensure that chromosome IDs are same for the two genomes.
-## Either find best query match for every reference genome.
-## Or if --no-chrmatch is set then remove non-matching chromosomes.
+    # Ensure that chromosome IDs are same for the two genomes.
+    # Either find best query match for every reference genome.
+    # Or if --no-chrmatch is set then remove non-matching chromosomes.
 
     if np.unique(coords.aChr).tolist() != np.unique(coords.bChr).tolist():
         logger.warning('Chromosomes IDs do not match.')
@@ -226,23 +224,9 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     for i in range(len(allTransCluster)):
         allTransClusterIndices.update(dict.fromkeys(allTransCluster[i], i))
 
-    # with open("members.txt","w") as fout:
-    #     for i in allTransCluster:    #         fout.write(",".join(map(str, i.member)) + "\n")
-    #     fout.write("\n\n")
-    #     for i in allTransGenomeBGroups:
-    #         fout.write(",".join(map(str, i.member)) + "\n")
-
     logger.debug("Translocations : making blocks data " + chromo +" " + str(datetime.now()))
     logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
 
-    # isSynOverlap = getOverlapWithSynBlocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd),
-    #                               np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd),
-    #                               np.array(inPlaceBlocks.aStart), np.array(inPlaceBlocks.aEnd),
-    #                               np.array(inPlaceBlocks.bStart), np.array(inPlaceBlocks.bEnd), 50,
-    #                               allTransBlocks.shape[0], tUC, tUP)
-
-
-    # allTransBlocks.to_csv(cwdPath+"allTransBlocks.txt", sep="\t", index = False)
     if len(allTransBlocks) > 0:
         auni = getOverlapWithSynBlocks(np.array(allTransBlocks.aStart),
                                        np.array(allTransBlocks.aEnd),
@@ -279,25 +263,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
             allTransBlocksData[count].setStatus(1)
         count+=1
 
-
-
-#     allTransBlocksData = []
-#     for i in range(allTransBlocks.shape[0]):
-#         temp_trans_block = transBlock(allTransBlocks.iat[i, 0], \
-#                                       allTransBlocks.iat[i, 1], \
-#                                       allTransBlocks.iat[i, 2], \
-#                                       allTransBlocks.iat[i, 3], \
-#                                       allTransBlocks.iat[i, 4], \
-#                                       allTransClusterIndices[i], \
-#                                       i)
-#         temp_trans_block.addTransGroupIndices(allTransGroupIndices[i])
-#         temp_trans_block.checkOverlapWithSynBlocks(inPlaceBlocks, threshold)
-#         temp_trans_block.checkoverlaps(allTransGenomeAGroups, allTransGenomeBGroups)
-#         if (temp_trans_block.aUni and temp_trans_block.genomeAUni) or (
-#                 temp_trans_block.bUni and temp_trans_block.genomeBUni):
-#             temp_trans_block.setStatus(1)
-#         allTransBlocksData.append(temp_trans_block)
-
     logger.debug("Translocations : finished making blocks data on" + chromo)
     logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
 
@@ -326,34 +291,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
         del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
         collect()
 
-    # Code for finding mutually exclusive blocks
-    # for i in range(allTransBlocks.shape[0]):
-    #     # if i%20000 == 0:
-    #     #     logger.debug("transBlockAdded" + str(i))
-    #     temp = allTransBlocksData[i]            ## create temporary trans blocks
-    #     if not temp.aUni and not temp.bUni:
-    #         allTransCluster[allTransClusterIndices[i]].remove(i)
-    #     elif temp.status == 1:
-    #         continue
-    #     elif not temp.aUni:
-    #         for j in temp.getoverlappingregions(groups = allTransGenomeBGroups,genome="b"):
-    #             if allTransBlocksData[j].bStart - threshold < temp.bStart and allTransBlocksData[j].bEnd + threshold > temp.bEnd:
-    #                 temp.addMEBlock(j)
-    #     elif not temp.bUni:
-    #         for j in temp.getoverlappingregions(groups = allTransGenomeAGroups,genome="a"):
-    #             if allTransBlocksData[j].aStart - threshold < temp.aStart and allTransBlocksData[j].aEnd + threshold > temp.aEnd:
-    #                 temp.addMEBlock(j)
-    #     else:
-    #         me_a = []       ## list of mutually exclusive regions on "a" genome
-    #         for j in temp.getoverlappingregions(groups = allTransGenomeAGroups,genome="a"):
-    #             if allTransBlocksData[j].aStart - threshold < temp.aStart and allTransBlocksData[j].aEnd + threshold > temp.aEnd:
-    #                 me_a.append(j)
-    #         me_b = []       ## list of mutually exclusive regions on "b" genome
-    #         for j in temp.getoverlappingregions(groups = allTransGenomeBGroups,genome="b"):
-    #             if allTransBlocksData[j].bStart - threshold < temp.bStart and allTransBlocksData[j].bEnd + threshold > temp.bEnd:
-    #                 me_b.append(j)
-    #         temp.setMEList(me_a, me_b)
-
     logger.debug("Translocations : finding solutions "+ chromo + str(datetime.now()))
     clusterSolutions = []
     for i in range(len(allTransCluster)):
@@ -361,7 +298,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
             clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT))
     
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
-    #clusterBlocks = unlist(clusterSolutionBlocks)
     
     logger.debug("Translocations : processing translocations " + chromo + str(datetime.now()))
     
@@ -386,7 +322,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
             fout.write("\t".join(map(str,invertedCoordsOri.iloc[j][:4])))
             fout.write("\n")
     fout.close()
-    
     
     ## Grouping Syn blocks : Final synblock identification is done after ctx identification.
     allBlocks, outClusters = groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn)
@@ -443,6 +378,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     fout.close()
 
 ########################################################################################################################
+    
     
 def getBlocks(orderedBlocks, annoCoords, threshold, tUC, tUP):
     if len(orderedBlocks) == 0:
@@ -604,24 +540,6 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
             ctxBlocksData[count].setStatus(1)
         count+=1
 
-    # ctxBlocksData = deque()
-    # for i in ctxTransBlocks.index.values:
-    #     tempTransBlock = transBlock(ctxTransBlocks.at[i,"aStart"],\
-    #                                 ctxTransBlocks.at[i,"aEnd"],\
-    #                                 ctxTransBlocks.at[i,"bStart"],\
-    #                                 ctxTransBlocks.at[i,"bEnd"],\
-    #                                 ctxTransBlocks.at[i,"bDir"],\
-    #                                 ctxClusterIndices[i],\
-    #                                 i)
-    #     # tempTransBlock.addTransGroupIndices(ctxGroupIndices[i])
-    #     tempTransBlock.checkOverlapWithSynBlocks_A(annoCoords.loc[annoCoords.aChr == ctxTransBlocks.at[i,"aChr"]], threshold)
-    #     tempTransBlock.checkOverlapWithSynBlocks_B(annoCoords.loc[annoCoords.bChr == ctxTransBlocks.at[i,"bChr"]], threshold)
-    #     # tempTransBlock.addGenomeGroupMembers(ctxTransGenomeAGroups, ctxTransGenomeBGroups)
-    #     # if (tempTransBlock.aUni and tempTransBlock.genomeAUni) or (tempTransBlock.bUni and tempTransBlock.genomeBUni):
-    #     #     tempTransBlock.setStatus(1)
-    #     ctxBlocksData.append(tempTransBlock)
-    # ctxBlocksData = list(ctxBlocksData)
-
     aUni = np.array([ctxBlocksData[i].aUni for i in range(ctxTransBlocks.shape[0])], dtype="int")
     bUni = np.array([ctxBlocksData[i].bUni for i in range(ctxTransBlocks.shape[0])], dtype="int")
     status = np.array([ctxBlocksData[i].status for i in range(ctxTransBlocks.shape[0])], dtype="int")
@@ -648,32 +566,6 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
 
         del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
         collect()
-
-    # for i in range(len(ctxBlocksData)):
-    #     tempTransBlock = ctxBlocksData[i]
-    #     index = tempTransBlock.transBlocksID
-    #     if not tempTransBlock.aUni and not tempTransBlock.bUni:
-    #         ctxCluster[ctxClusterIndices[index]].remove(index)
-    #     elif tempTransBlock.status == 1:
-    #         continue
-    #     elif not tempTransBlock.aUni:
-    #         for j in tempTransBlock.getoverlappingregions(groups = ctxTransGenomeBGroups,genome="b"):
-    #             if ctxBlocksData[j].bStart - threshold < tempTransBlock.bStart and ctxBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
-    #                 tempTransBlock.addMEBlock(j)
-    #     elif not tempTransBlock.bUni:
-    #         for j in tempTransBlock.getoverlappingregions(groups = ctxTransGenomeAGroups,genome="a"):
-    #             if ctxBlocksData[j].aStart - threshold < tempTransBlock.aStart and ctxBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
-    #                 tempTransBlock.addMEBlock(j)
-    #     else:
-    #         ME_A = []
-    #         for j in tempTransBlock.getoverlappingregions(groups = ctxTransGenomeAGroups,genome="a"):
-    #             if ctxBlocksData[j].aStart - threshold < tempTransBlock.aStart and ctxBlocksData[j].aEnd + threshold > tempTransBlock.aEnd:
-    #                 ME_A.append(j)
-    #         ME_B = []
-    #         for j in tempTransBlock.getoverlappingregions(groups = ctxTransGenomeBGroups,genome="b"):
-    #             if ctxBlocksData[j].bStart - threshold < tempTransBlock.bStart and ctxBlocksData[j].bEnd + threshold > tempTransBlock.bEnd:
-    #                 ME_B.append(j)
-    #         tempTransBlock.setMEList(ME_A, ME_B)
 
     logger.debug("Finding clusters")
 
@@ -986,17 +878,11 @@ def getInversions(coords,chromo, threshold, synData, synPath):
          
     shortest = getShortest(invblocks)
     logger.debug("found shortest " + chromo )
-
-#    revenue = getRevenue(invBlocks, shortest, invertedCoordsOri)
     
     revenue = getRevenue(invblocks, shortest, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values)
     logger.debug("found revenue " + chromo)
 
     ## Get syntenic neighbouring blocks of inversions
-
-
-#    neighbourSyn = getNeighbourSyn(invertedCoordsOri, synData, threshold)
-    
     neighbourSyn = getNeighbourSyn(invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.index.values, invertedCoordsOri.bDir.values, synData.aStart.values, synData.aEnd.values, synData.bStart.values, synData.bEnd.values, synData.index.values, synData.bDir.values, threshold)
         
     logger.debug("found neighbours " + chromo)
@@ -1052,7 +938,7 @@ def getInversions(coords,chromo, threshold, synData, synPath):
         for i in range(lp):
             nonOverlapA = np.where(iAStart > (iAEnd[i] - threshold))[0]
             nonOverlapB = np.where(iBStart > (iBEnd[i] - threshold))[0]
-            childNodes = np.intersect1d(nonOverlapA, nonOverlapB, assume_unique=True) #.astype("uint32") + 1               ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes
+            childNodes = np.intersect1d(nonOverlapA, nonOverlapB, assume_unique=True)             ## two inversions can co-exist only if the overlap between them is less than threshold on both genomes
             chIndex =  np.where(scores[childNodes] + totscore[i] > totscore[childNodes])[0]
             totscore[childNodes[chIndex]] = scores[childNodes[chIndex]] + totscore[i]
             parents[childNodes[chIndex]] = i
@@ -1077,7 +963,6 @@ def getInversions(coords,chromo, threshold, synData, synPath):
     synInInv = []
     for _i in bestInvPath:
         invNeighbour = profitable[_i].neighbours
-#        synInInv = list(range(invNeighbour[0]+1, invNeighbour[1]))
         invPos = profitable[_i].invPos
         invCoord = [invertedCoordsOri.iat[invPos[0],0],invertedCoordsOri.iat[invPos[-1],1],invertedCoordsOri.iat[invPos[-1],3],invertedCoordsOri.iat[invPos[0],2]]
         for _j in range(invNeighbour[0]+1, invNeighbour[1]):
@@ -1086,7 +971,6 @@ def getInversions(coords,chromo, threshold, synData, synPath):
                 synInInv.append(_j)
             else:
                 badSyn.append(_j)
-
     return(invertedCoordsOri, profitable, bestInvPath,invData, synInInv, badSyn)
                
 def getRedundantIndex(inPlaceBlocks, outPlaceBlocks, threshold):
@@ -1207,25 +1091,10 @@ def mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks,
         
 
 def findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd):
-#    aBlocks = list(np.intersect1d(np.where(inPlaceBlocks.aStart.values < aEnd)[0],\
-#                                      np.where(inPlaceBlocks.aEnd.values > aStart)[0]))
-#    bBlocks = list(np.intersect1d(np.where(inPlaceBlocks.bStart.values < bEnd)[0],\
-#                                      np.where(inPlaceBlocks.bEnd.values > bStart)[0]))
     aBlocks = list(np.where((inPlaceBlocks.aStart.values < aEnd) & (inPlaceBlocks.aEnd.values > aStart) == True)[0])
     bBlocks = list(np.where((inPlaceBlocks.bStart.values < bEnd) & (inPlaceBlocks.bEnd.values > bStart) == True)[0])
     return(aBlocks, bBlocks)
     
-
-
-#
-#%%cython
-#import numpy as np
-#cimport numpy as np
-#import sys
-#
-#
-#
-
 
 cpdef np.ndarray getTranslocationScore(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray aLen, np.ndarray bLen, np.ndarray translocations):
     """Function to score the proposed translocation block based on the number of
@@ -1255,8 +1124,7 @@ cpdef np.ndarray getTranslocationScore(np.ndarray aStart, np.ndarray aEnd, np.nd
                 blocksScores[j] = 1
         transScores[i] = blocksScores
     return transScores
-#
-#
+
 
 cpdef np.ndarray getTranslocationScore_ctx(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray aLen, np.ndarray bLen, np.ndarray bDir, np.ndarray translocations):
     """Function to score the proposed translocation block based on the number of
@@ -1291,7 +1159,6 @@ cpdef np.ndarray getTranslocationScore_ctx(np.ndarray aStart, np.ndarray aEnd, n
     return transScores
 
 
-# noinspection PyUnreachableCode
 def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, tUC, tUP, ctx = False):
     logger = logging.getLogger("findOrderedTranslocations")
     if not isinstance(ctx, bool):
@@ -1516,13 +1383,12 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
         transScores = getTranslocationScore_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.aLen.values, orderedBlocks.bLen.values, orderedBlocks.bDir.values, shortestOutOG)
         logger.debug("finished getTranslocationScore")
         
-#    transScores = getTranslocationScore(shortestOutOG, orderedBlocks, ctx)
     transBlocks = getTransBlocks(transScores, shortestOutOG, orderedBlocks, inPlaceBlocks, threshold, tUC, tUP, ctx)
     logger.debug("finished getTransBlocks")
 
     return transBlocks
         
-    #%%            
+        
 def getTransOverlapGroups(transBlocks, orderedBlocks, threshold):
     transBlocksData = []
     for i in transBlocks:
@@ -1564,7 +1430,7 @@ def makeTransGroupList(transBlocksData, startC, endC, threshold):
         return genomeGroups
     else:
         return []
-#%%
+
 
 cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold, np.ndarray left, np.ndarray right):
     """Compute whether two alignments can be part of one translation block. For this:
@@ -1586,7 +1452,6 @@ cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aE
 
     for i in range(n):
         for j in range(i,n):
-            #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
             if bDir[i] != bDir[j]:
                 sys.exit("ERROR: bDir not matching")
             elif not any([k in allRanges[i] for k in allRanges[j]]):
@@ -1596,11 +1461,10 @@ cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aE
                     outOrderedBlocks[i][j] = True
                 else:
                     outOrderedBlocks[i][j] = False
-#            elif(aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bEnd[i]) > threshold and (bEnd[j] - bStart[i]) > threshold:
-#                outOrderedBlocks[i][j] = True
             else:
                 outOrderedBlocks[i][j] = False
     return outOrderedBlocks
+    
     
 cpdef np.ndarray[np.npy_bool, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold):
     """Compute whether two alignments can be part of one translation block. For this:
@@ -1639,35 +1503,6 @@ cpdef np.ndarray[np.npy_bool, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.n
                 sys.exit("ERROR: ILLEGAL BDIR VALUE")
     return(outOrderedBlocks)
              
-#
-#def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
-#    assert(list(transGroupIndices.keys()) == list(range(len(transGroupIndices))))
-#    nodeStack = np.zeros(len(transGroupIndices), dtype='uint8')
-#    visitedTransBlock = np.zeros(len(transGroupIndices), dtype='uint8')
-#    transCluster = []
-#    
-#    j = 0
-#    for key,value in transGroupIndices.items():
-#        if visitedTransBlock[key] == 0:
-#            visitedTransBlock[key]=1
-#            newGroup = [key]
-#            node1 = value[0]
-#            node2 = value[1]
-#            nodeStack[transGenomeAGroups[node1].member] = 1
-#            nodeStack[transGenomeBGroups[node2].member] = 1
-#            nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
-#            while len(np.nonzero(nodeStack)[0]) > 0:
-#                newKey = np.where(nodeStack == 1)[0][0]
-#                if visitedTransBlock[newKey]== 0:
-#                    visitedTransBlock[newKey] = 1
-#                    newGroup.append(newKey)
-#                    nodeStack[transGenomeAGroups[transGroupIndices[newKey][0]].member] = 1 
-#                    nodeStack[transGenomeBGroups[transGroupIndices[newKey][1]].member] = 1
-#                    nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
-#            newGroup.sort()
-#            transCluster.append(list(newGroup))
-#    return(transCluster)
-
 
 def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
     assert(list(transGroupIndices.keys()) == list(range(len(transGroupIndices))))
@@ -1690,7 +1525,6 @@ def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
             nodeStack[transGenomeAGroups[node1].member] = 1
             nodeStack[transGenomeBGroups[node2].member] = 1
             nodeStack[visitedIndices] = 0
-#            nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
             while 1 in nodeStack:
                 count=count+1
                 if count%20000 ==0:
@@ -1717,10 +1551,7 @@ def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
             transCluster.append(list(newGroup))
     return(transCluster)
 
-#
-# %%cython
-# import numpy as np
-# cimport numpy as np
+
 cpdef getOverlapWithSynBlocks(np.ndarray[np.int_t, ndim=1] start, np.ndarray[np.int_t, ndim=1] end, np.ndarray chrom, np.ndarray[np.int_t, ndim=1] in_start, np.ndarray[np.int_t, ndim=1] in_end, np.ndarray in_chrom, np.int_t threshold, np.int_t count, np.int_t tUC, np.float_t tUP):
 
     assert(len(start) == len(end) == len(chrom) ==count)
@@ -1763,7 +1594,6 @@ cpdef getOverlapWithSynBlocks(np.ndarray[np.int_t, ndim=1] start, np.ndarray[np.
     return uni
 
 
-
 def getBestClusterSubset(cluster, transBlocksData, bRT):
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
     if len(cluster) < 50:
@@ -1773,6 +1603,7 @@ def getBestClusterSubset(cluster, transBlocksData, bRT):
     else:
         output = greedySubsetSelector(cluster, transBlocksData, seedBlocks)
     return output
+
 
 def bruteSubsetSelector(cluster, transBlocksData, seedBlocks, bRT):
     posComb = [seedBlocks]
@@ -1927,6 +1758,7 @@ def updateBestComb(bestScore, bestComb, outBlocks, transBlocksData):
         bestComb = outBlocks
     return(bestScore, bestComb)
 
+
 def getScore(outBlocks, transBlocksData):
     aIndices = np.array([[transBlocksData[j].aStart, transBlocksData[j].aEnd] for j in outBlocks if transBlocksData[j].aUni])
     bIndices = np.array([[transBlocksData[j].bStart, transBlocksData[j].bEnd] for j in outBlocks if transBlocksData[j].bUni])
@@ -1989,12 +1821,10 @@ def getscafDict(scaffolds, data, scafSize):
                 percentCutoffSize = percentCutoff*size
                 bpSizeValues = sorted(bpSizeDict.values())
                 identified = 0
-#                for j in range(len(bpSizeValues)-1,0,-1):
                 l = len(bpSizeValues)-1
                 if (bpSizeValues[l] - bpSizeValues[l-1]) > percentCutoffSize:
                     scafChrDict[i] = list(bpSizeDict.keys())[list(bpSizeDict.values()).index(bpSizeValues[l])]
                     identified = 1
-#                        break
                 if identified == 0:
                     meanAlignSize = {}
                     for j in uniChr:
@@ -2135,7 +1965,6 @@ def getDupGenome(dupData, allTransBlocksData, transClasses):
     return(dupData)
 
 def outSyn(cwdPath, threshold, prefix):
-#    reCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
     ctxAnnoDict = {"duplication":"dupCtx",
                    "invDuplication":"invDupCtx",
                    "translocation":"TLCtx",
@@ -2153,8 +1982,7 @@ def outSyn(cwdPath, threshold, prefix):
                 synData.append(list(map(int,line[:4]))+[chromo,chromo])
             elif len(line) == 5:
                 synData.append(list(map(int,line[:4]))+[chromo,chromo] + [line[4]])
-#    fin.close()
-    
+                
     synData = pd.DataFrame(synData)
     if len(synData.columns) == 6:
         synData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
@@ -2465,8 +2293,7 @@ def readAnnoCoords(cwdPath, uniChromo, prefix):
     annoCoords.index = range(len(annoCoords))
     annoCoords["aIndex"] = range(len(annoCoords))
     return(annoCoords)
-            
-#%%
+
 
 class alingmentBlock:
     def __init__(self, id, children, data):
@@ -2509,27 +2336,12 @@ class transGroups:
         self.member.append(index)
         
 class transBlock:
-#     def __init__(self,aStart, aEnd, bStart, bEnd, Dir, transClusterIndex, i):
-#         self.aStart = aStart
-#         self.aEnd = aEnd
-#         self.bStart = bStart
-#         self.bEnd = bEnd
-#         self.dir = Dir
-# #        self.orderedBlocksIndex = orderedBlocksIndex
-#         self.transBlocksID = i
-#         self.transClusterIndex = transClusterIndex
-#         self.status = 0
-#         self.overlappingInPlaceBlocks = []
-#         self.aUni = False
-#         self.bUni = False
-
     def __init__(self, i):
         self.aStart = None
         self.aEnd = None
         self.bStart = None
         self.bEnd = None
         self.dir = None
-        #        self.orderedBlocksIndex = orderedBlocksIndex
         self.transBlocksID = i
         self.transClusterIndex = None
         self.status = 0
@@ -2541,22 +2353,12 @@ class transBlock:
         self.genomeBUni = False
 
 
-    # def addGenomeGroupMembers(self,ctxTransGenomeAGroups, ctxTransGenomeBGroups):
-    #     aMem = ctxTransGenomeAGroups[self.transGroupIndices[0]].member.copy()
-    #     aMem.remove(self.transBlocksID)
-    #     bMem = ctxTransGenomeBGroups[self.transGroupIndices[1]].member.copy()
-    #     bMem.remove(self.transBlocksID)
-    #     self.genomeAMembers = np.array(aMem, dtype = 'int32')
-    #     self.genomeBMembers = np.array(bMem, dtype = 'int32')
-    #     self.genomeAUni = True if len(self.genomeAMembers) == 0 else False
-    #     self.genomeBUni = True if len(self.genomeBMembers) == 0 else False
-    #
-
     def checkoverlaps(self, agroups, bgroups):
         a = self.getoverlappingregions(agroups, "a")
         b = self.getoverlappingregions(bgroups, "b")
         self.genomeAUni = True if len(a) == 0 else False
         self.genomeBUni = True if len(b) == 0 else False
+
 
     def getoverlappingregions(self, groups, genome):
         if genome=="a":
@@ -2566,18 +2368,17 @@ class transBlock:
         reg.remove(self.transBlocksID)
         return reg
 
+
     def addOrderedData(self, orderedData):
         self.orderedData = orderedData
 
+
     def checkOverlapWithSynBlocks(self,inPlaceBlocks, threshold):
         aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, self.aStart, self.aEnd, self.bStart, self.bEnd)
-
         blockAUni = 0
         blockBUni = 0
-
         start = self.aStart
         end = self.aEnd
-
         for aBlock in aBlocks:
             if inPlaceBlocks.iat[aBlock,0] - start < threshold and\
                 end - inPlaceBlocks.iat[aBlock,1] < threshold:
@@ -2619,12 +2420,10 @@ class transBlock:
         self.aUni = True if blockAUni > 1000 or blockAUni > 0.5*(self.aEnd-self.aStart) else False
         self.bUni = True if blockBUni > 1000 or blockBUni > 0.5*(self.bEnd-self.bStart) else False
 
+
     def checkOverlapWithSynBlocks_A(self,inPlaceBlocks, threshold):
         aBlocks = list(np.where((inPlaceBlocks.aStart.values < self.aEnd) & (inPlaceBlocks.aEnd.values > self.aStart) == True)[0])
-
-
         blockAUni = 0
-
         astart = self.aStart
         end = self.aEnd
         for aBlock in aBlocks:
@@ -2646,11 +2445,9 @@ class transBlock:
         self.overlappingInPlaceBlocks.append(aBlocks)
         self.aUni = True if blockAUni > 1000 or blockAUni > 0.5*(self.aEnd-self.aStart) else False
 
-    def checkOverlapWithSynBlocks_B(self,inPlaceBlocks, threshold):
-#        bBlocks = list(np.intersect1d(np.where(inPlaceBlocks.bStart.values < self.bEnd)[0],\
-#                                      np.where(inPlaceBlocks.bEnd.values > self.bStart)[0]))
-        bBlocks = list(np.where((inPlaceBlocks.bStart.values < self.bEnd) & (inPlaceBlocks.bEnd.values > self.bStart) == True)[0])
 
+    def checkOverlapWithSynBlocks_B(self,inPlaceBlocks, threshold):
+        bBlocks = list(np.where((inPlaceBlocks.bStart.values < self.bEnd) & (inPlaceBlocks.bEnd.values > self.bStart) == True)[0])
         blockBUni = 0
         start = self.bStart
         end = self.bEnd
@@ -2676,90 +2473,25 @@ class transBlock:
         self.overlappingInPlaceBlocks.append(bBlocks)
         self.bUni = True if blockBUni > 1000 or blockBUni > 0.5*(self.bEnd-self.bStart) else False
 
-    # def addMEBlock(self, blockID):
-    #     """List of Blocks which prohibit the entry of current block in the
-    #     optimal solution"""
-    #
-    #     try:
-    #         self.meTo.extend(blockID) if type(blockID) == list else self.meTo.append(blockID)
-    #     except AttributeError:
-    #         self.meTo = blockID if type(blockID) == list else [blockID]
-
 
     def addMEBlock(self, blockID):
         """List of Blocks which prohibit the entry of current block in the
         optimal solution"""
         self.meTo = np.array(blockID, dtype = "uint32")
-        # try:
-        #     self.meTo .extend(blockID) if type(blockID) == list else self.meTo.append(blockID)
-        # except AttributeError:
-        #     self.meTo = blockID if type(blockID) == list else [blockID]
+
+
     def setMEList(self, meAlist, meBlist):
         """Lists of a-overlap and b-overlap blocks. If at least 1 block has
         been selected from both lists then this block would become redundant"""
         self.meAlist = np.array(meAlist, dtype="uint32")
         self.meBlist = np.array(meBlist, dtype="uint32")
 
+
     def setStatus(self,stat):
         """stat = 1 ==> transBlock is important/necessary/unique"""
         self.status = stat
 
-# cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim=1] aEnd, np.ndarray[np.int_t, ndim=1] bStart, np.ndarray[np.int_t, ndim=1] bEnd, np.int_t threshold, np.int_t count, np.ndarray[np.int_t, ndim=1] aUni, np.ndarray[np.int_t, ndim=1] bUni, np.ndarray[np.int_t, ndim=1] status, np.ndarray[np.int_t, ndim=1] aIndex, np.ndarray[np.int_t, ndim=1] bIndex, aGroups, bGroups):
-#     # Function take the coordinates and cluster information of all translocated blocks and identifies mutually exclusive
-#     #  blocks by comparing the coordinates of each block to the coordinates of the member blocks in its cluster
-#     cdef np.ndarray[np.int_t, ndim=1] members
-#     cdef np.int_t i, j
-#     rem = deque()
-#     meblock = {}            ## for blocks which are overlapping with inplace blocks
-#     melist = {}             ## for blocks which are not overlapping with inplace blocks
-#
-#     assert(len(aStart) == len(aEnd) == len(bStart)== len(bEnd))
-#     assert(count == len(aUni)== len(bUni)== len(status)== len(aIndex)== len(bIndex))
-#
-#     for i in range(count):
-#         if i%50000 == 0:
-#             print("Number of mutually exclusive blocks identified", i)
-#         if not aUni[i] and not bUni[i]:
-#             rem.append(i)
-#         elif status[i] == 1:
-#             continue
-#         elif not aUni[i]:
-#             meb = deque()               ## vector of mutually exclusive block
-#             members = bGroups[bIndex[i]]
-#             for j in members:
-#                 if j!=i:
-#                     if bStart[j] - threshold < bStart[i] and bEnd[j] + threshold > bEnd[i]:
-#                         meb.append(j)
-#             meblock[i] = meb
-#         elif not bUni[i]:
-#             meb = deque()                ## vector of mutually exclusive block
-#             members = aGroups[aIndex[i]]
-#             for j in members:
-#                 if j!=i:
-#                     if aStart[j] - threshold < aStart[i] and aEnd[j]+threshold > aEnd[i]:
-#                         meb.append(j)
-#             meblock[i] = meb
-#         else:
-#             meb_a = deque()             ## vector of mutually exclusive block on A genome
-#             meb_b = deque()             ## vector of mutually exclusive block on B genome
-#             members = aGroups[aIndex[i]]
-#             for j in members:
-#                 if j!=i:
-#                     if aStart[j] - threshold < aStart[i] and aEnd[j] + threshold > aEnd[i]:
-#                         meb_a.append(j)
-#
-#             members = bGroups[bIndex[i]]
-#             for j in members:
-#                 if j != i:
-#                     if bStart[j] - threshold < bStart[i] and bEnd[j] + threshold > bEnd[i]:
-#                         meb_b.append(j)
-#             melist[i] = (meb_a, meb_b)
-#     return rem, meblock, melist
 
-# %%cython
-# import numpy as np
-# cimport numpy as np
-# from collections import deque
 cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim=1] aEnd, np.ndarray[np.int_t, ndim=1] bStart, np.ndarray[np.int_t, ndim=1] bEnd, np.int_t threshold, np.int_t count, np.ndarray[np.int_t, ndim=1] aUni, np.ndarray[np.int_t, ndim=1] bUni, np.ndarray[np.int_t, ndim=1] status, np.ndarray[np.int_t, ndim=1] aIndex, np.ndarray[np.int_t, ndim=1] bIndex, aGroups, bGroups):
     # Function take the coordinates and cluster information of all translocated blocks and identifies mutually exclusive
     #  blocks by comparing the coordinates of each block to the coordinates of the member blocks in its cluster
@@ -2768,7 +2500,6 @@ cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim
     cdef np.ndarray[np.npy_bool, ndim=1, cast=True] meb, meb_a, meb_b, rem = np.zeros(count, dtype="bool")
 
     cdef np.int_t i, j, index
-    # rem = deque()
     meblock = {}            ## for blocks which are overlapping with inplace blocks
     melist = {}             ## for blocks which are not overlapping with inplace blocks
 
@@ -2820,7 +2551,6 @@ cpdef getmeblocks(np.ndarray[np.int_t, ndim=1] aStart, np.ndarray[np.int_t, ndim
             melist[i] = (np.array(temp, dtype="uint32"), np.array(members[meb_b], dtype="uint32"))
     return rem, meblock, melist
 
-#%%
 #################################################################
 ### SV identification functions
 #################################################################
@@ -2899,352 +2629,6 @@ def readSRData(cwdPath, prefix, dup = False):
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
     annoCoords.index = range(len(annoCoords))
     return annoCoords
-
-#
-# def getSV(cwdPath, allAlignments, prefix, offset):
-#     fout = open(cwdPath+prefix+"sv.txt","w")
-#     allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
-#     allBlocks = pd.unique(allAlignments.id)
-#
-#     for i in allBlocks:
-#         blocksAlign = allAlignments.loc[allAlignments.id == i].copy()
-#         ordered = 1 if "inv" not in blocksAlign.state.iloc[0] else 0
-#         for j in range(len(blocksAlign) - 1):
-#             m = blocksAlign.iat[j+1,0] - blocksAlign.iat[j,1] - 1
-#             if ordered:
-#                 n = blocksAlign.iat[j+1,2] - blocksAlign.iat[j,3] - 1
-#             else:
-#                 n = blocksAlign.iat[j,3] - blocksAlign.iat[j+1,2] - 1
-#
-#
-#             ## No overlap of reference genome
-#             if m == 0:
-#
-#                 ## No overlap in query genome
-#                 if n == 0:
-#                     continue
-#
-#                 elif n > 0:
-#                     if ordered:
-#                         fout.write("\t".join(["InDel",
-#                                               str(blocksAlign.iat[j,1]),
-#                                               str(blocksAlign.iat[j+1,0]),
-#                                               str(blocksAlign.iat[j,3] + 1),
-#                                               str(blocksAlign.iat[j+1, 2] - 1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#                     else:
-#                         fout.write("\t".join(["InDel",
-#                                               str(blocksAlign.iat[j,1]),
-#                                               str(blocksAlign.iat[j+1,0]),
-#                                               str(blocksAlign.iat[j,3] - 1),
-#                                               str(blocksAlign.iat[j+1, 2] + 1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#
-#                 elif n < 0:
-#                     if ordered:
-#                         j_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
-#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])
-#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-#                         fout.write("\t".join(["CNV",
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#                     else:
-#                         j_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
-#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
-#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-#                         fout.write("\t".join(["CNV",
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#
-#             elif m == 1:
-#
-#                 if n == 0:
-#                     if ordered:
-#                         fout.write("\t".join(["InDel",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#                     else:
-#                         fout.write("\t".join(["InDel",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               str(blocksAlign.iat[j+1, 2]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#
-#                 elif n==1:
-#                     if ordered:
-#                         fout.write("\t".join(["SNP",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]+1),
-#                                               str(blocksAlign.iat[j+1,2]-1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#                     else:
-#                         fout.write("\t".join(["SNP",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]-1),
-#                                               str(blocksAlign.iat[j+1,2]+1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#                 elif n>1:
-#                     if ordered:
-#                         fout.write("\t".join(["InDel+SNP",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]+1),
-#                                               str(blocksAlign.iat[j+1,2]-1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "SNP:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-#                     else:
-#                         fout.write("\t".join(["InDel+SNP",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]-1),
-#                                               str(blocksAlign.iat[j+1,2]+1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "SNP:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-#                 elif n<0:
-#                     if ordered:
-#                         j_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
-#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])
-#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-#                         fout.write("\t".join(["CNV+InDel",
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-#                     else:
-#                         j_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
-#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
-#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-#                         fout.write("\t".join(["CNV+InDel",
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-#
-#             elif m>1:
-#
-#                 if n==0:
-#                     if ordered:
-#                         fout.write("\t".join(["InDel",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#                     else:
-#                         fout.write("\t".join(["InDel",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#                 elif n==1:
-#                     if ordered:
-#                         fout.write("\t".join(["InDel+SNP",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]+1),
-#                                               str(blocksAlign.iat[j+1,2]-1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "SNP:Q:"+str(blocksAlign.iat[j,3]+1)+"-"+str(blocksAlign.iat[j+1,2]-1)]) + "\n")
-#                     else:
-#                         fout.write("\t".join(["InDel+SNP",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]-1),
-#                                               str(blocksAlign.iat[j+1,2]+1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "SNP:Q:"+str(blocksAlign.iat[j,3]-1)+"-"+str(blocksAlign.iat[j+1,2]+1)]) + "\n")
-#                 elif n>1:
-#                     if ordered:
-#                         fout.write("\t".join(["HDR",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]+1),
-#                                               str(blocksAlign.iat[j+1,2]-1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) +"\n")
-#                     else:
-#                         fout.write("\t".join(["HDR",
-#                                               str(blocksAlign.iat[j,1]+1),
-#                                               str(blocksAlign.iat[j+1,0]-1),
-#                                               str(blocksAlign.iat[j,3]-1),
-#                                               str(blocksAlign.iat[j+1,2]+1),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) +"\n")
-#                 elif n<0:
-#                     if ordered:
-#                         j_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
-#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])
-#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-#                         fout.write("\t".join(["CNV+InDel",
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-#                     else:
-#                         j_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
-#                         j1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
-#                         sCoord = round(blocksAlign.iat[j,1] - j_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,0] + j1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-#                         fout.write("\t".join(["CNV+InDel",
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "InDel:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(blocksAlign.iat[j+1,0]-1)]) + "\n")
-#
-#             elif m<0:
-#
-#                 j_prop = abs(m) / (blocksAlign.iat[j,1] - blocksAlign.iat[j,0])
-#                 j1_prop = abs(m) / (blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])
-#
-#                 if n==0:
-#                     if ordered:
-#                         sCoord = round(blocksAlign.iat[j,3] - j_prop*(blocksAlign.iat[j,3] - blocksAlign.iat[j,2])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,2] + j1_prop*(blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])).astype(int)
-#                         fout.write("\t".join(["CNV",
-#                                               str(blocksAlign.iat[j+1,0]),
-#                                               str(blocksAlign.iat[j,1]),
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#                     else:
-#                         sCoord = round(blocksAlign.iat[j,3] + j_prop*(blocksAlign.iat[j,2] - blocksAlign.iat[j,3])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,2] - j1_prop*(blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])).astype(int)
-#                         fout.write("\t".join(["CNV",
-#                                               str(blocksAlign.iat[j+1,0]),
-#                                               str(blocksAlign.iat[j,1]),
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6]]) + "\n")
-#
-#                 if n>0:
-#                     if ordered:
-#                         sCoord = round(blocksAlign.iat[j,3] - j_prop*(blocksAlign.iat[j,3] - blocksAlign.iat[j,2])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,2] + j1_prop*(blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])).astype(int)
-#                         fout.write("\t".join(["CNV+InDel",
-#                                               str(blocksAlign.iat[j+1,0]),
-#                                               str(blocksAlign.iat[j,1]),
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "InDel:Q:"+str(blocksAlign.iat[j,3]+1)+"-"+str(blocksAlign.iat[j+1,2]-1)]) + "\n")
-#                     else:
-#                         sCoord = round(blocksAlign.iat[j,3] + j_prop*(blocksAlign.iat[j,2] - blocksAlign.iat[j,3])).astype(int)
-#                         eCoord = round(blocksAlign.iat[j+1,2] - j1_prop*(blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])).astype(int)
-#                         fout.write("\t".join(["CNV+InDel",
-#                                               str(blocksAlign.iat[j+1,0]),
-#                                               str(blocksAlign.iat[j,1]),
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "InDel:Q:"+str(blocksAlign.iat[j,3]-1)+"-"+str(blocksAlign.iat[j+1,2]+1)]) + "\n")
-#
-#                 if n<0:
-#                     maxOverlap = max(abs(m),abs(n))
-#                     if abs(m-n) < 0.1*maxOverlap: ## no SV if the overlap on both genomes is of similar size
-#                         continue
-#
-#                     if abs(m) > abs(n):
-#                         if ordered:
-#                             sCoord = round(blocksAlign.iat[j,3] - j_prop*(blocksAlign.iat[j,3] - blocksAlign.iat[j,2])).astype(int)
-#                             eCoord = round(blocksAlign.iat[j+1,2] + j1_prop*(blocksAlign.iat[j+1,3] - blocksAlign.iat[j+1,2])).astype(int)
-#                             fout.write("\t".join(["CNV+Tandem",
-#                                               str(blocksAlign.iat[j+1,0]),
-#                                               str(blocksAlign.iat[j,1]),
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "Tandem:Q:"+str(blocksAlign.iat[j,3]+1)+"-"+str(eCoord)]) + "\n")
-#
-#                         else:
-#                             sCoord = round(blocksAlign.iat[j,3] + j_prop*(blocksAlign.iat[j,2] -blocksAlign.iat[j,3])).astype(int)
-#                             eCoord = round(blocksAlign.iat[j+1,2] - j1_prop*(blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,2])).astype(int)
-#                             fout.write("\t".join(["CNV+Tandem",
-#                                               str(blocksAlign.iat[j+1,0]),
-#                                               str(blocksAlign.iat[j,1]),
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "Tandem:Q:"+str(blocksAlign.iat[j,3]-1)+"-"+str(eCoord)]) + "\n")
-#                     else:
-#                         if ordered:
-#                             k_prop = abs(n) / (blocksAlign.iat[j,3] - blocksAlign.iat[j,2])
-#                             k1_prop = abs(n) / (blocksAlign.iat[j+1,3] - blocksAlign.iat[j,2])
-#                             sCoord = round(blocksAlign.iat[j,1] - k_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-#                             eCoord = round(blocksAlign.iat[j+1,0] + k1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-#                             fout.write("\t".join(["CNV+Tandem",
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "Tandem:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(eCoord)]) + "\n")
-#                         else:
-#                             k_prop = abs(n) / (blocksAlign.iat[j,2] - blocksAlign.iat[j,3])
-#                             k1_prop = abs(n) / (blocksAlign.iat[j+1,2] - blocksAlign.iat[j+1,3])
-#                             sCoord = round(blocksAlign.iat[j,1] - k_prop*(blocksAlign.iat[j,1] - blocksAlign.iat[j,0])).astype(int)
-#                             eCoord = round(blocksAlign.iat[j+1,0] + k1_prop*(blocksAlign.iat[j+1,1] - blocksAlign.iat[j+1,0])).astype(int)
-#                             fout.write("\t".join(["CNV+Tandem",
-#                                               str(sCoord),
-#                                               str(eCoord),
-#                                               str(blocksAlign.iat[j+1,2]),
-#                                               str(blocksAlign.iat[j,3]),
-#                                               blocksAlign.iat[0,5],
-#                                               blocksAlign.iat[0,6],
-#                                               "Tandem:R:"+str(blocksAlign.iat[j,1]+1)+"-"+str(eCoord)]) + "\n")
-#
-#     fout.close()
-#     return None
 
 
 def getSV(cwdPath, allAlignments, prefix, offset):
@@ -3606,8 +2990,6 @@ def runss(_id, _sspath, _delta, allAlignments):
                       pd.unique(_block["bChr"])[0]])+ "\n" + _out[0].decode("UTF-8")
 
 def getshv(args):
-
-    # fin = "mumSNPIn.txt" if args.align.name is None else args.align.name
     cwdpath = args.dir
     prefix = args.prefix
     nc = args.nCores
@@ -3620,7 +3002,6 @@ def getshv(args):
     allBlocks = pd.unique(allAlignments.id)
 
     blocklists = [allBlocks[_i:(_i+nc)] for _i in range(0, len(allBlocks), nc)]
-    # count = 0
     with open(cwdpath + prefix + "snps.txt", "w") as fout:
         for _id in blocklists:
             with Pool(processes=nc) as pool:
@@ -3671,7 +3052,6 @@ def getNotAligned(cwdPath, prefix, ref, qry):
         print("ctxOut.txt is empty. Skipping analysing it.")
     except Exception as e:
         print("ERROR: while trying to read ", fileType, "Out.txt", e)
-#    fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
     coordsData = fileData.loc[fileData[0] == "#"]
     coordsData = coordsData[[2,3,6,7,1,5]].copy()
     coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
@@ -3723,9 +3103,7 @@ def getNotAligned(cwdPath, prefix, ref, qry):
             if maxEnd < qrySize[chrom]:
                 fout.write("\t".join(["Q",str(maxEnd+1),
                                           str(qrySize[chrom]),
-                                          chrom]) + "\n")
-                
-#    fout.close()
+                                          chrom]) + "\n")         
     return None
 
 ##################################################################
@@ -3825,7 +3203,6 @@ def getTSV(cwdpath, ref):
     :param cwdpath: Path containing all input files
     :return: A TSV file containing genomic annotation for the entire genome
     """
-
     import pandas as pd
     import sys
     from collections import defaultdict
@@ -3873,10 +3250,6 @@ def getTSV(cwdpath, ref):
     sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
     sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
     sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
-
-    # out = pd.concat([anno, sv])
-    # out.sort_values(['achr', 'astart', 'aend'], inplace=True)
-
     notal = pd.read_table(cwdpath + "notAligned.txt", header=None)
     notal.columns = ["gen", "start", "end", "chr"]
     notal[["start", "end"]] = notal[["start", "end"]].astype("int")
@@ -3915,7 +3288,6 @@ def getTSV(cwdpath, ref):
                 'bseq': "-"
             }
     notal = pd.DataFrame.from_dict(entries, orient="index")
-    # notal.loc[:, ['astart', 'aend', 'bstart', 'bend']] = notal.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
     notal = notal.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
     notal.sort_values(['achr', 'astart', 'aend'], inplace=True)
     notal['selected'] = -1
@@ -4050,8 +3422,6 @@ def getTSV(cwdpath, ref):
     positions = defaultdict()
     for _chr in snpdata.achr.unique():
         positions[_chr] = snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "INS"), "astart"].tolist() + (snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "DEL"), "astart"] - 1).tolist()
-        # positions[chrom] = (snpdata.loc[(snpdata.achr == chrom) & (snpdata.vartype == "DEL"), "astart"] - 1).tolist()
-
     seq = extractseq(ref, positions)
 
     for _chr in snpdata.achr.unique():
@@ -4108,7 +3478,6 @@ def getTSV(cwdpath, ref):
 
             _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
             notA.loc[(notA.achr == row.achr) & (notA.aend == row.aend + 1), 'selected'] = 1
-            # _notB = notB.loc[(notB.bchr == row.bchr) & (notB.bend == row.bstart-1)]
             if len(_notA) == 0:
                 pass
             elif len(_notA) == 1:
@@ -4116,13 +3485,6 @@ def getTSV(cwdpath, ref):
             else:
                 logger.error("too many notA regions")
                 sys.exit()
-
-            # if len(_notB) == 0:
-            #     pass
-            # elif len(_notB) == 1:
-            #     fout.write("\t".join(list(map(str, _notB.iloc[0]))) + "\n")
-            # else:
-            #     sys.exit("too many notB regions")
             fout.write("\t".join(list(map(str, row))) + "\n")
             row_old = row
 
@@ -4182,9 +3544,8 @@ def getVCF(finname, foutname):
             '##INFO=<ID=VarType,Number=1,Type=String,Description="Start position on non-reference genome">' + '\n')
         fout.write(
             '##INFO=<ID=DupType,Number=1,Type=String,Description="Copy gain or loss in the non-reference genome">' + '\n')
-        # fout.write('##INFO=<ID=NotAlGen,Number=1,Type=String,Description="Genome containing the not aligned region">' + '\n')
-
         fout.write('\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']) + '\n')
+        
         for line in data.itertuples(index=False):
             pos = [line[0], line[1], ".", 'N', '<' + line[10] + '>', '.', 'PASS']
 
@@ -4224,276 +3585,3 @@ def getVCF(finname, foutname):
                     pos.append(_info)
                     fout.write('\t'.join(pos) + '\n')
     return 0
-
-
-
-##################################################################
-### Multi SV functions
-##################################################################
-        
-def getBlocksData(filePaths, fileTypes):
-    genomeData = pd.DataFrame()
-    synData = pd.read_table(filePaths[0],header = None)
-    synData = synData.loc[synData[0] != "#"]
-    synData = synData[[0,1,2,3]]
-    synData.columns = ["aStart", "aEnd","bStart","bEnd"]
-    synData = synData.astype("int64")
-    synData["state"] = fileTypes.pop(0)
-    genomeData = genomeData.append(synData)
-    
-    for i in filePaths[1:]:
-        fileData = pd.read_table(i, header = None)
-        fileData = fileData.loc[fileData[0] == "#"]
-        fileData = fileData[[1,2,4,5]]
-        fileData.columns = ["aStart", "aEnd","bStart","bEnd"]
-        fileData = fileData.astype("int64")
-        fileData["state"] = fileTypes.pop(0)
-        genomeData = genomeData.append(fileData)
-    genomeData.sort_values(by = ["aStart", "aEnd","bStart","bEnd"], inplace = True)
-    genomeData.index = range(len(genomeData))
-    return(genomeData)
-    
-
-def getConservedRegions(dataList, isSyn = True):
-    if not isinstance(isSyn, bool):
-        raise TypeError("isSyn must be a bool")
-    
-    bGenomes = np.unique(dataList.bGenome)
-    genomeCount = len(bGenomes)
-    if isSyn:
-        allCoords = dataList[["start","end","bGenome"]]
-    else:
-        allCoords = pd.DataFrame()
-        for i in bGenomes:
-            gData = dataList.loc[dataList.bGenome == i]
-            start = list(gData.start)
-            end = list(gData.end)
-            s = start[0]
-            e = end[0]
-            endStack = [float('inf'),e]
-            region = []
-            for j in range(1,len(start)):
-                s1 = start[j]
-                e1 = end[j]
-                if s1 < e:
-                    region.append([s,s1])
-                    s = s1
-                    endStack.append(e1)
-                    e = min(endStack)
-                elif e <= s1:
-                    region.append([s,e])
-                    while True:
-                        s = e
-                        endStack.remove(e)
-                        e = min(endStack)
-                        if e <= s1:
-                            region.append([s,e])
-                        else:
-                            break
-                    if len(endStack) > 1:
-                        region.append([s,s1])
-                        s = s1
-                        endStack.append(e1)
-                        e = min(endStack)
-                    else:
-                        s = s1
-                        endStack.append(e1)
-                        e = min(endStack)
-            while len(endStack) > 1:
-                region.append([s,e])
-                s = e
-                endStack.remove(e)
-                e = min(endStack)
-            region = [a for a in region if a[0] < a[1]]
-            region = pd.DataFrame(region)
-            region.columns = ["start","end"]
-            region["bGenome"] = i
-            allCoords = allCoords.append(region)
-        allCoords.sort_values(["start","end"],inplace = True)
-        
-    terminalData = pd.DataFrame(data = np.zeros([2,genomeCount], dtype = "int"), index = ["start","end"], columns = bGenomes)
-    
-    inGenomeCount = 0 
-    regions = []
-    count = 0
-    for row in allCoords.itertuples(index=False):
-        count+=1
-        if row.end <= terminalData[row.bGenome].end:
-            print("values must be sorted. Invalid Entry: ",row, terminalData[row.bGenome])
-            sys.exit()
-        if row.start <= terminalData[row.bGenome].end:
-            terminalData[row.bGenome].start = terminalData[row.bGenome].end + 1
-            terminalData[row.bGenome].end = row.end
-        else:
-            terminalData[row.bGenome].start = row.start
-            terminalData[row.bGenome].end = row.end
-        if max(terminalData.loc["start"]) < min(terminalData.loc["end"]):
-            regions.append((max(terminalData.loc["start"]),min(terminalData.loc["end"])))
-    regions = pd.DataFrame(regions, columns = ["start","end"])
-    return regions
-
-
-def getDataList(dataTables, genomeID, identity):
-    start = []
-    end = []
-    bGenome = []
-    bStart = []
-    bEnd = []
-    state = []
-    
-    if len(dataTables) != len(genomeID):
-        print("need 1 identifier for each table")
-        sys.exit()
-    else:
-        for i in range(len(genomeID)):
-            if identity[i] == "a":
-                start.extend(dataTables[i].aStart.tolist())
-                end.extend(dataTables[i].aEnd.tolist())
-                bStart.extend(dataTables[i].bStart.tolist())
-                bEnd.extend(dataTables[i].bEnd.tolist())
-            elif identity[i] == "b":
-                start.extend(dataTables[i].bStart.tolist())
-                end.extend(dataTables[i].bEnd.tolist())
-                bStart.extend(dataTables[i].aStart.tolist())
-                bEnd.extend(dataTables[i].aEnd.tolist())
-            state.extend(dataTables[i].state.tolist())
-            bGenome.extend([genomeID[i]]*len(dataTables[i]))
-        outData = pd.DataFrame({"start":start,"end":end,"bStart":bStart,"bEnd":bEnd,"state":state,"bGenome":bGenome})
-        outData.sort_values(["start","end","bStart","bEnd"], inplace = True)
-        outData = outData[["start","end","bStart","bEnd","state","bGenome"]]
-        outData.index = range(len(outData))
-        return(outData)
-        
-
-def getCLQ(adjM,partSize):
-    """
-    Mirghorbani, M., & Krokhmal, P. (2013). On finding k-cliques in k-partite graphs. Optim Lett, 7, 1155–1165. https://doi.org/10.1007/s11590-012-0536-y
-    """
-    class startCLQ:
-        def __init__(self, adjM, partSize):
-            self.clq = []
-            self.t = 0
-            self.sub = []
-            self.BsOut = list(range(len(partSize)))
-            self.Bs = []
-            self.Z = np.ones([len(partSize),sum(partSize)], dtype = "bool")
-            self.Z0 = np.ones([len(partSize), sum(partSize)])
-            self.adjM = adjM
-            self.partSize = partSize
-            self.partIndex = [sum(partSize[:i]) for i in range(len(partSize))]
-            self.clqSize = len(partSize)
-            self.S = []
-            self.Q = []
-            self.bitCLQ(self.t)
-            
-        def getBits(self, t, b):
-            return self.Z[t, self.partIndex[b]:self.partIndex[b]+self.partSize[b]]
-
-        def getBt(self, partSize, t):
-            nodeCount = [sum(self.getBits(t,i)) for i in self.BsOut]
-            return self.BsOut[nodeCount.index(min(nodeCount))]
-        
-        def bitCLQ(self, t):
-            bt = self.getBt(self.partSize, t)
-            sigBits = np.where(np.array(self.getBits(t,bt)) == True)[0]
-            sigBitsLen = len(sigBits)
-            count = 0
-            for i in sigBits:
-                count+=1
-                if t == 0:
-                    print(count, sigBitsLen, datetime.datetime.now())
-                nt = self.partIndex[bt]+i
-                self.Z[t,nt] = 0
-                self.S.append(nt)
-                if len(self.S) == self.clqSize:
-                    self.Q.append(self.S.copy())
-                    self.S.remove(nt)
-                else:
-                    self.Z[t+1] = self.Z[t] & self.adjM[nt]
-                    self.Bs.append(bt)
-                    self.BsOut.remove(bt)
-                    P = sum([1 for i in self.BsOut if sum(self.getBits(t,i)) > 0])
-                    if len(self.S) + P == self.clqSize:
-                        self.bitCLQ(t+1)
-                        self.S.remove(nt)
-                        self.Bs.remove(bt)
-                        self.BsOut.append(bt)
-                    else:
-                        self.S.remove(nt)
-                        self.Bs.remove(bt)
-                        self.BsOut.append(bt)
-        
-    def filterCLQ(clqList, partIndex):
-        clqList = [sorted(i) for i in clqList]
-        clqList = [[i[j] - partIndex[j] for j in range(len(i))] for i in clqList]
-        return(clqList)
-    CLQData = startCLQ(adjM, partSize)
-    return(filterCLQ(CLQData.Q, CLQData.partIndex))
-    
-
-##%%
-#def plotBlocks(blocksData):
-#    blocksData = [orderedBlocks.iloc[[250,251,255]], orderedBlocks.iloc[[1370, 1371]]]
-#    
-#    blocksDataOri = [i.copy() for i in blocksData]
-#
-#    
-#    blocksCoords = {}
-#    for i in range(len(blocksData)):        
-#        bData = blocksData[i].copy()
-#        aMin = min(bData[['aStart','aEnd']].min())
-#        aMax = max(bData[['aStart','aEnd']].max())
-#        bMin = min(bData[['bStart','bEnd']].min())
-#        bMax = max(bData[['bStart','bEnd']].max())
-#        blocksCoords[i] = [aMin,aMax, bMin, bMax]        
-#    
-#    keyOrder = sorted(blocksCoords.keys(), key = lambda x : blocksCoords[x][0])
-#    
-#    gapsRemoved = []
-##    startPosition = blocksCoords[keyOrder[0]][0]
-#    maxEnd = blocksCoords[keyOrder[0]][1]
-#    for i in range(1,len(keyOrder)):
-#        if blocksCoords[keyOrder[i]][0] > maxEnd:
-#            gapsRemoved.append(blocksCoords[keyOrder[i]][0] - blocksCoords[keyOrder[i-1]][1])
-#        else:
-#            gapsRemoved.append(0)
-#            
-#    for i in range(1, len(keyOrder)):
-#        leftShift = sum(gapsRemoved[:i])
-#        rightShift = max(0,log(leftShift,1.015))
-#        blocksData[keyOrder[i]]['aStart'] = blocksData[keyOrder[i]]['aStart'] -  leftShift + rightShift
-#        blocksData[keyOrder[i]]['aEnd'] = blocksData[keyOrder[i]]['aEnd'] -  leftShift + rightShift
-#    
-#    dataLimits = [[min(i[['aStart','aEnd']].min()), max(i[['aStart','aEnd']].max()),min(i[['bStart','bEnd']].min()), max(i[['bStart','bEnd']].max())] for i in blocksData]
-#    aMin = min(unlist([x[0:2] for x in dataLimits]))
-#    aMax = max(unlist([x[0:2] for x in dataLimits]))
-#    bMin = min(unlist([x[2:4] for x in dataLimits]))
-#    bMax = max(unlist([x[2:4] for x in dataLimits]))
-#
-#    
-##    
-##    for i in range(1,len(blocksCoords)):
-##        if blocksCoords[i][0] > blocksCoords[i-1][1] 
-##    
-#    colList = ['aStart', 'aEnd', 'bStart', 'bEnd']    
-#    for bData in blocksData:
-#        for i in colList[:2]:
-#            bData[i] = (bData[i] - aMin)/(aMax - aMin)
-#            
-#        for i in colList[2:]:
-#            bData[i] = (bData[i] - bMin)/(bMax - bMin)
-#    
-#    colors = getColors(plt.cm.Dark2,len(blocksData))
-#    
-#    bLen = len(blocksData)
-#    
-#    for count in range(bLen):
-#        bData = blocksData[count]
-#        for i in range(bData.shape[0]):
-#            row = bData.iloc[i]
-#            plt.plot([row[0], row[1]], [0 - (0.1*count),0 - (0.1*count)], linewidth = 5, color = colors[count], path_effects = [pe.Stroke(linewidth = 10, foreground="k"),pe.Normal()])
-#            plt.plot([row[2], row[3]], [1 + 0.1*(bLen-1-count),1 + 0.1*(bLen-1-count)], linewidth = 5, color = colors[count],path_effects = [pe.Stroke(linewidth = 10, foreground="k"),pe.Normal()])
-#    plt.show()
-#    plt.gca().add_patch(patches.Rectangle((10,10), 30,5))
-#    plt.show()
-#    plt.plot()

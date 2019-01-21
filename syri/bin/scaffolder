@@ -711,6 +711,6 @@ if __name__ == "__main__":
     parser.add_argument("-l", dest="length", help='length of the range', type=int, default=10000)
     parser.add_argument("-n", dest='ncount', help="number of N's to be inserted", type=int, default=500)
     parser.add_argument('-o', dest='out', help="output file prefix", default="out", type=str)
-    parser.add_argument('-noref', dest='noref', help="Use this parameter when no assembly is at chromosome level", defaul=False, action='store_true')
+    parser.add_argument('-noref', dest='noref', help="Reference assembly is not at chromosome level", default=False, action='store_true')
     args = parser.parse_args()
     scaf(args)
