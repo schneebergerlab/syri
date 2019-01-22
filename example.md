@@ -1,24 +1,112 @@
-### Running SyRI for identificaion of genomic differences
-## Genome difference identification:
+## Identifying genomic differences using SyRI
 
-### Pre-requisite:
-Chromosomal assemblies need to be aligned. This can be done using mummer's nucmer
-tool. The nucmer specific parameter would depend on the complexity of the concerned
-genomes (amount of repeat regions) and assembly quality (gaps).
+SyRI requires assemblies to be at chromosome-level for accurate identification of SRs. If chromosome-level assemblies are not available, one can create pseudo-chromosome level assemblies using [scaforder](scaforder.md) utility. 
+
+### Whole-genome alignment
+SyRI uses whole-genome alignments as input. These can be generated using the [MUMmer3](http://mummer.sourceforge.net/) package. Firstly, the genomes (in multi-fasta format) are aligned using the NUCmer utility.
+```bash
+nucmer --maxmatch -c 500 -b 500 -l 100 refgenome qrygenome;
+```
+
+Here, `-c`,`-b`, and `-l` are parameters used to control the alignment resolution and need to be twerked based on the genome size and complexity. Mere details are available [here](http://mummer.sourceforge.net/manual/#nucmer).
+
+NUCmer would generate a `out.delta` file as output. The identified alignments are filtered using and then converted into a tab-separated format as [required](fileformat.md) by SyRI.
 
 ```bash
-## sample nucmer run, filtering of alignment (optional, but recommended), and transforming delta file into tab-delimited file format.
-nucmer --maxmatch -c 500 -b 500 -l 100 refgenome qrygenome;
 delta-filter -m -i 90 -l 100 out.delta > out_m_i90_l100.delta; 
 show-coords -THrd out_m_i90_l100.delta > out_m_i90_l100.coords;
 ```
 
-Here, `--maxmatch` (for nucmer), `-m` (for delta-filter), `-THrd` (for show-coords) are critical and should be used as such to ensure that the output format is correct.
+Users can change values for `-i`, and `-l` input to suite their genomes and problem. More information is available [here](http://mummer.sourceforge.net/manual/#filter).
+
+Here, `--maxmatch` (for nucmer), `-m` (for delta-filter), `-THrd` (for show-coords) are essential and should be used as such.
 
 ### SR identification using `syri`:
 This is the main method of this package. It takes `*.coords` file as input and process them to annotate structural rearrangements. 
 syri can be run using the following command in working directory:
 ```bash
+
+
+
+
+usage: syri [-h] -c INFILE [-r REF] [-q QRY] [-d DELTA]
+            [-log {DEBUG,INFO,WARN}] [-lf LOG_FIN] [-dir DIR]
+            [--prefix PREFIX] [-seed SEED] [-nc NCORES] [-k] [-o FOUT]
+            [-novcf] [-nosr] [-b BRUTERUNTIME] [-unic TRANSUNICOUNT]
+            [-unip TRANSUNIPERCENT] [-inc INCREASEBY] [--no-chrmatch] [-nosv]
+            [-nosnp] [--all] [--allow-offset OFFSET] [-ss SSPATH] [-buff BUFF]
+
+Input Files:
+  -c INFILE             File containing alignment coordinates in a tsv format
+                        (default: None)
+  -r REF                Genome A (which is considered as reference for the
+                        alignments). Required for short variation
+                        identification. (default: None)
+  -q QRY                Genome B (which is considered as query for the
+                        alignments). Required for short variation
+                        identification. (default: None)
+  -d DELTA              .delta file from mummer. Required for snps/small
+                        indels identification (default: None)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -log {DEBUG,INFO,WARN}
+                        log level (default: INFO)
+  -lf LOG_FIN           Name of log file (default: syri.log)
+  -dir DIR              path to working directory (if not current directory)
+                        (default: None)
+  --prefix PREFIX       Prefix to add before the output file Names (default: )
+  -seed SEED            seed for generating random numbers (default: 1)
+  -nc NCORES            number of cores to use in parallel (max is number of
+                        chromosomes) (default: 1)
+  -k                    Keep internediate output files (default: False)
+  -o FOUT               Output file name (default: syri)
+  -novcf                Do not combine all files into one output file
+                        (default: False)
+
+SR identification:
+  -nosr                 Set to skip structural rearrangement identification
+                        (default: False)
+  -b BRUTERUNTIME       Cutoff to restrict brute force methods to take too
+                        much time (in seconds). Smaller values would make
+                        algorithm faster, but could have marginal effects on
+                        accuracy. In general case, would not be required.
+                        (default: 60)
+  -unic TRANSUNICOUNT   Number of uniques bps for selecting translocation.
+                        Smaller values would select smaller TLs better, but
+                        may increase time and decrease accuracy. (default:
+                        1000)
+  -unip TRANSUNIPERCENT
+                        Percent of unique region requried to select
+                        translocation. Value should be in range (0,1]. Smaller
+                        values would selection of translocation which are more
+                        overlapped with other regions. (default: 0.5)
+  -inc INCREASEBY       Minimum score increase required to add another
+                        alignment to translocation cluster solution (default:
+                        1000)
+  --no-chrmatch         Do not allow SyRI to automatically match chromosome
+                        ids between the two genomes if they are not equal
+                        (default: False)
+
+ShV identification:
+  -nosv                 Set to skip structural variation identification
+                        (default: False)
+  -nosnp                Set to skip SNP/Indel (within alignment)
+                        identification (default: False)
+  --all                 Use duplications too for variant identification
+                        (default: False)
+  --allow-offset OFFSET
+                        BPs allowed to overlap (default: 0)
+  -ss SSPATH            path to show-snps from mummer (default: show-snps)
+  -buff BUFF            Remove SNPs which have other variants or alignment
+                        break within buff size bps (default: 0)
+
+
+
+
+
+
+
 syri /path/to/coords/file [options]
 ```
 <!---where, the accepted parameters are:
