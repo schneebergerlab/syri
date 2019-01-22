@@ -1,8 +1,11 @@
 # Contents:
 1. [Introduction](#introduction)
-2. [Requirements](#requires)
+2. [Pre-requisite](#pre-requisite)
+3. [Installation guide](#installation-guide)
 
-## Requires:
+## Introduction:
+
+## Pre-requisite:
 
 go to [test](test.md)
 - Python3 (preferred python3.5)
