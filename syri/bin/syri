@@ -15,9 +15,9 @@ if __name__ == "__main__":
     optional = parser._action_groups.pop()
     required = parser.add_argument_group("Input Files")
     required.add_argument("-c", dest="infile", help="File containing alignment coordinates in a tsv format", type=argparse.FileType('r'), required=True)
-    required.add_argument("-r", dest="ref", help="Genome A (which is considered as reference for the alignments). Required for short variation identification.", type=argparse.FileType('r'))
-    required.add_argument("-q", dest="qry", help="Genome B (which is considered as query for the alignments). Required for short variation identification.", type=argparse.FileType('r'))
-    required.add_argument("-d", dest="delta", help=".delta file from mummer. Required for snps/small indels identification", type=argparse.FileType('r'))
+    required.add_argument("-r", dest="ref", help="Genome A (which is considered as reference for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
+    required.add_argument("-q", dest="qry", help="Genome B (which is considered as query for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
+    required.add_argument("-d", dest="delta", help=".delta file from mummer. Required for short variation (SNPs/indels) identification", type=argparse.FileType('r'))
 
 # parser.add_argument("-n", dest="threshold", help="Threshold to differentiate estimate whether the",\type=int,
     # default=50)
