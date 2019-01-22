@@ -1,4 +1,6 @@
 ## Requires:
+
+go to [test](test.md)
 - Python3 (preferred python3.5)
 - Required packages:
     - Cython
