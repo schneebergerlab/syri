@@ -10,7 +10,7 @@ nucmer --maxmatch -c 500 -b 500 -l 100 refgenome qrygenome;
 
 Here, `-c`,`-b`, and `-l` are parameters used to control the alignment resolution and need to be twerked based on the genome size and complexity. Mere details are available [here](http://mummer.sourceforge.net/manual/#nucmer).
 
-NUCmer would generate a `out.delta` file as output. The identified alignments are filtered using and then converted into a tab-separated format as [required](fileformat.md) by SyRI.
+NUCmer would generate a `out.delta` file as output. The identified alignments are filtered using and then converted into a tab-separated [format](fileformat.md) as required by SyRI.
 
 ```bash
 delta-filter -m -i 90 -l 100 out.delta > out_m_i90_l100.delta; 
@@ -26,7 +26,7 @@ This is the main method of this package. It takes genome alignments coordinates 
 
 The usage and parameters are:
 
-```bash
+```
 usage: syri [-h] -c INFILE [-r REF] [-q QRY] [-d DELTA]
             [-log {DEBUG,INFO,WARN}] [-lf LOG_FIN] [-dir DIR]
             [--prefix PREFIX] [-seed SEED] [-nc NCORES] [-k] [-o FOUT]
@@ -38,13 +38,14 @@ Input Files:
   -c INFILE             File containing alignment coordinates in a tsv format
                         (default: None)
   -r REF                Genome A (which is considered as reference for the
-                        alignments). Required for short variation
-                        identification. (default: None)
+                        alignments). Required for local variation (large
+                        indels, CNVs) identification. (default: None)
   -q QRY                Genome B (which is considered as query for the
-                        alignments). Required for short variation
-                        identification. (default: None)
-  -d DELTA              .delta file from mummer. Required for snps/small
-                        indels identification (default: None)
+                        alignments). Required for local variation (large
+                        indels, CNVs) identification. (default: None)
+  -d DELTA              .delta file from mummer. Required for short variation
+                        (SNPs/indels) identification (default: None)
+
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -99,6 +100,20 @@ ShV identification:
   -buff BUFF            Remove SNPs which have other variants or alignment
                         break within buff size bps (default: 0)
 ```
+#### Parameters related to SR identification
+In case the chromosome IDs for the two assemblies are not identical, SyRI would try to find homologous chromosomes and then map their IDs to be identical. This behaviour can be turned off using the `--no-chrmatch` parameter.
+
+Other parameters in this section regulate how translocation and duplications (TDs) are identified. For small networks of overlapping candidate TDs, SyRI uses a brute-force method to find the optimal set of TDs. The time allowed to this method can be restricted using the `-b` parameter. If for a network, brute-force method take more than the assigned time, then it will automatically switch to a randomized-greedy method. The `-unic` and `-unip` parameters state how unique a candidate TD need to be. Candidates which overlap highly with syntenic path and inversions and thus do not pass these thresholds will be filtered out. From a network of candidate TDs, it is possible to select different set of candidates. The `-inc` threshold is used decide whether a new set of candidates is better then the current candidate and thus can be selected as the solution or not. A new set will be considered as the better set if:
+
+```
+
+```
+```math
+a + v = 2
+```
+
+$a+b=2$
+    h<sub>&theta;</sub>(x) = &theta;<sub>o</sub> x + &theta;<sub>1</sub>x
 
 The output is stored in seven files corresponding to syntenic regions (synOut.txt) and six classes of SRs inversion (invOut.txt), translocation (TLOut.txt), inverted translocation (invTLOut.txt), duplication (dupOut.txt), inverted duplication (invDupOut.txt), and cross-chromosomal exchange (ctxOut.txt). The files use a two layer structure reporting annotated block and the alignments which constitute the block.
 
