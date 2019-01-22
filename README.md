@@ -2,12 +2,14 @@
 1. [Introduction](#introduction)
 2. [Pre-requisite](#pre-requisite)
 3. [Installation guide](#installation-guide)
+4. [Citation](#citation)
+
+
 
 ## Introduction:
+Synteny and Rearrangement Identifier (SyRI) is a comprehensive tool for identifying all genomic differences between between genomes of related related whole genome assembliesidentifies syntenic path, structural rearrangements (inversions, translocations, and duplications), local variations (SNPs, indels, CNVs etc) and un-aligned region  
 
 ## Pre-requisite:
-
-go to [test](test.md)
 - Python3 (preferred python3.5)
 - Required packages:
     - Cython
