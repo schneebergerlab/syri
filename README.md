@@ -7,33 +7,12 @@ Further, SyRI also identifies local variations within all syntenic and structura
 
 # Contents
 1. [Pre-requisite](prereq.md)
-2. [Installation guide](#installation-guide)
-3. 
-3. [Citation](#citation)
-
-
-
-
-## Pre-requisite
-- Python3 (preferred python3.5)
-- Required packages:
-    - Cython
-    - Numpy
-    - Scipy
-    - Pandas
-    - Igraph (python-igraph)
-    - Biopython
-- MUMmer3
-
-## Installation guide
-1. Download the directory
-2. Open it and run:
-
-```bash
-python3 setup.py install
-```
-
-All executables would be in ```syri/bin/```.
+2. [Installation guide](install.md)
+3. [SyRI's algorithm](algo.md)
+4. [Genomic difference identification](example.md)
+5. [Pseudo-genome generation](scaforder.md)
+6. [File-format](fileformat.md)
+7. [Citation](#citation)
 
 ## Genome difference identification:
 
