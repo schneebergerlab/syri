@@ -22,13 +22,11 @@ Users can change values for `-i`, and `-l` input to suite their genomes and prob
 Here, `--maxmatch` (for nucmer), `-m` (for delta-filter), `-THrd` (for show-coords) are essential and should be used as such.
 
 ### SR identification using `syri`:
-This is the main method of this package. It takes `*.coords` file as input and process them to annotate structural rearrangements. 
-syri can be run using the following command in working directory:
+This is the main method of this package. It takes genome alignments coordinates as input in a tsv format. Additionally, fasta files for the two genomes will also be required if structure variations are also needed. Further, for short variation identification `delta` file (as generated from NUCmer) will also be requried.
+
+The usage and parameters are:
+
 ```bash
-
-
-
-
 usage: syri [-h] -c INFILE [-r REF] [-q QRY] [-d DELTA]
             [-log {DEBUG,INFO,WARN}] [-lf LOG_FIN] [-dir DIR]
             [--prefix PREFIX] [-seed SEED] [-nc NCORES] [-k] [-o FOUT]
@@ -100,45 +98,11 @@ ShV identification:
   -ss SSPATH            path to show-snps from mummer (default: show-snps)
   -buff BUFF            Remove SNPs which have other variants or alignment
                         break within buff size bps (default: 0)
-
-
-
-
-
-
-
-syri /path/to/coords/file [options]
 ```
-<!---where, the accepted parameters are:
-```
-optional arguments:
-  -h, --help          show this help message and exit
-  -b BRUTERUNTIME     Cutoff to restrict brute force methods to take too much
-                      time (in seconds). Smaller values would make algorithm
-                      faster, but could have marginal effects on accuracy. In
-                      general case, would not be required. (default: 60)
-  -c TRANSUNICOUNT    Number of uniques bps for selecting translocation.
-                      Smaller values would select smaller TLs better, but may
-                      increase time and decrease accuracy. (default: 1000)
-  -p TRANSUNIPERCENT  Percent of unique region requried to select
-                      tranalocation. Value should be in range (0,1]. Smaller
-                      values would selection of translocation which are more
-                      overlapped with other regions. (default: 0.5)
-  -nC NCORES          number of cores to use in parallel (max is number of
-                      chromosomes) (default: 1)
-  -d DIR              path to working directory (if not current directory)
-                      (default: /biodata/dep_coupland/grp_schneeberger/project
-                      s/SynSearch/scripts/python/syri/)
-  -i INCREASEBY       Minimum score increase required to add another alingment
-                      to translocation cluster solution (default: 1000)
-  --prefix PREFIX     Prefix to add before the output file Names (default: )
-  -s SEED             seed for generating random numbers (default: 1)
-
-```-->
 
 The output is stored in seven files corresponding to syntenic regions (synOut.txt) and six classes of SRs inversion (invOut.txt), translocation (TLOut.txt), inverted translocation (invTLOut.txt), duplication (dupOut.txt), inverted duplication (invDupOut.txt), and cross-chromosomal exchange (ctxOut.txt). The files use a two layer structure reporting annotated block and the alignments which constitute the block.
 
-```
+
 #	Chr1	8241	610363	-	Chr1	1	601274              
 8241	550541	1	542302  
 549844	587482	541241	578850  
