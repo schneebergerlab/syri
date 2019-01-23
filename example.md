@@ -21,7 +21,7 @@ Users can change values for `-i`, and `-l` input to suite their genomes and prob
 
 Here, `--maxmatch` (for nucmer), `-m` (for delta-filter), `-THrd` (for show-coords) are essential and should be used as such.
 
-### SR identification using `syri`:
+### SR identification using `syri`
 This is the main method of this package. It takes genome alignments coordinates as input in a tsv format. Additionally, fasta files for the two genomes will also be required if structure variations are also needed. Further, for short variation identification `delta` file (as generated from NUCmer) will also be requried.
 
 The usage and parameters are:
