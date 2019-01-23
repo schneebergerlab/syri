@@ -104,9 +104,12 @@ ShV identification:
 In case the chromosome IDs for the two assemblies are not identical, SyRI would try to find homologous chromosomes and then map their IDs to be identical. This behaviour can be turned off using the `--no-chrmatch` parameter.
 
 Other parameters in this section regulate how translocation and duplications (TDs) are identified. For small networks of overlapping candidate TDs, SyRI uses a brute-force method to find the optimal set of TDs. The time allowed to this method can be restricted using the `-b` parameter. If for a network, brute-force method take more than the assigned time, then it will automatically switch to a randomized-greedy method. The `-unic` and `-unip` parameters state how unique a candidate TD need to be. Candidates which overlap highly with syntenic path and inversions and thus do not pass these thresholds will be filtered out. From a network of candidate TDs, it is possible to select different set of candidates. The `-inc` threshold is used decide whether a new set of candidates is better then the current candidate and thus can be selected as the solution or not. A new set will be considered as the better set if one of the following conditions satisfy:
-* score(new_set) &gt; score(current_set) + inc
-* score(new_set) &gt; score(current_set) &amp; number_of_candidate(new_set) &ge; number_of_candidate(current_set)
-* score(new_set) &gt; score(current_set) - inc &amp; number_of_candidate(new_set) &lt; number_of_candidate(current_set)
+
+<img src="https://latex.codecogs.com/svg.latex?score(new\_set)>score(current\_set)+inc" title="eq1" />
+
+<img src="https://latex.codecogs.com/svg.latex?score(new\_set)>score(current\_set)\quad\textrm{and}\quad{number\_of\_candidate(new\_set)\leq{number\_of\_candidate(current\_set)}}" title="eq2" />
+
+<img src="https://latex.codecogs.com/svg.latex?score(new\_set)>score(current\_set)-inc\quad\textrm{and}\quad{number\_of\_candidate(new\_set)<number\_of\_candidate(current\_set)" title="eq2" />
  
 #### Parameters for local variaition identificaiton
 The `--allow-offset` parameter is used to define a threshold to decide whether two consecutive alignments within an annotated blocks are overlapping or not. Alignments, for which number of overlapping bases will be more than `--allow-offset` will result CNVs.
