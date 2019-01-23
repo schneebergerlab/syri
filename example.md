@@ -109,6 +109,9 @@ Other parameters in this section regulate how translocation and duplications (TD
 
 <img src="https://latex.codecogs.com/svg.latex?\Large&space;score(new\_set)>score(current\_set)\quad\textrm{and}\quad{number\_of\_candidate(new\_set)\leq{number\_of\_candidate(current\_set)}" title="eq2" />
 
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;score(new\_set)>score(current\_set)+inc" title="eq1" />
+
+
 <img src="https://latex.codecogs.com/svg.latex?\Large&space;score(new\_set)>score(current\_set)-inc\quad\textrm{and}\quad{number\_of\_candidate(new\_set)<number\_of\_candidate(current\_set)" title="eq3" />
  
 #### Parameters for local variaition identificaiton
