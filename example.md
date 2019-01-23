@@ -111,6 +111,7 @@ Other parameters in this section regulate how translocation and duplications (TD
 and
 
 <img src="https://latex.codecogs.com/svg.latex?number\_of\_candidate(new\_set)\leq{}number\_of\_candidate(current\_set)" title="eq2" />
+
 * <img src="https://latex.codecogs.com/svg.latex?score(new\_set)>score(current\_set)-inc" title="eq3" />
  and
  
