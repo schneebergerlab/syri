@@ -1,6 +1,3 @@
-![](https://latex.codecogs.com/svg.latex?y%3Dx%5E2)
-![equation](http://latex.codecogs.com/gif.latex?O_t%3D%5Ctext%20%7B%20Onset%20event%20at%20time%20bin%20%7D%20t)
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}" title="\Large x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}" />
 #	Chr1	8241	610363	-	Chr1	1	601274              
 8241	550541	1	542302  
 549844	587482	541241	578850  
