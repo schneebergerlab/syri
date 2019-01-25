@@ -7,8 +7,9 @@ When one of the assemblies is at chromosome-level, then the scaffolds from the o
 
 When both assemblies are at scaffold-level, `chroder` groups scaffolds (from one assembly) which align to same scaffold in the other assembly. This is done for both assemblies. 
 The position, in the chromosome, where the scaffolds From the alignments,   Based on the alignments, `chroder`     These molecules are formed by concatenating ordered and oriented scaffolds.  `chroder` can be used to generate pseudo-chromosomes even when ther This method can be used to generate pseudo consists of ordered and oriented scaffolds which are arranged so that to resemble   which can then be used to identify  when whoWhen a chromosome level assembly is not availableSyRI can be used to generate reference guided pseudo-genomes (pseudo-chromosomal assemblies) to analyse genomes for which chromosome level assemblies are not available. Incomplete assembly is aligned to the reference genomes and the alignment information allows anchoring of scaffolds to get pseudo-chromosomes. Though, highly useful, this may result in higher false negatives, as being reference guided some variation will be subdued.
-
+<p align='center'>
 <img src='chroder.svg' />
+</p>
 
 ```bash
 #Steps:
