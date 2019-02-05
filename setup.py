@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup, Extension
 import sys
 import numpy
 
@@ -10,7 +10,8 @@ except ImportError:
 
 
     
-setup(name="synfunc",
-        ext_modules=cythonize("syri/pyxFiles/synsearchFunctions.pyx"),
+setup(name="syri",
+        ext_modules=cythonize(Extension('syri.pyxFiles.synsearchFunctions',
+        ['syri/pyxFiles/synsearchFunctions.pyx'])),
         packages=["syri","syri.bin", "syri.bin.func"],
         include_dirs=[numpy.get_include()])

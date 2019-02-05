@@ -27,7 +27,7 @@ def readData(args, cwdPath):
         annoData = finD.loc[finD[0] == "#"].copy().drop( [0,4],axis = 1).dropna(axis = 1 , how="all")
         annoData["state"] = fin
         annoData = annoData.reindex(columns = ["state"]+annoData.columns[:-1].tolist())
-        annoCoords = annoCoords.append(annoData.copy())
+        annoCoords = annoCoords.append(annoData.copy(), sort = True)
     annoCoords[[2,3,6,7]] = annoCoords[[2,3,6,7]].astype("int")
     colNames = ["SVtype","refChr","refStart","refEnd","qryChr","qryStart","qryEnd","ctxType","Genome"]
     annoCoords.columns = colNames[:annoCoords.shape[1]]
@@ -41,7 +41,7 @@ def getRegion(args, cwdPath):
         regions = data.loc[(data.refChr==args.chr) & (data.refStart <= args.end) & (data.refEnd >= args.start)].copy()
     elif args.q:
         regions = data.loc[(data.qryChr==args.chr) & (data.qryStart <= args.end) & (data.qryEnd >= args.start)].copy()
-        regions.sort_values(["qryChr","qryStart","qryEnd","refChr","refStart","refEnd"],inplace=True)
+        regions.sort_values(["qryChr","qryStart","qryEnd","refChr","refStart","refEnd"],inplace=True	)
     print(regions.to_csv(sep="\t",index=False, header=False))
 
 

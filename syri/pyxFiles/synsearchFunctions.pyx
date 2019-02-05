@@ -23,7 +23,9 @@ import logging
 import psutil
 
 cimport numpy as np
+cimport cython
 
+# cython: linetrace=True
 np.random.seed(1)
 def startSyri(args):
     coordsfin = args.infile.name
@@ -750,7 +752,8 @@ def getConnectivityGraph(blocksList):
     outOG.es["target"] = list(targetList)
     return outOG
 
-cpdef getAllLongestPaths(graph,sNode, eNode, np.ndarray[np.int32_t, ndim =1] source, np.ndarray[np.int32_t, ndim =1] target, np.ndarray[np.float32_t, ndim=1] weight, by="weight"):
+
+cdef getAllLongestPaths(n,sNode, eNode, np.ndarray[np.int32_t, ndim =1] source, np.ndarray[np.int32_t, ndim =1] target, np.ndarray[np.float32_t, ndim=1] weight, by="weight"):
     """Uses Bellman-Ford Algorithm to find the shortest path from node "sNode" in the 
     directed acyclic graph "graph" to all nodes in the list "eNode". Edges weighed 
     are negative, so shortest path from sNode to eNode corresponds to the longest path.
@@ -774,9 +777,10 @@ cpdef getAllLongestPaths(graph,sNode, eNode, np.ndarray[np.int32_t, ndim =1] sou
         list of len(eNodes) longest paths from sNodes to eNodes
         
     """
-    pathList = []
+    print(sNode)
+    pathList = deque()
     cdef:
-        cdef Py_ssize_t i, j, n = len(graph.vs.indices)
+        cdef Py_ssize_t i, j, current
         np.ndarray[np.int32_t, ndim =1] pred = np.array([-1]*n, dtype = np.int32)
         np.ndarray[np.float32_t, ndim=1] dist = np.array([np.float32('inf')]*n, dtype = np.float32)
 
@@ -791,34 +795,43 @@ cpdef getAllLongestPaths(graph,sNode, eNode, np.ndarray[np.int32_t, ndim =1] sou
                 changes = True
                 dist[target[j]] = dist[source[j]] + weight[j]
                 pred[target[j]] = source[j]
-                
+
     for j in range(len(source)):
         if dist[source[j]] + weight[j] < dist[target[j]]:
             sys.exit("Negative weight cycle identified")
 
-    for key in eNode:
-        if dist[key] != float("inf"):
-            path = []
-            while key!=sNode:
-                path.append(key)
-                key = pred[key]
+
+    # Store paths for enodes which have already been found
+    nodepath = {}
+    for i in eNode:
+        current = i
+        if dist[current] != float("inf"):
+            path = deque()
+            while current!=sNode:
+                if current in nodepath.keys():
+                    path.extend(nodepath[current].copy())
+                    break
+                path.append(current)
+                current = pred[current]
+            nodepath[i] = path.copy()
             path.append(sNode)
-            pathList.append(np.array(path[::-1], dtype="int32"))
+            pathList.append(np.array(path, dtype="int32")[::-1])
     return(pathList)
+
 
 cpdef list getShortest(invBlocks):
     cdef:
-        list shortest = []
+        shortest = deque()
         int i
         list j = list(range(len(invBlocks)))
     invG = getConnectivityGraph(invBlocks)
     source = np.array(invG.es['source'], dtype = np.int32)
     target = np.array(invG.es['target'], dtype = np.int32)
     weight = np.array(invG.es['weight'], dtype = np.float32)
-       
+    n = len(invG.vs.indices)
     for i in j:
-        shortest.append(getAllLongestPaths(invG,i,j,source,target,weight))
-    return shortest
+        shortest.append(getAllLongestPaths(n,i,j,source,target,weight))
+    return list(shortest)
 
 
 cpdef list getRevenue(invBlocks, shortest, np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray iDen):
