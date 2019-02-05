@@ -777,7 +777,6 @@ cdef getAllLongestPaths(n,sNode, eNode, np.ndarray[np.int32_t, ndim =1] source, 
         list of len(eNodes) longest paths from sNodes to eNodes
         
     """
-    print(sNode)
     pathList = deque()
     cdef:
         cdef Py_ssize_t i, j, current
@@ -831,7 +830,9 @@ cpdef list getShortest(invBlocks):
     n = len(invG.vs.indices)
     for i in j:
         shortest.append(getAllLongestPaths(n,i,j,source,target,weight))
-    return list(shortest)
+    short = [list(s) for s in shortest]
+    print(short)
+    return short
 
 
 cpdef list getRevenue(invBlocks, shortest, np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray iDen):
@@ -1520,7 +1521,7 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
     for i in range(len(orderedBlocksList)):
         eNode = [i]
         eNode.extend(list(np.where(outOrderedBlocks.iloc[i] == True)[0]))
-        shortestOutOG.append(getAllLongestPaths(outOG,i,eNode,source, target, weight, "weight"))   
+        shortestOutOG.append(getAllLongestPaths(len(outOG.vs.indices),i,eNode,source, target, weight, "weight"))
     shortestOutOG = np.array(shortestOutOG)
     logger.debug("starting getTranslocationScore")
     if not ctx:
