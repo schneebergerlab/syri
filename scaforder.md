@@ -5,10 +5,12 @@ Biologically, syntenic regions are meaningful only for homologous regions. As a 
 
 When one of the assemblies is at chromosome-level, then the scaffolds from the other assemblies are anchored to the chromosomes. Order of the scaffolds is determined based on the location in the chromosome where a scaffold aligns. Similarly, scaffold orientation in the pseudo-chromosome depends on the alignments with the chromosome. Scaffolds having inverted alignments with the chromosome are reverse-complemented, as a result all scaffolds are in forward orientation with respect to the chromosomes.
 
-When both assemblies are at scaffold-level, `chroder` groups scaffolds (from one assembly) which align to same scaffold in the other assembly. This is done for both assemblies. 
-The position, in the chromosome, where the scaffolds From the alignments,   Based on the alignments, `chroder`     These molecules are formed by concatenating ordered and oriented scaffolds.  `chroder` can be used to generate pseudo-chromosomes even when ther This method can be used to generate pseudo consists of ordered and oriented scaffolds which are arranged so that to resemble   which can then be used to identify  when whoWhen a chromosome level assembly is not availableSyRI can be used to generate reference guided pseudo-genomes (pseudo-chromosomal assemblies) to analyse genomes for which chromosome level assemblies are not available. Incomplete assembly is aligned to the reference genomes and the alignment information allows anchoring of scaffolds to get pseudo-chromosomes. Though, highly useful, this may result in higher false negatives, as being reference guided some variation will be subdued.
+When both assemblies are at scaffold-level, `chroder` groups scaffolds (from one assembly) which align to same scaffold in the other assembly. This creates a chain of scaffolds originated from neighbouring regions of a chromsome. The scaffolds are then ordered and oriented and then concatenated with to create pseudo-chromosome like molecule.
+
 <p align='center'>
-<img src='chroder.svg' />
+<img src='chroder.svg' alt>
+  
+<em>asdfa</em>
 </p>
 
 ```bash
