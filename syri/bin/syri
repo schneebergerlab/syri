@@ -21,37 +21,37 @@ if __name__ == "__main__":
 
 # parser.add_argument("-n", dest="threshold", help="Threshold to differentiate estimate whether the",\type=int,
     # default=50)
-    optional.add_argument("-log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
-    optional.add_argument("-lf", dest="log_fin", help="Name of log file", type=argparse.FileType("w"), default="syri.log")
-    optional.add_argument('-dir', dest='dir', help="path to working directory (if not current directory)", action='store')
-    optional.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
-    optional.add_argument("-seed", dest="seed", help="seed for generating random numbers", type=int, default=1)
-    optional.add_argument('-nc', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
-    optional.add_argument('-k', dest="keep", help="Keep internediate output files", default=False, action="store_true")
     optional.add_argument('-o', dest="fout", help="Output file name", default="syri", type=str)
-    optional.add_argument('-novcf', dest="novcf", help="Do not combine all files into one output file", default=False, action="store_true")
+    optional.add_argument('-k', dest="keep", help="Keep internediate output files", default=False, action="store_true")
+    optional.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
+    optional.add_argument("--lf", dest="log_fin", help="Name of log file", type=argparse.FileType("w"), default="syri.log")
+    optional.add_argument('--dir', dest='dir', help="path to working directory (if not current directory)", action='store')
+    optional.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
+    optional.add_argument("--seed", dest="seed", help="seed for generating random numbers", type=int, default=1)
+    optional.add_argument('--nc', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
+    optional.add_argument('--novcf', dest="novcf", help="Do not combine all files into one output file", default=False, action="store_true")
 
     parser._action_groups.append(optional)
-
     # Parameters for identification of structural rearrangements
     srargs = parser.add_argument_group("SR identification")
-    srargs.add_argument("-nosr", dest="nosr", help="Set to skip structural rearrangement identification", action="store_true", default=False)
+    srargs.add_argument("--nosr", dest="nosr", help="Set to skip structural rearrangement identification", action="store_true", default=False)
     srargs.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
-    srargs.add_argument("-unic", dest="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type=int, default=1000)
-    srargs.add_argument("-unip", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would selection of translocation which are more overlapped with \
+    srargs.add_argument("--unic", dest="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type=int, default=1000)
+    srargs.add_argument("--unip", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would selection of translocation which are more overlapped with \
      other regions.", type=float, default=0.5)
-    srargs.add_argument("-inc", dest="increaseBy", help="Minimum score increase required to add another alignment to translocation cluster solution", type=int, default=1000)
+    srargs.add_argument("--inc", dest="increaseBy", help="Minimum score increase required to add another alignment to translocation cluster solution", type=int, default=1000)
     srargs.add_argument("--no-chrmatch", dest='chrmatch', help="Do not allow SyRI to automatically match chromosome ids between the two genomes if they are not equal", default=False, action='store_true')
 
     # Parameters for identification of short variations
     shvargs = parser.add_argument_group("ShV identification")
-    shvargs.add_argument("-nosv", dest="nosv", help="Set to skip structural variation identification", action="store_true", default=False)
-    shvargs.add_argument("-nosnp", dest="nosnp", help="Set to skip SNP/Indel (within alignment) identification", action="store_true", default=False)
+    shvargs.add_argument("--nosv", dest="nosv", help="Set to skip structural variation identification", action="store_true", default=False)
+    shvargs.add_argument("--nosnp", dest="nosnp", help="Set to skip SNP/Indel (within alignment) identification", action="store_true", default=False)
     # shvargs.add_argument("-align", dest="align", help="Alignment file to parse to show-snps for SNP/Indel identification", action="store_false", type=argparse.FileType("r"))
     shvargs.add_argument("--all", help="Use duplications too for variant identification",  action="store_true", default=False)
     shvargs.add_argument("--allow-offset", dest='offset', help='BPs allowed to overlap', default=0, type=int, action="store")
-    shvargs.add_argument('-ss', dest="sspath", help="path to show-snps from mummer", default="show-snps")
-    shvargs.add_argument('-buff', dest="buff", help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=0)
+    shvargs.add_argument('--cigar', dest="cigar", help="Find SNPs/indels using CIGAR string. Necessary for alignment generated using aligners other than nucmers", default=False, action='store_true')
+    shvargs.add_argument('-s', dest="sspath", help="path to show-snps from mummer", default="show-snps")
+    # shvargs.add_argument('-buff', dest="buff", help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=0)
 
     args = parser.parse_args()
 
@@ -108,30 +108,31 @@ if __name__ == "__main__":
     ###################################################################
     # Identify structural variations
     ###################################################################
+    logger = logging.getLogger("local_variation")
+
     if not args.nosv:
         if args.all:
             fin = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt"]
         else:
             fin = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "ctxOut.txt"]
-
+        logger.info("Finding SVs in " + ", ".join(fin))
         listDir = os.listdir(args.dir)
 
         for file in fin:
             if args.prefix+file not in listDir:
-                sys.exit(file + " is not present in the directory. Exiting")
+                logger.error(file + " is not present in the directory. Exiting")
+                sys.exit()
 
-        from syri.pyxFiles.synsearchFunctions import readSRData, getSV, getNotAligned
+        from syri.findsv import readSRData, getSV, getNotAligned
 
         allAlignments = readSRData(args.dir, args.prefix, args.all)
-        # mumSNPIn = allAlignments[["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].copy()
-        # mumSNPIn.to_csv(args.dir+args.prefix+"mumSNPIn.txt", sep="\t", header=False, index=False)
         getSV(args.dir, allAlignments, args.prefix, args.offset)
         getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name)
 
     ###################################################################
     # Identify snps/indels
     ###################################################################
-    from syri.pyxFiles.synsearchFunctions import getshv
+    from syri.findshv import getshv
     if not args.nosnp:
         getshv(args)
 
@@ -139,8 +140,18 @@ if __name__ == "__main__":
     # Combine Output
     ###################################################################
     if not args.novcf:
-        from syri.pyxFiles.synsearchFunctions import getTSV, getVCF
-        getTSV(args.dir, args.ref)
+        from syri.writeout import getTSV, getVCF
+        listDir = os.listdir(args.dir)
+        files = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", 'sv.txt', 'notAligned.txt', 'snps.txt']
+        for file in files:
+            if file not in listDir:
+                logger.error(file + " is not present in the directory. Exiting")
+                sys.exit()
+        logger.info('Generating table output')
+        print(args.ref)
+        getTSV(args.dir, args.ref.name)
+
+        logger.info('Generating VCF')
         getVCF("syri.out", "syri.vcf")
 
     from syri.bin.func.myUsefulFunctions import fileRemove
