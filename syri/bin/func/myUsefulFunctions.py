@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jun 19 15:36:01 2017
-
 @author: goel
 """
 import operator as op
