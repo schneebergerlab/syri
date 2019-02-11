@@ -3,26 +3,30 @@
 SyRI requires assemblies to be at chromosome-level for accurate identification of SRs. If chromosome-level assemblies are not available, one can create pseudo-chromosome level assemblies using [scaforder](scaforder.md) utility. 
 
 ### Whole-genome alignment
-SyRI uses whole-genome alignments as input. These can be generated using the [MUMmer3](http://mummer.sourceforge.net/) package. Firstly, the genomes (in multi-fasta format) are aligned using the NUCmer utility.
+SyRI uses whole-genome alignments as input. These can be generated using whole-genome aligner of user's choice (check [installation guide](install.md). Here, we would use [MUMmer3](http://mummer.sourceforge.net/) package.
+
+Firstly, the genomes (in multi-fasta format) are aligned using the NUCmer utility.
 ```bash
 nucmer --maxmatch -c 500 -b 500 -l 100 refgenome qrygenome;
 ```
 
-Here, `-c`,`-b`, and `-l` are parameters used to control the alignment resolution and need to be twerked based on the genome size and complexity. Mere details are available [here](http://mummer.sourceforge.net/manual/#nucmer).
+Here, `-c`,`-b`, and `-l` are parameters used to control the alignment resolution and need to be adjusted based on the genome size and complexity. Mere details are available [here](http://mummer.sourceforge.net/manual/#nucmer).
 
-NUCmer would generate a `out.delta` file as output. The identified alignments are filtered using and then converted into a tab-separated [format](fileformat.md) as required by SyRI.
+NUCmer would generate a `out.delta` file as output. The identified alignments are filtered using `delta-filter`  and then converted into a tab-separated [format](fileformat.md) using `show-coords`.
 
 ```bash
 delta-filter -m -i 90 -l 100 out.delta > out_m_i90_l100.delta; 
 show-coords -THrd out_m_i90_l100.delta > out_m_i90_l100.coords;
 ```
 
-Users can change values for `-i`, and `-l` input to suite their genomes and problem. More information is available [here](http://mummer.sourceforge.net/manual/#filter).
+Users can change values for `-i`, and `-l` input to suite their genomes and specifc scientific problem. More information is available [here](http://mummer.sourceforge.net/manual/#filter).
 
-Here, `--maxmatch` (for nucmer), `-m` (for delta-filter), `-THrd` (for show-coords) are essential and should be used as such.
+For identificaiton of structural rearrangements (which include duplications), that overlapping alignments are not filtered out. In the example above, `--maxmatch` (for nucmer) results in identificaiton of all alignments. The `-m` (for delta-filter) parameter removes redundant alignments, though it is not necessary but is used as it helps in significantly reducing number of alignments which in turn reduces time and memory required by SyRI. Finally, `-THrd` (for show-coords) converts the alignments form `.delta` format to `.tsv` format consisting of alignment coordinates required by SyRI.
+
+For alignments generated using MUMmer3, CIGAR strings are not required. For other, aligners it is necessary to have CIGAR string for identification of SNPs and short indels (structural rearrangements and structural variaition can be identified without CIGAR strings).
 
 ### SR identification using `syri`
-This is the main method of this package. It takes genome alignments coordinates as input in a tsv format. Additionally, fasta files for the two genomes will also be required if structure variations are also needed. Further, for short variation identification `delta` file (as generated from NUCmer) will also be requried.
+SyRI takes genome alignments coordinates as input. Additionally, fasta files for the two genomes will also be required if structure variations are also needed. Further, for short variation identification, when CIGAR strings are not available, `.delta` file (as generated from NUCmer) will also be requried.
 
 The usage and parameters are:
 
