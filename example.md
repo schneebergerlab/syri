@@ -31,12 +31,12 @@ SyRI takes genome alignments coordinates as input. Additionally, fasta files for
 The usage and parameters are:
 
 ```
-usage: syri [-h] -c INFILE [-r REF] [-q QRY] [-d DELTA]
-            [-log {DEBUG,INFO,WARN}] [-lf LOG_FIN] [-dir DIR]
-            [--prefix PREFIX] [-seed SEED] [-nc NCORES] [-k] [-o FOUT]
-            [-novcf] [-nosr] [-b BRUTERUNTIME] [-unic TRANSUNICOUNT]
-            [-unip TRANSUNIPERCENT] [-inc INCREASEBY] [--no-chrmatch] [-nosv]
-            [-nosnp] [--all] [--allow-offset OFFSET] [-ss SSPATH] [-buff BUFF]
+usage: syri [-h] -c INFILE [-r REF] [-q QRY] [-d DELTA] [-o FOUT] [-k]
+            [--log {DEBUG,INFO,WARN}] [--lf LOG_FIN] [--dir DIR]
+            [--prefix PREFIX] [--seed SEED] [--nc NCORES] [--novcf] [--nosr]
+            [-b BRUTERUNTIME] [--unic TRANSUNICOUNT] [--unip TRANSUNIPERCENT]
+            [--inc INCREASEBY] [--no-chrmatch] [--nosv] [--nosnp] [--all]
+            [--allow-offset OFFSET] [--cigar] [-s SSPATH]
 
 Input Files:
   -c INFILE             File containing alignment coordinates in a tsv format
@@ -48,43 +48,43 @@ Input Files:
                         alignments). Required for local variation (large
                         indels, CNVs) identification. (default: None)
   -d DELTA              .delta file from mummer. Required for short variation
-                        (SNPs/indels) identification (default: None)
-
+                        (SNPs/indels) identification when CIGAR string is not
+                        available (default: None)
 
 optional arguments:
   -h, --help            show this help message and exit
-  -log {DEBUG,INFO,WARN}
+  -o FOUT               Output file name (default: syri)
+  -k                    Keep internediate output files (default: False)
+  --log {DEBUG,INFO,WARN}
                         log level (default: INFO)
-  -lf LOG_FIN           Name of log file (default: syri.log)
-  -dir DIR              path to working directory (if not current directory)
+  --lf LOG_FIN          Name of log file (default: syri.log)
+  --dir DIR             path to working directory (if not current directory)
                         (default: None)
   --prefix PREFIX       Prefix to add before the output file Names (default: )
-  -seed SEED            seed for generating random numbers (default: 1)
-  -nc NCORES            number of cores to use in parallel (max is number of
+  --seed SEED           seed for generating random numbers (default: 1)
+  --nc NCORES           number of cores to use in parallel (max is number of
                         chromosomes) (default: 1)
-  -k                    Keep internediate output files (default: False)
-  -o FOUT               Output file name (default: syri)
-  -novcf                Do not combine all files into one output file
+  --novcf               Do not combine all files into one output file
                         (default: False)
 
 SR identification:
-  -nosr                 Set to skip structural rearrangement identification
+  --nosr                Set to skip structural rearrangement identification
                         (default: False)
   -b BRUTERUNTIME       Cutoff to restrict brute force methods to take too
                         much time (in seconds). Smaller values would make
                         algorithm faster, but could have marginal effects on
                         accuracy. In general case, would not be required.
                         (default: 60)
-  -unic TRANSUNICOUNT   Number of uniques bps for selecting translocation.
+  --unic TRANSUNICOUNT  Number of uniques bps for selecting translocation.
                         Smaller values would select smaller TLs better, but
                         may increase time and decrease accuracy. (default:
                         1000)
-  -unip TRANSUNIPERCENT
+  --unip TRANSUNIPERCENT
                         Percent of unique region requried to select
                         translocation. Value should be in range (0,1]. Smaller
                         values would selection of translocation which are more
                         overlapped with other regions. (default: 0.5)
-  -inc INCREASEBY       Minimum score increase required to add another
+  --inc INCREASEBY      Minimum score increase required to add another
                         alignment to translocation cluster solution (default:
                         1000)
   --no-chrmatch         Do not allow SyRI to automatically match chromosome
@@ -92,20 +92,21 @@ SR identification:
                         (default: False)
 
 ShV identification:
-  -nosv                 Set to skip structural variation identification
+  --nosv                Set to skip structural variation identification
                         (default: False)
-  -nosnp                Set to skip SNP/Indel (within alignment)
+  --nosnp               Set to skip SNP/Indel (within alignment)
                         identification (default: False)
   --all                 Use duplications too for variant identification
                         (default: False)
   --allow-offset OFFSET
                         BPs allowed to overlap (default: 0)
-  -ss SSPATH            path to show-snps from mummer (default: show-snps)
-  -buff BUFF            Remove SNPs which have other variants or alignment
-                        break within buff size bps (default: 0)
-                        
+  --cigar               Find SNPs/indels using CIGAR string. Necessary for
+                        alignment generated using aligners other than nucmers
+                        (default: False)
+  -s SSPATH             path to show-snps from mummer (default: show-snps)
 ```
-#### Parameters related to SR identification
+
+#### SR identification
 In case the chromosome IDs for the two assemblies are not identical, SyRI would try to find homologous chromosomes and then map their IDs to be identical. This behaviour can be turned off using the `--no-chrmatch` parameter.
 
 Other parameters in this section regulate how translocation and duplications (TDs) are identified. For small networks of overlapping candidate TDs, SyRI uses a brute-force method to find the optimal set of TDs. The time allowed to this method can be restricted using the `-b` parameter. If for a network, brute-force method take more than the assigned time, then it will automatically switch to a randomized-greedy method. The `-unic` and `-unip` parameters state how unique a candidate TD need to be. Candidates which overlap highly with syntenic path and inversions and thus do not pass these thresholds will be filtered out. From a network of candidate TDs, it is possible to select different set of candidates. The `-inc` threshold is used decide whether a new set of candidates is better then the current candidate and thus can be selected as the solution or not. A new set will be considered as the better set if one of the following conditions satisfy: <br />
