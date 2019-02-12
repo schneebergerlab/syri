@@ -1,24 +1,19 @@
 ### Pseudo-genome assembly generation using `chroder`
-Biologically, syntenic regions are meaningful only for homologous regions. As a result, for SyRI to find SRs (which depend on identification of syntenic regions), it is necessary that the DNA molecules in the two genomes are homologous to each other. Typically, this would mean that the assemblies would be at chromosome-level. However, occasionally, one or even both assemblies would not be at chromosome-level. Since, it is not always possible to have such high contiguity assemblies, SyRI has `chroder` utility which can generate pseudo-chromosome like molecules. 
+Biologically, syntenic regions are meaningful only for homologous regions. Consequently, to find SRs (which depend on identification of syntenic regions), it is necessary that the DNA molecules in the two genomes are homologous to each other and it is possible to have a one-to-one mapping between molecules of the two assemblies. Typically, this would require the assemblies to be at chromosome-level. However, occasionally, one or even both assemblies would not be at chromosome-level as it is not always possible to have high contiguity assemblies. To overcome, this problem, SyRI has `chroder` utility which can be used generate pseudo-chromosome like molecules. It can generate pseudo-choromosomes irrespective of whether one or both assemblies are at scaffold-level. Thus species for which no chromosome-level assemblies are available can also be analysed.
 
-`chroder` analyses the whole-genome alignment between the two genomes. These assemblies can be either one at chromosome-level assembly and other at scaffold-level or both at scaffold-level. Thus species for which no chromosome-level assemblies are available can also be analysed.
+`chroder` analyses the whole-genome alignment between two incomplete genome assemblies. When one of the assemblies is at chromosome-level, then the scaffolds from the other assemblies are anchored with respec to the chromosomes. Order of the scaffolds is determined based on the location where it aligns in the chromosome. Similarly, scaffold orientation in the pseudo-chromosome depends on the alignment direction (whether the scaffold align to sense or anti-sense sequence) with the chromosome. Scaffolds having inverted alignments are reverse-complemented, as a result all scaffolds are in forward orientation with respect to the chromosomes.
 
-When one of the assemblies is at chromosome-level, then the scaffolds from the other assemblies are anchored to the chromosomes. Order of the scaffolds is determined based on the location in the chromosome where a scaffold aligns. Similarly, scaffold orientation in the pseudo-chromosome depends on the alignments with the chromosome. Scaffolds having inverted alignments with the chromosome are reverse-complemented, as a result all scaffolds are in forward orientation with respect to the chromosomes.
-
-When both assemblies are at scaffold-level, `chroder` groups scaffolds (from one assembly) which align to same scaffold in the other assembly. This creates a chain of scaffolds originated from neighbouring regions of a chromsome. The scaffolds are then ordered and oriented and then concatenated with to create pseudo-chromosome like molecule.
+When both assemblies are at scaffold-level, `chroder` groups scaffolds (from one assembly) which align to same scaffold in the other assembly. This creates a chain of scaffolds originated from neighbouring regions of a chromosome. The scaffolds are then ordered and oriented and then concatenated with to create pseudo-chromosome like molecule.
 
 <p align='center'>
 <img src='chroder.svg' alt>
-  
-<em>asdfa</em>
+<br />
+*Scaffolds from Genome A (green) are aligned against scaffolds from Genome B (blue). Scaffolds aligning to same scaffold are grouped together. For example, Scaf_B_1 and Scaf_B_2 both align to Scaf_A_1 and therefore could be considered to have been originated from neighboring regions in the original chromosome. Similarly, Scaf_A_1 and Scaf_A_2 could be considered as to have been originated from neighboring region. This process is repeated to find all scaffolds which could have originated from same chromosome are then concatenated to generate pseudo-chromosome like molecule.*
 </p>
 
 ```bash
 #Steps:
-nucmer --maxmatch -c 1000 -l 100 --noextend -p scaf refgenome qrygenome;
-delta-filter -m -i 90 -l 100 scaf.delta > scaf_m_i90_l100.delta; 
-show-coords -THrd scaf_m_i90_l100.delta > scaf_m_i90_l100.coords;
-cat scaf_m_i90_l100.coords | cut -f10 | uniq | xargs -n 1 -I chr mummerplot -f -l -r chr -p chr scaf_m_i90_l100.delta;
+
 scaffoldOrder qrygenome scaf_m_i90_l100.coords;
 ```
 
