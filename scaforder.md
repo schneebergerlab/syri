@@ -8,7 +8,7 @@ When both assemblies are at scaffold-level, `chroder` groups scaffolds (from one
 <p align='center'>
 <img src='chroder.svg' alt>
 <br />
-*Scaffolds from Genome A (green) are aligned against scaffolds from Genome B (blue). Scaffolds aligning to same scaffold are grouped together. For example, Scaf_B_1 and Scaf_B_2 both align to Scaf_A_1 and therefore could be considered to have been originated from neighboring regions in the original chromosome. Similarly, Scaf_A_1 and Scaf_A_2 could be considered as to have been originated from neighboring region. This process is repeated to find all scaffolds which could have originated from same chromosome are then concatenated to generate pseudo-chromosome like molecule.*
+<em>Scaffolds from Genome A (green) are aligned against scaffolds from Genome B (blue). Scaffolds aligning to same scaffold are grouped together. For example, Scaf_B_1 and Scaf_B_2 both align to Scaf_A_1 and therefore could be considered to have been originated from neighboring regions in the original chromosome. Similarly, Scaf_A_1 and Scaf_A_2 could be considered as to have been originated from neighboring region. This process is repeated to find all scaffolds which could have originated from same chromosome are then concatenated to generate pseudo-chromosome like molecule.</em>
 </p>
 
 ```
