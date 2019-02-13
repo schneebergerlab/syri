@@ -24,7 +24,7 @@ Genomes are required to be provideed in multi-fasta format. Alternatively, nucme
 SyRI outputs results in TSV format and VCF file format.
 
 #### TSV format specifications
-Column Number | Value   | Type |
+|Column Number | Value   | Type |
 | ------------ | ---------- | ----------- |
 |1       | chromosome ID in genome A     |         string |
 |2       | genome A start position (1-based, includes start position) | int |
