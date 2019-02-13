@@ -1,3 +1,17 @@
+## File formats
+### Input file format
+SyRI takes whole genome alignment coordinates in a TSV format with the following columns:
+
+|             |          Grouping           ||
+First Header  | Second Header | Third Header |
+ ------------ | :-----------: | -----------: |
+Content       |          *Long Cell*        ||
+Content       |   **Cell**    |         Cell |
+
+New section   |     More      |         Data |
+And more      | With an escaped '\|'         || 
+
+```
 #	Chr1	8241	610363	-	Chr1	1	601274              
 8241	550541	1	542302  
 549844	587482	541241	578850  

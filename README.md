@@ -12,5 +12,3 @@ Further, SyRI also identifies local variations within all syntenic and structura
 4. [File-format](fileformat.md)
 5. [Citation](#citation)
 
-
-fads asdf
