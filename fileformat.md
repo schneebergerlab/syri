@@ -40,6 +40,22 @@ SyRI outputs results in TSV format and VCF file format.
 |11      | Annotation type  | string |
 |12      | Copy status (for duplications)| string |
 
+Here, annotation type can have the following meaning:
+
+| Annotation | Meaning| | Annotation | Meaning |
+|----------|----------|---------|----------|----------|
+| SYN | Syntenic region | | SYNAL | Alignment in syntenic region |
+| INV | Inverted region || INVAL | Alignment in inverted region |
+| TRANS | Translocated region || TRANSAL | Alignment in translocated region |
+| INVTR | Inverted translocated region || INVTRAL | Alignment in inverted translocated region |
+| DUP | Duplicated region || DUPAL | Alignment in duplicated region |
+| INVDP | Inverted duplicated region || INVDPAL | Alignment in inverted duplicated region |
+| NOTAL | Un-aligned region || SNP | Single nucleotide polymorphism |
+| CPG | Copy gain in genome B || CPL | Copy loss in genome B |
+| HDR | Highly diverged regions || TDM | Tandem repeat |
+| INS | Insertion in genome B || DEL | Deletion in genome B |
+
+Copy status describes whether the duplicated region in genome B (copygain, i.e. genome B has the extra copy) or in genome A (copyloss, i.e. genome A has the extra copy).
 
 #### VCF format
 Above information is translated to VCF (v4.3) file format where genome A is considered as the reference genome. However, since VCF is based on reference genome position, we do not output un-aligned regions in genome B in VCF file, as it was not possible to write them in context of position in reference genome.
