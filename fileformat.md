@@ -57,6 +57,12 @@ Here, annotation type can have the following meaning:
 
 Copy status describes whether the duplicated region in genome B (copygain, i.e. genome B has the extra copy) or in genome A (copyloss, i.e. genome A has the extra copy).
 
+Parent ID corresponds to the unique ID of the annotated block (syntenic region or structural rearrangement) in which the alignment or the local variation exists. So, if there is a A->T SNP (with unique ID SNP1) in a translocated region (unique ID TRANS1) at position Chr1:10 on genome A and Chr2:542 on genome B then the corresponding entry would be:
+
+```
+Chr1  10  10  A T Chr2 542  542 SNP1  TRANS1  SNP -
+```
+
 #### VCF format
 Above information is translated to VCF (v4.3) file format where genome A is considered as the reference genome. However, since VCF is based on reference genome position, we do not output un-aligned regions in genome B in VCF file, as it was not possible to write them in context of position in reference genome.
 
