@@ -18,7 +18,7 @@ np.random.seed(1)
 ### Generate formatted output
 ##################################################################
 
-def getsrtable(cwdpath):
+def getsrtable(cwdpath, prefix):
     import re
 
     files = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt"]
@@ -42,7 +42,7 @@ def getsrtable(cwdpath):
         elif sr_type == "invDup":
             sr_type = "INVDP"
 
-        with open(cwdpath + file, "r") as fin:
+        with open(cwdpath + prefix + file, "r") as fin:
             for line in fin:
                 line = line.strip().split("\t")
                 if line[0] == "#":
@@ -106,7 +106,7 @@ def extractseq(_gen, _pos):
             chrs[fasta.id] = {_i:fasta.seq[_i-1] for _i in _pos[fasta.id]}
     return chrs
 
-def getTSV(cwdpath, ref):
+def getTSV(cwdpath, prefix, ref):
     """
     :param cwdpath: Path containing all input files
     :return: A TSV file containing genomic annotation for the entire genome
@@ -115,9 +115,9 @@ def getTSV(cwdpath, ref):
     import sys
     from collections import defaultdict
     logger = logging.getLogger("getTSV")
-    anno = getsrtable(cwdpath)
+    anno = getsrtable(cwdpath, prefix)
 
-    _svdata = pd.read_table(cwdpath + "sv.txt", header=None)
+    _svdata = pd.read_table(cwdpath + prefix + "sv.txt", header=None)
     _svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr']
 
     entries = defaultdict()
@@ -132,6 +132,7 @@ def getTSV(cwdpath, ref):
                                (anno.bend == row.bend) &
                                (anno.parent == "-"), "id"]
             if len(_parent) != 1:
+                print(row)
                 logger.error("Error in finding parent for SV")
                 logger.error(row.to_string() + "\t" + _parent.to_string())
                 sys.exit()
@@ -159,7 +160,7 @@ def getTSV(cwdpath, ref):
     sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
     sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
 
-    notal = pd.read_table(cwdpath + "notAligned.txt", header=None)
+    notal = pd.read_table(cwdpath + prefix + "notAligned.txt", header=None)
     notal.columns = ["gen", "start", "end", "chr"]
     notal[["start", "end"]] = notal[["start", "end"]].astype("int")
     entries = defaultdict()
@@ -220,7 +221,7 @@ def getTSV(cwdpath, ref):
         }
 
     entries = defaultdict()
-    with open("snps.txt", "r") as fin:
+    with open(cwdpath + prefix + "snps.txt", "r") as fin:
         indel = 0                           # marker for indel status. 0 = no_indel, 1 = insertion, -1 = deletion
         _as = -1                            # astart
         _ae = -1
@@ -232,6 +233,7 @@ def getTSV(cwdpath, ref):
         _seq = ""
 
         for line in fin:
+            print(line)
             line = line.strip().split("\t")
             try:
                 if line[0] == "#" and len(line) == 7:

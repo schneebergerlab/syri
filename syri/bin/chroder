@@ -6,10 +6,11 @@ Spyder Editor
 This is a temporary script file.
 """
 
-#%%
 import argparse
 
+
 def getdata(reflength, refid, refdir):
+
     # Each node corresponds to a continuous genomic region aligning to a scaffold
     class node:
         def __init__(self, id, name, pos):
@@ -73,12 +74,12 @@ def getdata(reflength, refid, refdir):
     refdata = {}
     # For each scaffold in genome A find the list of aligning scaffolds in genome B
     for rid in refid:
-        print(rid)
+        # print(rid)
         qiddata = {}
         fnd = defaultdict(dict)
 
         # Use sliding window (size: 5) for ref scaffolds larger than 50 units, scaffolds which are not major alignment in any window are removed.
-        print("Sliding Window")
+        # print("Sliding Window")
         if len(reflength[rid]) > 50:
             wsize = 5
             scaflist = []
@@ -87,7 +88,7 @@ def getdata(reflength, refid, refdir):
                 for j in range(i, i+5):
                     try:
                         qids.append(reflength[rid][j*10000])
-                    except KeyError as e:
+                    except KeyError:
                         pass
                 qids = Counter(qids)
                 for k, v in qids.items():
@@ -97,7 +98,7 @@ def getdata(reflength, refid, refdir):
         else:
             scaflist = list(np.unique(list(reflength[rid].values())))
 
-        print("node generation")
+        # print("node generation")
         a2 = np.array([[k, scaflist.index(v)] for k, v in reflength[rid].items() if v in scaflist])
         a2 = a2[a2[:, 0].argsort()]
 
@@ -130,7 +131,7 @@ def getdata(reflength, refid, refdir):
                 tunid.remove(nodes[j].name)
 
         # Get list of nodes corresponding longest mapping
-        print("number of nodes", len(nodes))
+        # print("number of nodes", len(nodes))
         path = getpath(nodes)
         for i in path[1:-1]:
             if scaflist[nodes[i].name] not in qiddata:
@@ -241,15 +242,7 @@ def remove_multialign(refdata, qrydata, noref):
     return refdata, qrydata
 
 
-
 def scaf(args):
-    import pandas as pd
-    import numpy as np
-    from collections import defaultdict, deque, Counter
-    from syri.bin.func.myUsefulFunctions import mergeRanges
-    from Bio.SeqIO import parse
-    import operator
-
     refin = args.ref.name
     qryin = args.qry.name
     nn = "N"*args.ncount
@@ -602,7 +595,7 @@ def scaf(args):
             if (path[0] not in [i[0][::-1] for i in unipaths]) and (path[1] not in [i[1][::-1] for i in unipaths]):
                 unipaths.append(path.copy())
 
-        bestpath = {}
+        bestpath = defaultdict()
         for path in unipaths:
             rids = pd.unique([loci[i][0] for i in path[0]])
             qids = pd.unique([loci[i][0] for i in path[1]])
@@ -623,6 +616,7 @@ def scaf(args):
 
         rdirs = {}
         last = ""
+        print(bestpath)
         for i in bestpath['rpath']:
             if loci[i][0] not in rdirs:
                 if len(loci[i][4]) == 2:
@@ -713,4 +707,10 @@ if __name__ == "__main__":
     parser.add_argument('-o', dest='out', help="output file prefix", default="out", type=str)
     parser.add_argument('-noref', dest='noref', help="Use this parameter when no assembly is at chromosome level", default=False, action='store_true')
     args = parser.parse_args()
+    import pandas as pd
+    import numpy as np
+    from collections import defaultdict, deque, Counter
+    from syri.bin.func.myUsefulFunctions import mergeRanges
+    from Bio.SeqIO import parse
+    import operator
     scaf(args)

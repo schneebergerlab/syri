@@ -125,13 +125,21 @@ if __name__ == "__main__":
 
         from syri.findsv import readSRData, getSV, getNotAligned
 
+        if args.ref == None or args.qry == None:
+            logger.error("Reference and query assembly fasta files are required for SV identification.")
+            sys.exit()
+        print("LOL")
         allAlignments = readSRData(args.dir, args.prefix, args.all)
+        print("LOL")
         getSV(args.dir, allAlignments, args.prefix, args.offset)
+        print("LOL")
         getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name)
+        print("LOL")
 
     ###################################################################
     # Identify snps/indels
     ###################################################################
+    logger.info("Finding SNPs and small indels")
     from syri.findshv import getshv
     if not args.nosnp:
         if not args.cigar:
@@ -142,24 +150,27 @@ if __name__ == "__main__":
             if args.delta.name not in os.listdir(args.dir):
                 logger.error("Delta file is missing. Exiting")
                 sys.exit()
-                
         getshv(args)
 
     ###################################################################
     # Combine Output
     ###################################################################
+    logger.info("Combining outputs")
     if not args.novcf:
         from syri.writeout import getTSV, getVCF
         listDir = os.listdir(args.dir)
         files = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", 'sv.txt', 'notAligned.txt', 'snps.txt']
         for file in files:
-            if file not in listDir:
+            if args.prefix+file not in listDir:
                 logger.error(file + " is not present in the directory. Exiting")
                 sys.exit()
         logger.info('Generating table output')
-        print(args.ref)
-        getTSV(args.dir, args.ref.name)
 
+        if args.ref == None:
+            logger.error("Reference genome fasta file is required for combining outputs.")
+            sys.exit()
+
+        getTSV(args.dir, args.prefix, args.ref.name)
         logger.info('Generating VCF')
         getVCF("syri.out", "syri.vcf")
 
