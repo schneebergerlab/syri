@@ -128,13 +128,10 @@ if __name__ == "__main__":
         if args.ref == None or args.qry == None:
             logger.error("Reference and query assembly fasta files are required for SV identification.")
             sys.exit()
-        print("LOL")
+
         allAlignments = readSRData(args.dir, args.prefix, args.all)
-        print("LOL")
         getSV(args.dir, allAlignments, args.prefix, args.offset)
-        print("LOL")
         getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name)
-        print("LOL")
 
     ###################################################################
     # Identify snps/indels

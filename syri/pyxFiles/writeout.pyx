@@ -132,7 +132,6 @@ def getTSV(cwdpath, prefix, ref):
                                (anno.bend == row.bend) &
                                (anno.parent == "-"), "id"]
             if len(_parent) != 1:
-                print(row)
                 logger.error("Error in finding parent for SV")
                 logger.error(row.to_string() + "\t" + _parent.to_string())
                 sys.exit()
@@ -233,7 +232,6 @@ def getTSV(cwdpath, prefix, ref):
         _seq = ""
 
         for line in fin:
-            print(line)
             line = line.strip().split("\t")
             try:
                 if line[0] == "#" and len(line) == 7:

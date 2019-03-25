@@ -616,7 +616,7 @@ def scaf(args):
 
         rdirs = {}
         last = ""
-        print(bestpath)
+
         for i in bestpath['rpath']:
             if loci[i][0] not in rdirs:
                 if len(loci[i][4]) == 2:
