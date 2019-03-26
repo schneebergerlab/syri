@@ -25,7 +25,7 @@ if __name__ == "__main__":
     optional.add_argument('-k', dest="keep", help="Keep internediate output files", default=False, action="store_true")
     optional.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
     optional.add_argument("--lf", dest="log_fin", help="Name of log file", type=argparse.FileType("w"), default="syri.log")
-    optional.add_argument('--dir', dest='dir', help="path to working directory (if not current directory)", action='store')
+    optional.add_argument('--dir', dest='dir', help="path to working directory (if not current directory). All files must be in this directory.", action='store')
     optional.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
     optional.add_argument("--seed", dest="seed", help="seed for generating random numbers", type=int, default=1)
     optional.add_argument('--nc', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
@@ -125,7 +125,7 @@ if __name__ == "__main__":
 
         from syri.findsv import readSRData, getSV, getNotAligned
 
-        if args.ref == None or args.qry == None:
+        if args.ref is None or args.qry is None:
             logger.error("Reference and query assembly fasta files are required for SV identification.")
             sys.exit()
 
@@ -140,13 +140,13 @@ if __name__ == "__main__":
     from syri.findshv import getshv
     if not args.nosnp:
         if not args.cigar:
-            if args.delta == None:
+            if args.delta is None:
                 logger.error("Please provide delta file. Exiting")
                 sys.exit()
 
-            if args.delta.name not in os.listdir(args.dir):
-                logger.error("Delta file is missing. Exiting")
-                sys.exit()
+            # if args.delta.name not in os.listdir(args.dir):
+            #     logger.error("Delta file is missing. Exiting")
+            #     sys.exit()
         getshv(args)
 
     ###################################################################
@@ -163,7 +163,7 @@ if __name__ == "__main__":
                 sys.exit()
         logger.info('Generating table output')
 
-        if args.ref == None:
+        if args.ref is None:
             logger.error("Reference genome fasta file is required for combining outputs.")
             sys.exit()
 
