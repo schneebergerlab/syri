@@ -48,8 +48,6 @@ def getdata(reflength, refid, refdir):
             # fnd[i][",".join(map(str, added))] = path
             return path
         elif len(nodes[i].children) == 1:
-            if i == 76:
-                print(nodes[i].name, last, 'printing 76')
             if nodes[i].name == last:
                 path = path + getpath(nodes, added, nodes[i].children[0], last)
                 # fnd[i][",".join(map(str, added))] = path
@@ -398,6 +396,7 @@ def scaf(args):
     fout = open(out + ".anno", 'w')
     size = 60
     for chr in chrs:
+        print(chr)
         # print(chr)
         loci = {}
         count = 0
@@ -601,6 +600,10 @@ def scaf(args):
             print(chr)
             continue
 
+        if len(paths) == 0:
+            print('Could not assemble ', chr[0][0])
+            continue
+
         # Remove inverse paths
         unipaths = []
         for path in paths:
@@ -726,3 +729,4 @@ if __name__ == "__main__":
     from Bio.SeqIO import parse
     import operator
     scaf(args)
+    print('Finished chroder')

@@ -72,7 +72,7 @@ def readSRData(cwdPath, prefix, dup = False):
     except Exception as e:
         print("ERROR: while trying to read ", fileType, "Out.txt", e)
 
-    if fileData is None:
+    if fileData is not None:
         annoIndices = np.where(fileData[0] =="#")[0]
         states = list(fileData[8].loc[annoIndices])
         coordsData = fileData.loc[fileData[0] =="#"].copy()
