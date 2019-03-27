@@ -31,6 +31,9 @@ from syri.pyxFiles.function cimport getmeblocks, getOverlapWithSynBlocks
 
 def readCoords(coordsfin, chrmatch, cigar = False):
     logger = logging.getLogger('Reading Coords')
+
+    chrlink = {}
+
     try:
         coords = pd.read_table(coordsfin, header = None)
     except pd.errors.ParserError:
@@ -153,6 +156,7 @@ def readCoords(coordsfin, chrmatch, cigar = False):
                     assigned.append(maxid)
                     logger.info("setting {} as {}".format(maxid, chrom))
                     coords.loc[coords.bChr == maxid, "bChr"] = chrom
+                    chrlink[maxid] = chrom
         else:
             logger.warning("--no-chrmatch is set. Not matching chromosomes automatically.")
             aChromo = set(coords["aChr"])
@@ -161,7 +165,7 @@ def readCoords(coordsfin, chrmatch, cigar = False):
             logger.warning(", ".join(badChromo) + " present in only one genome. Removing corresponding alignments")
             coords = coords.loc[~coords.aChr.isin(badChromo) & ~coords.bChr.isin(badChromo)]
 
-    return coords
+    return coords, chrlink
 
 def startSyri(args):
     coordsfin = args.infile.name
@@ -180,7 +184,7 @@ def startSyri(args):
     logger.warning("starting")
     logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
 
-    coords = readCoords(coordsfin, chrmatch)
+    coords, chrlink = readCoords(coordsfin, chrmatch)
 
     uniChromo = list(np.unique(coords.aChr))
     logger.info('Analysing chromosomes: {}'.format(uniChromo))
@@ -198,7 +202,8 @@ def startSyri(args):
 
     # Recalculate syntenic blocks by considering the blocks introduced by CX events
     outSyn(cwdPath, threshold, prefix)
-    
+    return chrlink
+
 def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     logger = logging.getLogger("syri."+chromo)
 

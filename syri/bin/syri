@@ -103,7 +103,7 @@ if __name__ == "__main__":
     ###################################################################
     from syri.pyxFiles.synsearchFunctions import startSyri
     if not args.nosr:
-        startSyri(args)
+        chrlink = startSyri(args)
 
     ###################################################################
     # Identify structural variations
@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
         allAlignments = readSRData(args.dir, args.prefix, args.all)
         getSV(args.dir, allAlignments, args.prefix, args.offset)
-        getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name)
+        getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name, chrlink)
 
     ###################################################################
     # Identify snps/indels

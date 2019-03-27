@@ -440,7 +440,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
     return None
 
 
-def getNotAligned(cwdPath, prefix, ref, qry):
+def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
+    logger = logging.getLogger("getNA")
+
     refSize = {fasta.id: len(fasta.seq) for fasta in parse(ref,'fasta')}
     qrySize = {fasta.id: len(fasta.seq) for fasta in parse(qry,'fasta')}
 
@@ -478,6 +480,12 @@ def getNotAligned(cwdPath, prefix, ref, qry):
     annoCoords = annoCoords.append(coordsData.copy())
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
     annoCoords.index = range(len(annoCoords))
+
+    for i in annoCoords.bChr:
+        if i not in qrySize.keys():
+            for k,v in chrlink.items():
+                if v == i:
+                    qrySize[i] = qrySize.pop(k)
 
     with open(cwdPath + prefix+"notAligned.txt","w") as fout:
         df = annoCoords[["aStart","aEnd","aChr"]].copy()
