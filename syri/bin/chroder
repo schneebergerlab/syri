@@ -45,14 +45,18 @@ def getdata(reflength, refid, refdir):
             return []
         path = [i]
         if len(nodes[i].children) == 0:
+            # fnd[i][",".join(map(str, added))] = path
             return path
         elif len(nodes[i].children) == 1:
+            if i == 76:
+                print(nodes[i].name, last, 'printing 76')
             if nodes[i].name == last:
                 path = path + getpath(nodes, added, nodes[i].children[0], last)
-                fnd[i][",".join(map(str, added))] = path
+                # fnd[i][",".join(map(str, added))] = path
                 return path
             else:
                 path = path + getpath(nodes, added + [nodes[i].name], nodes[i].children[0], nodes[i].name)
+                # fnd[i][",".join(map(str, added))] = path
                 return path
         else:
             bp = []
@@ -67,9 +71,10 @@ def getdata(reflength, refid, refdir):
                 if tmpscore > bpscore:
                     bp = tmppath
                     bpscore = tmpscore
-            if nodes[i].name == last:
-                fnd[i][",".join(map(str, added))] = path + bp
+            # if nodes[i].name == last:
+            fnd[i][",".join(map(str, added))] = path + bp
             return path+bp
+
 
     refdata = {}
     # For each scaffold in genome A find the list of aligning scaffolds in genome B
@@ -126,6 +131,11 @@ def getdata(reflength, refid, refdir):
                 if nodes[j].name not in tunid:
                     continue
                 nodes[i].children.append(j)
+
+                ## If a child node aligns to a large region (here > 100000bp), then that scaffold is considered to be fixed
+                if nodes[j].length >= 100000:                    ## Heuristic approach used to limit number of children a node can have
+                    break                                       ## This is requried cause otherwise the number of possible combinations grows to large for low contiguity assemblies
+
                 if nodes[i].name == nodes[j].name:
                     break
                 tunid.remove(nodes[j].name)
@@ -133,6 +143,7 @@ def getdata(reflength, refid, refdir):
         # Get list of nodes corresponding longest mapping
         # print("number of nodes", len(nodes))
         path = getpath(nodes)
+        # print('finished getting path')
         for i in path[1:-1]:
             if scaflist[nodes[i].name] not in qiddata:
                 qiddata[scaflist[nodes[i].name]] = {'s': nodes[i].start,
@@ -329,6 +340,7 @@ def scaf(args):
     # Get mapping data between scaffolds
     refdata = getdata(reflength, refid, refdir)
     qrydata = getdata(qrylength, qryid, qrydir)
+    print('got data')
 
     # remove scaffolds (Y) from the list of matched scaffolds for scaffold (X) if
     # X is not in the list of matched scaffolds for Y.
