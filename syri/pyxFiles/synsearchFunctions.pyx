@@ -297,16 +297,25 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
         transBlocks = []
     
     if len(invertedBlocks) > 0:
+        # For getTransSynOrientation need bStart < bEnd
         invertedCoords = invertedBlocks.copy()
         invertedCoords.bStart = invertedCoords.bStart + invertedCoords.bEnd
         invertedCoords.bEnd = invertedCoords.bStart - invertedCoords.bEnd
         invertedCoords.bStart = invertedCoords.bStart - invertedCoords.bEnd
-        invTransBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, invertedBlocks, threshold)
+        invTransBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, invertedCoords, threshold)
+
+        # For making blocks tree, need to reverse compliment the b chromosome
         invertedCoords = invertedBlocks.copy()
         maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
         invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart 
         invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
         outInvertedBlocks = pd.DataFrame(makeBlocksTree(invertedCoords.aStart.values, invertedCoords.aEnd.values, invertedCoords.bStart.values, invertedCoords.bEnd.values, invertedCoords.bDir.values, invertedCoords.aChr.values, invertedCoords.bChr.values, invertedCoords.index.values, threshold, invTransBlocksNeighbours[0].values, invTransBlocksNeighbours[1].values))
+
+        # For finding ordered translocations need bstart < bend
+        invertedCoords = invertedBlocks.copy()
+        invertedCoords.bStart = invertedCoords.bStart + invertedCoords.bEnd
+        invertedCoords.bEnd = invertedCoords.bStart - invertedCoords.bEnd
+        invertedCoords.bStart = invertedCoords.bStart - invertedCoords.bEnd
         invTransBlocks = findOrderedTranslocations(outInvertedBlocks, invertedCoords, inPlaceBlocks, threshold, tUC, tUP,ctx = False)
     else:
         invTransBlocks = []

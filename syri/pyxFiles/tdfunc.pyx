@@ -260,12 +260,8 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
                 bScore = 0
                 aStart = orderedBlocks.iat[almnt,0]
                 aEnd = orderedBlocks.iat[almnt,1]
-                if orderedBlocks.iat[almnt,8] == 1:
-                    bStart = orderedBlocks.iat[almnt,2]
-                    bEnd = orderedBlocks.iat[almnt,3]
-                else:
-                    bStart = orderedBlocks.iat[almnt,3]
-                    bEnd = orderedBlocks.iat[almnt,2]
+                bStart = orderedBlocks.iat[almnt,2]
+                bEnd = orderedBlocks.iat[almnt,3]
 
                 aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd)
 
