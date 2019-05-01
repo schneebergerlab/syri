@@ -1,21 +1,22 @@
 import numpy as np
-from syri.bin.func.myUsefulFunctions import *
 import sys
 import time
 from igraph import *
 from collections import deque
 from datetime import datetime, date
-# from scipy.stats import *
 import pandas as pd
 from multiprocessing import Pool
 from functools import partial
 from gc import collect
 import logging
-from syri.pyxFiles.function cimport getAllLongestPaths, getConnectivityGraph
-from syri.pyxFiles.function cimport getmeblocks, getOverlapWithSynBlocks
 from syri.pyxFiles.synsearchFunctions import alignmentBlock
+from syri.bin.func.myUsefulFunctions import *
 
-
+from libcpp.map cimport map as cpp_map
+from libcpp.vector cimport vector as cpp_deq
+from libcpp.string cimport string as cpp_str
+from cython.operator cimport dereference as deref, preincrement as inc
+from syri.pyxFiles.function cimport getAllLongestPaths, getConnectivityGraph, getmeblocks, getOverlapWithSynBlocks
 cimport numpy as np
 cimport cython
 
@@ -45,10 +46,50 @@ class transGroups:
         self.rightEnd = max(self.rightEnd, rightEnd)
         self.member.append(index)
 
+
+cpdef makeBlocksTree(long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd, int threshold, long[:] left, long[:] right):
+    """Compute whether two alignments can be part of one translation block. For this:
+        the alignments should not be separated by any inPlaceBlock on both ends and
+        they should be collinear with respect to each other.
+
+       Returns
+       --------
+       outOrderedBlocks: pandas DataFrame,
+           Dataframe of type Object. Lower half is NA, upper half contains whether two
+           alignments can be connected (True) or not (False).
+    """
+
+    cdef:
+        Py_ssize_t                                i,j, n = len(aStart)
+        cpp_map[long, cpp_deq[long]]              out
+        cpp_map[long, cpp_deq[long]].iterator     it
+    # cdef np.ndarray allRanges = np.array([range(left[i]+1, right[i]) for i in range(n)])
+
+    for i in range(n):
+        for j in range(i,n):
+            if (aStart[j] - aStart[i]) > threshold:
+                if (aEnd[j] - aEnd[i]) > threshold:
+                    if (bStart[j] - bStart[i]) > threshold:
+                        if (bEnd[j] - bEnd[i]) > threshold:
+                            # Alignments could form a block when they are not separated by inPlaceBlocks. For this, we check whether the alignments have a common intersecting inPlaceAlignments.
+                            if right[i]-1 >= left[j]+1 and right[i] <= right[j]:
+                                out[i].push_back(j)
+                            elif left[i] >= left[j] and left[i]+1 <= right[j]-1:
+                                out[i].push_back(j)
+
+    it = out.begin()
+    outdict = {}
+    while it != out.end():
+        outdict[deref(it).first] = [deref(it).second[i] for i in range(deref(it).second.size())]
+        inc(it)
+    return(outdict)
+
+
 def findOverlappingSynBlocks(inPlaceBlocks, aStart, aEnd, bStart, bEnd):
     aBlocks = list(np.where((inPlaceBlocks.aStart.values < aEnd) & (inPlaceBlocks.aEnd.values > aStart) == True)[0])
     bBlocks = list(np.where((inPlaceBlocks.bStart.values < bEnd) & (inPlaceBlocks.bEnd.values > bStart) == True)[0])
     return(aBlocks, bBlocks)
+
 
 
 cpdef np.ndarray getTranslocationScore(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray aLen, np.ndarray bLen, np.ndarray translocations):
@@ -433,8 +474,6 @@ def findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, th
     logger.debug("finished getTransBlocks")
 
     return transBlocks
-
-
 
 
 cpdef np.ndarray[np.npy_bool, ndim=2] makeBlocksTree_ctx(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold):

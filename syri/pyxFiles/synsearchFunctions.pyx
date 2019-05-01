@@ -239,7 +239,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     logger.info("Identifying Inversions for chromosome " + chromo)
 
     from syri.inversions import getInversions
-    invertedCoordsOri, profitable, bestInvPath, invData, synInInv, badSyn = getInversions(coords,chromo, threshold, synData, synPath)
+    invertedCoordsOri, profitable, bestInvPath, invData, synInInv, badSyn = getInversions(coords,chromo, threshold, synData, tUC, tUP)
 
 
 
@@ -249,7 +249,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     logger.info("Identifying translocation and duplication for chromosome " + chromo)
 
     # Import functions
-    from syri.tdfunc import getTransSynOrientation, findOrderedTranslocations, mergeTransBlocks, makeTransGroupList, getTransCluster, transBlock, getBestClusterSubset, getTransClasses, getDupGenome
+    from syri.tdfunc import blocksdata, makeTransGroupList, getTransCluster, transBlock, getBestClusterSubset, getTransClasses, getDupGenome
 
     chromBlocks = coords[(coords.aChr == chromo) & (coords.bChr == chromo)]
     inPlaceIndices = sorted(list(synData.index.values) + list(invData.index.values))
@@ -275,46 +275,19 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     inPlaceBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
     inPlaceBlocks.index = range(inPlaceBlocks.shape[0])
     outPlaceBlocks = chromBlocks[~chromBlocks.index.isin(inPlaceIndices)]
-    
-    logger.debug("Translocations : found blocks" + chromo)
-    ## Should not filter redundant alignments as they "can" be part of bigger translocations
-    ## filtering them may lead to removal of those translocations
-    
-    outPlaceBlocksFiltered = outPlaceBlocks.copy() 
-        
+
+    logger.debug("Translocations : Filtered inplace and outplace alignments" + chromo)
+
     ## Create connectivity tree for directed and inverted blocks
-    #### find all translocations which don't have large gaps between its alignments
-    #### and are not overlappign with the syntenic blocks
-    
-    orderedBlocks = outPlaceBlocksFiltered[outPlaceBlocksFiltered.bDir == 1]
-    invertedBlocks = outPlaceBlocksFiltered[outPlaceBlocksFiltered.bDir == -1]
+    ## find all translocations which don't have large gaps between its alignments
+    ## and are not overlappign with the syntenic blocks
+    ## Merge directed and inverted blocks
 
-    if len(orderedBlocks) > 0:
-        transBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, orderedBlocks, threshold)
-        outOrderedBlocks = pd.DataFrame(makeBlocksTree(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold, transBlocksNeighbours[0].values, transBlocksNeighbours[1].values))
-        transBlocks = findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, tUC, tUP, ctx = False)
-    else:
-        transBlocks = []
-    
-    if len(invertedBlocks) > 0:
-        invertedCoords = invertedBlocks.copy()
-        invertedCoords.bStart = invertedCoords.bStart + invertedCoords.bEnd
-        invertedCoords.bEnd = invertedCoords.bStart - invertedCoords.bEnd
-        invertedCoords.bStart = invertedCoords.bStart - invertedCoords.bEnd
-        invTransBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, invertedBlocks, threshold)
-        invertedCoords = invertedBlocks.copy()
-        maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
-        invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart 
-        invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
-        outInvertedBlocks = pd.DataFrame(makeBlocksTree(invertedCoords.aStart.values, invertedCoords.aEnd.values, invertedCoords.bStart.values, invertedCoords.bEnd.values, invertedCoords.bDir.values, invertedCoords.aChr.values, invertedCoords.bChr.values, invertedCoords.index.values, threshold, invTransBlocksNeighbours[0].values, invTransBlocksNeighbours[1].values))
-        invTransBlocks = findOrderedTranslocations(outInvertedBlocks, invertedCoords, inPlaceBlocks, threshold, tUC, tUP,ctx = False)
-    else:
-        invTransBlocks = []
+    transBlocks, invTransBlocks, allTransBlocks, allTransIndexOrder = blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP)
 
-    logger.debug("Translocations : found orderedBlocks " + chromo)
-    logger.debug("Translocations : merging blocks " + chromo)
+    logger.debug("Translocations : found blocks" + chromo)
 
-    allTransBlocks, allTransIndexOrder = mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks)
+
     allTransGenomeAGroups = makeTransGroupList(allTransBlocks, "aStart", "aEnd", threshold)
     allTransGenomeBGroups = makeTransGroupList(allTransBlocks, "bStart", "bEnd", threshold)
     
@@ -343,12 +316,12 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
                                        np.array(inPlaceBlocks.aStart),
                                        np.array(inPlaceBlocks.aEnd),
                                        np.array([chromo]*inPlaceBlocks.shape[0]),
-                                       50,
+                                       threshold,
                                        allTransBlocks.shape[0],
                                        tUC,
                                        tUP)
         sortedInPlace = inPlaceBlocks.sort_values(["bStart","bEnd"])
-        buni = getOverlapWithSynBlocks(np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), np.array([chromo]*allTransBlocks.shape[0]), np.array(sortedInPlace.bStart), np.array(sortedInPlace.bEnd), np.array([chromo]*inPlaceBlocks.shape[0]), 50, allTransBlocks.shape[0], tUC, tUP)
+        buni = getOverlapWithSynBlocks(np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), np.array([chromo]*allTransBlocks.shape[0]), np.array(sortedInPlace.bStart), np.array(sortedInPlace.bEnd), np.array([chromo]*inPlaceBlocks.shape[0]), threshold, allTransBlocks.shape[0], tUC, tUP)
 
     genomeGroupLengths = ([len(i.member) for i in allTransGenomeAGroups], [len(i.member) for i in allTransGenomeBGroups])
 
@@ -384,7 +357,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     bGroups = {i: np.array(allTransGenomeBGroups[i].member, dtype="int") for i in range(len(allTransGenomeBGroups))}
 
     if len(allTransBlocks) > 0:
-        out = getmeblocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd), np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), 50, allTransBlocks.shape[0], aUni, bUni, status, aIndex, bIndex, aGroups, bGroups)
+        out = getmeblocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd), np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), threshold, allTransBlocks.shape[0], aUni, bUni, status, aIndex, bIndex, aGroups, bGroups)
 
         for i in range(len(out[0])):
             if out[0][i]:
@@ -503,41 +476,44 @@ cpdef apply_TS(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray
     return df
 
 
-cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold, np.ndarray left, np.ndarray right):
-    """Compute whether two alignments can be part of one translation block. For this:
-        the alignments should not be separated by any inPlaceBlock on both ends and
-        they should be collinear with respect to each other.
-       
-       Returns
-       --------
-       outOrderedBlocks: pandas DataFrame,
-           Dataframe of type Object. Lower half is NA, upper half contains whether two
-           alignments can be connected (True) or not (False).
-    """
-
-    assert(aStart.dtype==np.int and aEnd.dtype==np.int and bStart.dtype==np.int and bEnd.dtype==np.int and bDir.dtype==np.int and aChr.dtype==np.object and bChr.dtype==np.object and index.dtype==np.int and left.dtype==np.int and right.dtype==np.int)
-    cdef Py_ssize_t i,j, n = len(aStart)
-    assert(n == len(aEnd) == len(bStart) == len(bEnd) == len(index) == len(bDir) == len(aChr) == len(bChr) == len(left) == len(right))
-    cdef np.ndarray[object, ndim=2] outOrderedBlocks =  np.array([[np.nan]*n]*n, dtype=object)
-    cdef np.ndarray allRanges = np.array([range(left[i]+1, right[i]) for i in range(n)])
-
-    for i in range(n):
-        for j in range(i,n):
-            #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
-            if bDir[i] != bDir[j]:
-                sys.exit("ERROR: bDir not matching")
-            elif not any([k in allRanges[i] for k in allRanges[j]]):
-                    outOrderedBlocks[i][j] = False
-            elif bDir[i] == bDir[j]:
-                if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
-                    outOrderedBlocks[i][j] = True
-                else:
-                    outOrderedBlocks[i][j] = False
-#            elif(aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bEnd[i]) > threshold and (bEnd[j] - bStart[i]) > threshold:
-#                outOrderedBlocks[i][j] = True
-            else:
-                outOrderedBlocks[i][j] = False
-    return outOrderedBlocks
+#
+#
+#
+# cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold, np.ndarray left, np.ndarray right):
+#     """Compute whether two alignments can be part of one translation block. For this:
+#         the alignments should not be separated by any inPlaceBlock on both ends and
+#         they should be collinear with respect to each other.
+#
+#        Returns
+#        --------
+#        outOrderedBlocks: pandas DataFrame,
+#            Dataframe of type Object. Lower half is NA, upper half contains whether two
+#            alignments can be connected (True) or not (False).
+#     """
+#
+#     assert(aStart.dtype==np.int and aEnd.dtype==np.int and bStart.dtype==np.int and bEnd.dtype==np.int and bDir.dtype==np.int and aChr.dtype==np.object and bChr.dtype==np.object and index.dtype==np.int and left.dtype==np.int and right.dtype==np.int)
+#     cdef Py_ssize_t i,j, n = len(aStart)
+#     assert(n == len(aEnd) == len(bStart) == len(bEnd) == len(index) == len(bDir) == len(aChr) == len(bChr) == len(left) == len(right))
+#     cdef np.ndarray[object, ndim=2] outOrderedBlocks =  np.array([[np.nan]*n]*n, dtype=object)
+#     cdef np.ndarray allRanges = np.array([range(left[i]+1, right[i]) for i in range(n)])
+#
+#     for i in range(n):
+#         for j in range(i,n):
+#             #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
+#             if bDir[i] != bDir[j]:
+#                 sys.exit("ERROR: bDir not matching")
+#             elif not any([k in allRanges[i] for k in allRanges[j]]):
+#                     outOrderedBlocks[i][j] = False
+#             elif bDir[i] == bDir[j]:
+#                 if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
+#                     outOrderedBlocks[i][j] = True
+#                 else:
+#                     outOrderedBlocks[i][j] = False
+# #            elif(aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bEnd[i]) > threshold and (bEnd[j] - bStart[i]) > threshold:
+# #                outOrderedBlocks[i][j] = True
+#             else:
+#                 outOrderedBlocks[i][j] = False
+#     return outOrderedBlocks
 
 
 
