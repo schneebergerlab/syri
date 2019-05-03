@@ -922,6 +922,7 @@ def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):
     bestScore = 0
     bestComb = []
     for i in range(iterCount):
+        print(i)
         tempCluster = np.zeros(len(transBlocksData), dtype="uint8")
         outBlocks = np.zeros(len(transBlocksData), dtype="uint8")
         skipList = np.zeros(len(transBlocksData), dtype="uint8")
