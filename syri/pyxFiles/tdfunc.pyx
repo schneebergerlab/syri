@@ -925,9 +925,9 @@ def greedySubsetSelector(cluster, transBlocksData, seedBlocks, iterCount = 100):
                     if outBlocks[transBlocksData[newBlock].meAlist].sum() > 0:
                         tempCluster[transBlocksData[newBlock].meBlist] = 0
                         skipList[transBlocksData[newBlock].meBlist] = 1
-                    elif outBlocks[transBlocksData[newBlock].meAlist].sum() > 0:
+                    elif outBlocks[transBlocksData[newBlock].meBlist].sum() > 0:
                         tempCluster[transBlocksData[newBlock].meAlist] = 0
-                        skipList[transBlocksData[newBlock].meBlist] = 1
+                        skipList[transBlocksData[newBlock].meAlist] = 1
                     for meElement in transBlocksData[newBlock].meAlist:
                         if meElement in transBlocksData[newBlock].meBlist:
                             tempCluster[meElement] = 0
