@@ -113,6 +113,17 @@ def readCoords(coordsfin, chrmatch, cigar = False):
             logger.error('bDir can only have values 1/-1')
             sys.exit()
 
+    try:
+        coords.aChr = coords.aChr.astype(str)
+    except:
+        logger.error('aChr is not string')
+
+
+    try:
+        coords.bChr = coords.bChr.astype(str)
+    except:
+        logger.error('bChr is not string')
+
     #check for bstart > bend when bdir is -1
     check = np.unique(coords.loc[coords.bDir == -1, 'bStart'] > coords.loc[coords.bDir == -1, 'bEnd'])
     if len(check) > 1:
@@ -213,6 +224,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     logger.info("Identifying Synteny for chromosome " + chromo)
 
     df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)
+
     nrow = df.shape[0]
     blocks = [alignmentBlock(i, np.where(df.iloc[i,] == True)[0], coordsData.iloc[i]) for i in range(nrow)]
     for block in blocks:
@@ -240,8 +252,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
 
     from syri.inversions import getInversions
     invertedCoordsOri, profitable, bestInvPath, invData, synInInv, badSyn = getInversions(coords,chromo, threshold, synData, tUC, tUP)
-
-
 
     ##########################################################
     #### Identify Translocation and duplications
@@ -353,11 +363,30 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     status = np.array([allTransBlocksData[i].status for i in range(allTransBlocks.shape[0])], dtype="int")
     aIndex = np.array([allTransBlocksData[i].transGroupIndices[0] for i in range(allTransBlocks.shape[0])], dtype="int")
     bIndex = np.array([allTransBlocksData[i].transGroupIndices[1] for i in range(allTransBlocks.shape[0])], dtype="int")
-    aGroups = {i:np.array(allTransGenomeAGroups[i].member, dtype="int") for i in range(len(allTransGenomeAGroups))}
-    bGroups = {i: np.array(allTransGenomeBGroups[i].member, dtype="int") for i in range(len(allTransGenomeBGroups))}
+
+    ## get sorted values. sorted based on genome coordinate in allTransBlocks
+    aGroups = {}
+    for i in range(len(allTransGenomeAGroups)):
+        aGroups[i] = allTransBlocks.iloc[allTransGenomeAGroups[i].member].sort_values(['aStart','aEnd']).index.values
+    bGroups = {}
+    for i in range(len(allTransGenomeBGroups)):
+        bGroups[i] = allTransBlocks.iloc[allTransGenomeBGroups[i].member].sort_values(['bStart', 'bEnd']).index.values
+    clstrsize = np.array([len(allTransCluster[i.transClusterIndex]) for i in allTransBlocksData], dtype = 'int')
 
     if len(allTransBlocks) > 0:
-        out = getmeblocks(np.array(allTransBlocks.aStart), np.array(allTransBlocks.aEnd), np.array(allTransBlocks.bStart), np.array(allTransBlocks.bEnd), threshold, allTransBlocks.shape[0], aUni, bUni, status, aIndex, bIndex, aGroups, bGroups)
+        out = getmeblocks(np.array(allTransBlocks.aStart),
+                          np.array(allTransBlocks.aEnd),
+                          np.array(allTransBlocks.bStart),
+                          np.array(allTransBlocks.bEnd),
+                          threshold,
+                          aUni,
+                          bUni,
+                          status,
+                          aIndex,
+                          bIndex,
+                          aGroups,
+                          bGroups,
+                          clstrsize)
 
         for i in range(len(out[0])):
             if out[0][i]:
@@ -370,29 +399,86 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
         for i in out[2].keys():
             allTransBlocksData[i].setMEList(list(out[2][i][0]),list(out[2][i][1]))
 
-        del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
-        collect()
+        # del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
+        # collect()
 
     logger.debug("Translocations : finding solutions "+ chromo + str(datetime.now()))
     clusterSolutions = []
     for i in range(len(allTransCluster)):
         if len(allTransCluster[i]) > 0:
-            clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT))
+            if len(allTransCluster[i]) > 10000:
+                clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT, chromo, aGroups, bGroups, threshold))
+            else:
+                clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT, chromo))
+
     
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
     #clusterBlocks = unlist(clusterSolutionBlocks)
     
     logger.debug("Translocations : processing translocations " + chromo + str(datetime.now()))
-    
-    transClasses = getTransClasses(clusterSolutionBlocks, allTransBlocksData, allTransGenomeAGroups, allTransGenomeBGroups)
-    
+
+    garb = deque()
+    for i in range(len(allTransBlocksData)):
+        if not allTransBlocksData[i].aUni and not allTransBlocksData[i].bUni:
+            garb.append(0)
+        elif allTransBlocksData[i].status == 1:
+            garb.append(0)
+        elif not allTransBlocksData[i].aUni:
+            garb.append(1)
+        elif not allTransBlocksData[i].bUni:
+            garb.append(2)
+        else:
+            garb.append(3)
+    meclass = np.array(list(garb), np.uint16)
+
+
+    # transClasses = getTransClasses(clusterSolutionBlocks, allTransBlocksData, allTransGenomeAGroups, allTransGenomeBGroups)
+
+    transClasses = getTransClasses(clusterSolutionBlocks,
+                                   allTransBlocksData,
+                                   allTransGenomeAGroups,
+                                   allTransGenomeBGroups,
+                                   allTransBlocks.aStart.values.astype(np.uint),
+                                   allTransBlocks.aEnd.values.astype(np.uint),
+                                   allTransBlocks.bStart.values.astype(np.uint),
+                                   allTransBlocks.bEnd.values.astype(np.uint),
+                                   aIndex,
+                                   bIndex,
+                                   aGroups,
+                                   bGroups,
+                                   threshold,
+                                   meclass)
     dupData = allTransBlocks.iloc[transClasses["duplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
     invDupData = allTransBlocks.iloc[transClasses["invDuplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
     TLData = allTransBlocks.iloc[transClasses["translocation"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
     invTLData = allTransBlocks.iloc[transClasses["invTranslocation"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])  
     
-    dupData = getDupGenome(dupData, allTransBlocksData, transClasses)
-    invDupData = getDupGenome(invDupData, allTransBlocksData, transClasses)
+    dupData = getDupGenome(dupData,
+                           allTransBlocksData,
+                           transClasses,
+                           allTransBlocks.aStart.values.astype(np.uint),
+                           allTransBlocks.aEnd.values.astype(np.uint),
+                           allTransBlocks.bStart.values.astype(np.uint),
+                           allTransBlocks.bEnd.values.astype(np.uint),
+                           aIndex,
+                           bIndex,
+                           aGroups,
+                           bGroups,
+                           threshold,
+                           meclass)
+    invDupData = getDupGenome(invDupData,
+                              allTransBlocksData,
+                              transClasses,
+                              allTransBlocks.aStart.values.astype(np.uint),
+                              allTransBlocks.aEnd.values.astype(np.uint),
+                              allTransBlocks.bStart.values.astype(np.uint),
+                              allTransBlocks.bEnd.values.astype(np.uint),
+                              aIndex,
+                              bIndex,
+                              aGroups,
+                              bGroups,
+                              threshold,
+                              meclass)
     
     
     fout = open(cwdPath+prefix+chromo+"_invOut.txt","w")
@@ -409,6 +495,10 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     
     ## Grouping Syn blocks : Final synblock identification is done after ctx identification.
     allBlocks, outClusters = groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn)
+
+    orderedBlocks = outPlaceBlocks[outPlaceBlocks.bDir == 1]
+    invertedBlocks = outPlaceBlocks[outPlaceBlocks.bDir == -1]
+
     
 ########################################################################################################################
     fout = open(cwdPath+prefix+chromo+"_synOut.txt","w")
@@ -462,18 +552,21 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     fout.close()
 
 ########################################################################################################################
-    
 
 
-cpdef apply_TS(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.int threshold):
-    assert(aStart.dtype == np.int and aEnd.dtype == np.int and bStart.dtype == np.int and bEnd.dtype == np.int)
-    cdef Py_ssize_t i, j,  n = len(aStart)
-    assert(n == len(aEnd) == len(bStart) == len(bEnd))
-    cdef np.ndarray[object, ndim =2 ] df =  np.array([[np.nan]*n]*n, dtype=object)
+cpdef apply_TS(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold):
+    cdef:
+        Py_ssize_t                      i, j,  n = len(astart)
+        unsigned short int[:,:]         df = np.zeros(n*n, dtype=np.uint16).reshape([n,n])
+    # cdef np.ndarray[object, ndim =2 ] df =  np.array([[np.nan]*n]*n, dtype=object)
     for i in range(n):
         for j in range(i+1,n):
-            df[i][j] =  True if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold else False
-    return df
+            if (astart[j] - astart[i]) > threshold:
+                if (aend[j] - aend[i]) > threshold:
+                    if (bstart[j] - bstart[i]) > threshold:
+                        if (bend[j] - bend[i]) > threshold:
+                            df[i,j] = 1
+    return np.array(df, np.bool)
 
 
 #

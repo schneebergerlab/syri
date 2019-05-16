@@ -57,7 +57,7 @@ cpdef invPath(cpp_map[long, cpp_vec[long]] invpos, long[:, :] neighbour, float[:
     while parents[maxid] != -1:
         path.push_front(parents[maxid])
         maxid = parents[maxid]
-    return [path[i] for i in range(path.size())]
+    return [path[i] for i in range(<Py_ssize_t> path.size())]
 
 cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd, float[:] iDen, cpp_map[int, cpp_vec[long]] neighbourSyn, float[:] synBlockScore, long[:] aStartSyn, long[:] aEndSyn, long tUC, float tUP,  brk = -1):
     cdef:
@@ -84,7 +84,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
     out = deque()
 
     # get neighbours of inverted alignments
-    for i in range(neighbourSyn.size()):
+    for i in range(<Py_ssize_t> neighbourSyn.size()):
         nsynmap[i, 0] = neighbourSyn[i][0]
         nsynmap[i, 1] = neighbourSyn[i][1]
 
@@ -133,11 +133,11 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
     # Find shortest path to all other nodes from each node
 
     for i in n:
-        if i%500 == 0:
-            print(i, str(datetime.now()))
+        # if i%500 == 0:
+        #     print(i, str(datetime.now()))
         nodepath.clear()
-        pred = np.array([-1]*len(n), dtype = np.int)
-        dist = np.array([np.float32('inf')]*len(n), dtype = np.float32)
+        pred = np.array([-1]* <Py_ssize_t> len(n), dtype = np.int)
+        dist = np.array([np.float32('inf')]*  <Py_ssize_t> len(n), dtype = np.float32)
         dist[i] = 0
 
         # Process vertices in topological order
@@ -158,7 +158,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                 path.clear()
                 while current!=i:
                     if nodepath.count(current) > 0:
-                        for index in range(nodepath[current].size()):
+                        for index in range(<Py_ssize_t> nodepath[current].size()):
                             path.push_back(nodepath[current][index])
                         # path.extend(nodepath[current].copy())
                         break
@@ -169,7 +169,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                 r_path.clear()
 
                 current = path.size()
-                for index in range(path.size()):
+                for index in range(<Py_ssize_t> path.size()):
                     r_path.push_back(path[current-index-1])
 
                 # calculate revenue of the identified path
@@ -218,7 +218,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                         iden.push_back(iDen[l])
 
                     if startA.size() == endA.size() == startB.size() == endB.size() == iden.size():
-                        for k in range(iden.size()):
+                        for k in range(<Py_ssize_t> iden.size()):
                             revenue += iden[k]*((endA[k] - startA[k] + 1) + (endB[k] - startB[k] + 1))
                         startA.clear()
                         endA.clear()
@@ -343,7 +343,6 @@ def getInversions(coords,chromo, threshold, synData, tUC, tUP):
     #######################################################################
     ###### Create list of inverted alignments
     #######################################################################
-    invTree = pd.DataFrame(apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold), index = range(len(invertedCoords)), columns = invertedCoords.index.values)
     invblocks = getInvBlocks(invTree, invertedCoordsOri)
     logger.debug("found inv blocks " + chromo)
 
