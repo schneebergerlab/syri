@@ -608,35 +608,6 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
             if not found:
                 dupGenomes[index] = "A"
         return(dupGenomes)
-    #
-    # def printCTX
-    #
-    #
-    #     (clusterSolutionBlocks, transData, transagroups, transbgroups, astart, aend, bstart, bend, aindex, bindex, agroup, bgroup, threshold, meclass)
-    #
-    #
-
-
-        # transClasses = getTransClasses(clusterSolutionBlocks, ctxBlocksData, genomeagroups, genomebgroups)
-        # indices = sorted(unlist(list(transClasses.values())))
-        # keys = [key for index in indices for key in list(transClasses.keys()) if index in transClasses[key]]
-        # blocksClasses = dict(zip(indices,keys))
-        # dupGenomes = getDupCTX(indices, ctxBlocksData, transClasses)
-        #
-        # fout = open(cwdPath+prefix+"ctxOut.txt","w")
-        # for index in indices:
-        #     if ctxBlocksData[index].dir == 1:
-        #         alignIndices = transBlocks[ctxTransIndexOrder[index]]
-        #         fout.write("#\t" + "\t".join(map(str,[ctxTransBlocks.iloc[index]["aChr"], ctxTransBlocks.iloc[index]["aStart"], ctxTransBlocks.iloc[index]["aEnd"], "-", ctxTransBlocks.iloc[index]["bChr"], ctxTransBlocks.iloc[index]["bStart"],ctxTransBlocks.iloc[index]["bEnd"]])) + "\t" + blocksClasses[index]+ "\t" +  dupGenomes[index]+"\n")
-        #         for i in alignIndices:
-        #             fout.write("\t".join(map(str,orderedBlocks.iloc[i,0:4]))+"\n")
-        #     elif ctxBlocksData[index].dir == -1:
-        #         alignIndices = invTransBlocks[ctxTransIndexOrder[index]]
-        #         fout.write("#\t" + "\t".join(map(str,[ctxTransBlocks.iloc[index]["aChr"], ctxTransBlocks.iloc[index]["aStart"], ctxTransBlocks.iloc[index]["aEnd"], "-", ctxTransBlocks.iloc[index]["bChr"], ctxTransBlocks.iloc[index]["bStart"],ctxTransBlocks.iloc[index]["bEnd"]]))+ "\t" + blocksClasses[index] + "\t" +  dupGenomes[index]+ "\n")
-        #         for i in alignIndices:
-        #             fout.write("\t".join(map(str,invertedBlocks.iloc[i,[0,1,3,2]])) + "\n")
-        # fout.close()
-
 
     logger.debug("Reading Coords" + str(datetime.now()))
 
@@ -662,9 +633,9 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
 
     logger.debug("Making Tree")
 
-    nCores = nCores if nCores < 2 else 2
+    nCorestemp = nCores if nCores < 2 else 2
 
-    with Pool(processes = nCores) as pool:
+    with Pool(processes = nCorestemp) as pool:
         blks = pool.starmap(partial(getBlocks, annoCoords=annoCoords, threshold=threshold, tUC=tUC, tUP=tUP), [[orderedBlocks, 0], [invertedBlocks, 1]])
 
     transBlocks = blks[0]
@@ -695,6 +666,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
         for block in ctxTransGenomeBGroups[i].member:
             ctxGroupIndices[block].append(i)
 
+    logger.debug("Getting clusters")
     ctxCluster = getTransCluster(ctxGroupIndices, ctxTransGenomeAGroups, ctxTransGenomeBGroups)
 
     ctxClusterIndices = dict()
@@ -736,6 +708,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
             ctxBlocksData[count].setStatus(1)
         count+=1
 
+    logger.debug("Finding ME Blocks")
     aUni = np.array([ctxBlocksData[i].aUni for i in range(ctxTransBlocks.shape[0])], dtype="int")
     bUni = np.array([ctxBlocksData[i].bUni for i in range(ctxTransBlocks.shape[0])], dtype="int")
     status = np.array([ctxBlocksData[i].status for i in range(ctxTransBlocks.shape[0])], dtype="int")
@@ -780,20 +753,30 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
         # del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
         # collect()
 
-    logger.debug("Finding clusters")
+    logger.debug("Finding best subset of clusters")
 
-    clusterSolutions = []
-    for i in range(len(ctxCluster)):
-        tempCluster = ctxCluster[i].copy()
-        if len(tempCluster) == 0:
-            continue
-        if len(tempCluster) > 10000:
-            clusterSolutions.append(getBestClusterSubset(tempCluster, ctxBlocksData, bRT, 'CTX', aGroups, bGroups, threshold))
-        else:
-            clusterSolutions.append(getBestClusterSubset(tempCluster, ctxBlocksData, bRT))
+    # clusterSolutions = []
+    # for i in range(len(ctxCluster)):
+    #     tempCluster = ctxCluster[i].copy()
+    #     if len(tempCluster) == 0:
+    #         continue
+    #     if len(tempCluster) > 10000:
+    #         clusterSolutions.append(getBestClusterSubset(tempCluster, ctxBlocksData, bRT, 'CTX', aGroups, bGroups, threshold))
+    #     else:
+    #         clusterSolutions.append(getBestClusterSubset(tempCluster, ctxBlocksData, bRT))
+    #
+    # clusterSolutionBlocks = [i[1] for i in clusterSolutions if i != None]
 
-    clusterSolutionBlocks = [i[1] for i in clusterSolutions]
+    with Pool(processes=nCores) as pool:
+        clusterSolutions = pool.map(partial(getBestClusterSubset,
+                                             transBlocksData=ctxBlocksData,
+                                             chromo='CTX',
+                                             bRT=bRT,
+                                             aGroups=aGroups,
+                                             bGroups=bGroups,
+                                             threshold=threshold), ctxCluster)
 
+    clusterSolutionBlocks = [i[1] for i in clusterSolutions if i != None]
 
     garb = deque()
     for i in range(len(ctxBlocksData)):
@@ -1949,6 +1932,8 @@ cdef greedySubsetSelector(cluster, transBlocksData, seedblocks, iterCount = 100)
 
 def getBestClusterSubset(cluster, transBlocksData, bRT, chromo='', aGroups=None, bGroups=None, threshold=None):
     logger = logging.getLogger('tdcluster'+chromo)
+    if len(cluster) == 0:
+        return
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
     if len(cluster) > 100000:
         logger.info('Massive (>100000 candidates) TD cluster (with '+ str(len(cluster)) +' candidate TDs) identified. Using low-memory high-runtime approach. Iterative sampling disabled. Using less stringent progressive elimination.')

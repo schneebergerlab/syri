@@ -157,10 +157,10 @@ if __name__ == "__main__":
         from syri.writeout import getTSV, getVCF
         listDir = os.listdir(args.dir)
         files = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", 'sv.txt', 'notAligned.txt', 'snps.txt']
-        for file in files:
-            if args.prefix+file not in listDir:
-                logger.error(file + " is not present in the directory. Exiting")
-                sys.exit()
+        # for file in files:
+        #     if args.prefix+file not in listDir:
+        #         logger.error(file + " is not present in the directory. Exiting")
+        #         sys.exit()
         logger.info('Generating table output')
 
         if args.ref is None:
@@ -169,7 +169,7 @@ if __name__ == "__main__":
 
         getTSV(args.dir, args.prefix, args.ref.name)
         logger.info('Generating VCF')
-        getVCF("syri.out", "syri.vcf")
+        getVCF("syri.out", "syri.vcf", args.dir, args.prefix)
 
     from syri.bin.func.myUsefulFunctions import fileRemove
 

@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Jun 19 15:54:53 2017
-
-@author: goel
-"""
+# distutils: language = c++
 
 import numpy as np
 from syri.bin.func.myUsefulFunctions import *
@@ -22,6 +18,9 @@ from Bio.SeqIO import parse
 import logging
 import psutil
 
+from cython.operator cimport dereference as deref, preincrement as inc
+from libcpp.map cimport map as cpp_map
+from libcpp.deque cimport deque as cpp_deq
 cimport numpy as np
 cimport cython
 
@@ -117,12 +116,13 @@ def readCoords(coordsfin, chrmatch, cigar = False):
         coords.aChr = coords.aChr.astype(str)
     except:
         logger.error('aChr is not string')
-
+        sys.exit()
 
     try:
         coords.bChr = coords.bChr.astype(str)
     except:
         logger.error('bChr is not string')
+        sys.exit()
 
     #check for bstart > bend when bdir is -1
     check = np.unique(coords.loc[coords.bDir == -1, 'bStart'] > coords.loc[coords.bDir == -1, 'bEnd'])
@@ -223,10 +223,22 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     logger.info(chromo+" " + str(coordsData.shape))
     logger.info("Identifying Synteny for chromosome " + chromo)
 
-    df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)
+    # df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)
 
-    nrow = df.shape[0]
-    blocks = [alignmentBlock(i, np.where(df.iloc[i,] == True)[0], coordsData.iloc[i]) for i in range(nrow)]
+    df = apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold)
+
+    # nrow = len(df)
+
+    # blocks = [alignmentBlock(i, np.where(df.iloc[i,] == True)[0], coordsData.iloc[i]) for i in range(nrow)]
+
+    # blocks = deque()
+    # keys = df
+    # for i in range(nrow(coordsData)):
+    #     if i in
+    #     blocks.append(alignmentBlock(i, df[i], coordsData.iloc[i]))
+    blocks = [alignmentBlock(i, df[i], coordsData.iloc[i]) for i in df.keys()]
+
+    # blocks = list(blocks)
     for block in blocks:
         i = 0
         while(i < len(block.children)):
@@ -556,58 +568,23 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
 
 cpdef apply_TS(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold):
     cdef:
-        Py_ssize_t                      i, j,  n = len(astart)
-        unsigned short int[:,:]         df = np.zeros(n*n, dtype=np.uint16).reshape([n,n])
-    # cdef np.ndarray[object, ndim =2 ] df =  np.array([[np.nan]*n]*n, dtype=object)
+        Py_ssize_t                              i, j,  n = len(astart)
+        cpp_map[long, cpp_deq[long]]            df
+        cpp_map[long, cpp_deq[long]].iterator   mapit
     for i in range(n):
         for j in range(i+1,n):
             if (astart[j] - astart[i]) > threshold:
                 if (aend[j] - aend[i]) > threshold:
                     if (bstart[j] - bstart[i]) > threshold:
                         if (bend[j] - bend[i]) > threshold:
-                            df[i,j] = 1
-    return np.array(df, np.bool)
-
-
-#
-#
-#
-# cpdef np.ndarray[object, ndim=2] makeBlocksTree(np.ndarray aStart, np.ndarray aEnd, np.ndarray bStart, np.ndarray bEnd, np.ndarray bDir, np.ndarray aChr, np.ndarray bChr, np.ndarray index, np.int threshold, np.ndarray left, np.ndarray right):
-#     """Compute whether two alignments can be part of one translation block. For this:
-#         the alignments should not be separated by any inPlaceBlock on both ends and
-#         they should be collinear with respect to each other.
-#
-#        Returns
-#        --------
-#        outOrderedBlocks: pandas DataFrame,
-#            Dataframe of type Object. Lower half is NA, upper half contains whether two
-#            alignments can be connected (True) or not (False).
-#     """
-#
-#     assert(aStart.dtype==np.int and aEnd.dtype==np.int and bStart.dtype==np.int and bEnd.dtype==np.int and bDir.dtype==np.int and aChr.dtype==np.object and bChr.dtype==np.object and index.dtype==np.int and left.dtype==np.int and right.dtype==np.int)
-#     cdef Py_ssize_t i,j, n = len(aStart)
-#     assert(n == len(aEnd) == len(bStart) == len(bEnd) == len(index) == len(bDir) == len(aChr) == len(bChr) == len(left) == len(right))
-#     cdef np.ndarray[object, ndim=2] outOrderedBlocks =  np.array([[np.nan]*n]*n, dtype=object)
-#     cdef np.ndarray allRanges = np.array([range(left[i]+1, right[i]) for i in range(n)])
-#
-#     for i in range(n):
-#         for j in range(i,n):
-#             #if len(np.intersect1d(range(left[i]+1,right[i]),range(left[j]+1,right[j]))) == 0:
-#             if bDir[i] != bDir[j]:
-#                 sys.exit("ERROR: bDir not matching")
-#             elif not any([k in allRanges[i] for k in allRanges[j]]):
-#                     outOrderedBlocks[i][j] = False
-#             elif bDir[i] == bDir[j]:
-#                 if (aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bStart[i]) > threshold and (bEnd[j] - bEnd[i]) > threshold:
-#                     outOrderedBlocks[i][j] = True
-#                 else:
-#                     outOrderedBlocks[i][j] = False
-# #            elif(aStart[j] - aStart[i]) > threshold and (aEnd[j] - aEnd[i]) > threshold and (bStart[j] - bEnd[i]) > threshold and (bEnd[j] - bStart[i]) > threshold:
-# #                outOrderedBlocks[i][j] = True
-#             else:
-#                 outOrderedBlocks[i][j] = False
-#     return outOrderedBlocks
-
+                            df[i].push_back(j)
+    out = {}
+    for i in range(n):
+        if df.count(i)== 1:
+            out[i] = [df[i][j] for j in range(<Py_ssize_t> df[i].size())]
+        else:
+            out[i] = []
+    return out
 
 
 def getSynPath(blocks):
