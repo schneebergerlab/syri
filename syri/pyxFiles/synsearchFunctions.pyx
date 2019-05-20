@@ -305,42 +305,10 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     ## and are not overlappign with the syntenic blocks
     ## Merge directed and inverted blocks
 
-<<<<<<< HEAD
-    if len(orderedBlocks) > 0:
-        transBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, orderedBlocks, threshold)
-        outOrderedBlocks = pd.DataFrame(makeBlocksTree(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, orderedBlocks.index.values, threshold, transBlocksNeighbours[0].values, transBlocksNeighbours[1].values))
-        transBlocks = findOrderedTranslocations(outOrderedBlocks, orderedBlocks, inPlaceBlocks, threshold, tUC, tUP, ctx = False)
-    else:
-        transBlocks = []
-    
-    if len(invertedBlocks) > 0:
-        # For getTransSynOrientation need bStart < bEnd
-        invertedCoords = invertedBlocks.copy()
-        invertedCoords.bStart = invertedCoords.bStart + invertedCoords.bEnd
-        invertedCoords.bEnd = invertedCoords.bStart - invertedCoords.bEnd
-        invertedCoords.bStart = invertedCoords.bStart - invertedCoords.bEnd
-        invTransBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, invertedCoords, threshold)
 
-        # For making blocks tree, need to reverse compliment the b chromosome
-        invertedCoords = invertedBlocks.copy()
-        maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
-        invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart 
-        invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
-        outInvertedBlocks = pd.DataFrame(makeBlocksTree(invertedCoords.aStart.values, invertedCoords.aEnd.values, invertedCoords.bStart.values, invertedCoords.bEnd.values, invertedCoords.bDir.values, invertedCoords.aChr.values, invertedCoords.bChr.values, invertedCoords.index.values, threshold, invTransBlocksNeighbours[0].values, invTransBlocksNeighbours[1].values))
-
-        # For finding ordered translocations need bstart < bend
-        invertedCoords = invertedBlocks.copy()
-        invertedCoords.bStart = invertedCoords.bStart + invertedCoords.bEnd
-        invertedCoords.bEnd = invertedCoords.bStart - invertedCoords.bEnd
-        invertedCoords.bStart = invertedCoords.bStart - invertedCoords.bEnd
-        invTransBlocks = findOrderedTranslocations(outInvertedBlocks, invertedCoords, inPlaceBlocks, threshold, tUC, tUP,ctx = False)
-    else:
-        invTransBlocks = []
-=======
     transBlocks, invTransBlocks, allTransBlocks, allTransIndexOrder = blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo)
 
     logger.debug("Translocations : found blocks" + chromo)
->>>>>>> V1.1
 
 
     allTransGenomeAGroups = makeTransGroupList(allTransBlocks, "aStart", "aEnd", threshold)
