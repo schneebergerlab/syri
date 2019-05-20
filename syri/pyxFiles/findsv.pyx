@@ -14,7 +14,6 @@ from gc import collect
 from Bio.SeqIO import parse
 import logging
 import psutil
-from syri.pyxFiles.function cimport getAllLongestPaths, getConnectivityGraph
 
 cimport numpy as np
 cimport cython

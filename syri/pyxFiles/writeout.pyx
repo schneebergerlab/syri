@@ -117,90 +117,107 @@ def getTSV(cwdpath, prefix, ref):
     logger = logging.getLogger("getTSV")
     anno = getsrtable(cwdpath, prefix)
 
-    _svdata = pd.read_table(cwdpath + prefix + "sv.txt", header=None)
-    _svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr']
+    hasSV = True
+    if not os.path.isfile(cwdpath + prefix + "sv.txt"):
+        hasSV = False
+        logger.info(cwdpath + prefix + "sv.txt"+' cannot be opened. Cannot output SVs.')
 
-    entries = defaultdict()
-    count = 1
-    for row in _svdata.itertuples(index=False):
-        if row.vartype == "#":
-            _parent = anno.loc[(anno.achr == row.achr) &
-                               (anno.astart == row.astart) &
-                               (anno.aend == row.aend) &
-                               (anno.bchr == row.bchr) &
-                               (anno.bstart == row.bstart) &
-                               (anno.bend == row.bend) &
-                               (anno.parent == "-"), "id"]
-            if len(_parent) != 1:
-                logger.error("Error in finding parent for SV")
-                logger.error(row.to_string() + "\t" + _parent.to_string())
-                sys.exit()
-            else:
-                _parent = _parent.to_string(index=False, header=False)
-            continue
-        entries[row.vartype + str(count)] = {
-            'achr': row.achr,
-            'astart': row.astart,
-            'aend': row.aend,
-            'bchr': row.bchr,
-            'bstart': row.bstart,
-            'bend': row.bend,
-            'vartype': row.vartype,
-            'parent': _parent,
-            'id': row.vartype + str(count),
-            'dupclass': "-",
-            'aseq': "-",
-            "bseq": "-"
-        }
-        count += 1
+    if hasSV:
+        svdata = pd.read_table(cwdpath + prefix + "sv.txt", header=None)
+        svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr']
 
-    sv = pd.DataFrame.from_dict(entries, orient="index")
-    sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-    sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
-    sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
-
-    notal = pd.read_table(cwdpath + prefix + "notAligned.txt", header=None)
-    notal.columns = ["gen", "start", "end", "chr"]
-    notal[["start", "end"]] = notal[["start", "end"]].astype("int")
-    entries = defaultdict()
-    _c = 0
-    for row in notal.itertuples(index=False):
-        _c += 1
-        if row.gen == "R":
-            entries["NOTAL" + str(_c)] = {
-                'achr': row.chr,
-                'astart': row.start,
-                'aend': row.end,
-                'bchr': "-",
-                'bstart': "-",
-                'bend': "-",
-                'vartype': "NOTAL",
-                'parent': "-",
-                'id': "NOTAL" + str(_c),
+        entries = defaultdict()
+        count = 1
+        for row in svdata.itertuples(index=False):
+            if row.vartype == "#":
+                _parent = anno.loc[(anno.achr == row.achr) &
+                                   (anno.astart == row.astart) &
+                                   (anno.aend == row.aend) &
+                                   (anno.bchr == row.bchr) &
+                                   (anno.bstart == row.bstart) &
+                                   (anno.bend == row.bend) &
+                                   (anno.parent == "-"), "id"]
+                if len(_parent) != 1:
+                    logger.error("Error in finding parent for SV")
+                    logger.error(row.to_string() + "\t" + _parent.to_string())
+                    sys.exit()
+                else:
+                    _parent = _parent.to_string(index=False, header=False)
+                continue
+            entries[row.vartype + str(count)] = {
+                'achr': row.achr,
+                'astart': row.astart,
+                'aend': row.aend,
+                'bchr': row.bchr,
+                'bstart': row.bstart,
+                'bend': row.bend,
+                'vartype': row.vartype,
+                'parent': _parent,
+                'id': row.vartype + str(count),
                 'dupclass': "-",
                 'aseq': "-",
                 "bseq": "-"
             }
-        elif row.gen == "Q":
-            entries["NOTAL" + str(_c)] = {
-                'achr': "-",
-                'astart': "-",
-                'aend': "-",
-                'bchr': row.chr,
-                'bstart': row.start,
-                'bend': row.end,
-                'vartype': "NOTAL",
-                'parent': "-",
-                'id': "NOTAL" + str(_c),
-                'dupclass': "-",
-                'aseq': "-",
-                'bseq': "-"
-            }
-    notal = pd.DataFrame.from_dict(entries, orient="index")
-    # notal.loc[:, ['astart', 'aend', 'bstart', 'bend']] = notal.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-    notal = notal.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
-    notal.sort_values(['achr', 'astart', 'aend'], inplace=True)
-    notal['selected'] = -1
+            count += 1
+
+        sv = pd.DataFrame.from_dict(entries, orient="index")
+        sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+        sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+        sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
+    else:
+        sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
+
+    hasNotal = True
+    if not os.path.isfile(cwdpath + prefix + "notAligned.txt"):
+        hasNotal = False
+        logger.info(cwdpath + prefix + "notAligned.txt"+' cannot be opened. Cannot output not aligned regions.')
+
+    if hasNotal:
+        notal = pd.read_table(cwdpath + prefix + "notAligned.txt", header=None)
+        notal.columns = ["gen", "start", "end", "chr"]
+        notal[["start", "end"]] = notal[["start", "end"]].astype("int")
+        entries = defaultdict()
+        _c = 0
+        for row in notal.itertuples(index=False):
+            _c += 1
+            if row.gen == "R":
+                entries["NOTAL" + str(_c)] = {
+                    'achr': row.chr,
+                    'astart': row.start,
+                    'aend': row.end,
+                    'bchr': "-",
+                    'bstart': "-",
+                    'bend': "-",
+                    'vartype': "NOTAL",
+                    'parent': "-",
+                    'id': "NOTAL" + str(_c),
+                    'dupclass': "-",
+                    'aseq': "-",
+                    "bseq": "-"
+                }
+            elif row.gen == "Q":
+                entries["NOTAL" + str(_c)] = {
+                    'achr': "-",
+                    'astart': "-",
+                    'aend': "-",
+                    'bchr': row.chr,
+                    'bstart': row.start,
+                    'bend': row.end,
+                    'vartype': "NOTAL",
+                    'parent': "-",
+                    'id': "NOTAL" + str(_c),
+                    'dupclass': "-",
+                    'aseq': "-",
+                    'bseq': "-"
+                }
+        notal = pd.DataFrame.from_dict(entries, orient="index")
+        # notal.loc[:, ['astart', 'aend', 'bstart', 'bend']] = notal.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+        notal = notal.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+        notal.sort_values(['achr', 'astart', 'aend'], inplace=True)
+        notal['selected'] = -1
+    else:
+        notal = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass', 'selected'])
+
 
     def p_indel():
         vtype = "INS" if indel == 1 else "DEL"
@@ -220,74 +237,67 @@ def getTSV(cwdpath, prefix, ref):
         }
 
     entries = defaultdict()
-    with open(cwdpath + prefix + "snps.txt", "r") as fin:
-        indel = 0                           # marker for indel status. 0 = no_indel, 1 = insertion, -1 = deletion
-        _as = -1                            # astart
-        _ae = -1
-        _bs = -1
-        _be = -1
-        _ac = -1
-        _bc = -1
-        _p = -1
-        _seq = ""
 
-        for line in fin:
-            line = line.strip().split("\t")
-            try:
-                if line[0] == "#" and len(line) == 7:
-                    if indel != 0:
-                        p_indel()
-                        indel = 0
-                        _seq = ""
-                    _parent = anno.loc[(anno.achr == line[5]) &
-                                       (anno.astart == int(line[1])) &
-                                       (anno.aend == int(line[2])) &
-                                       (anno.bchr == line[6]) &
-                                       (anno.bstart == int(line[3])) &
-                                       (anno.bend == int(line[4])) &
-                                       (anno.parent == "-"), "id"]
-                    if len(_parent) != 1:
-                        logger.error("Error in finding parent for SNP")
-                        logger.error("\t".join(line) + "\t" + _parent.to_string())
-                        sys.exit()
-                    else:
-                        _parent = _parent.to_string(index=False, header=False)
-                    continue
-                elif line[1] != "." and line[2] != "." and len(line) == 12:
-                    if indel != 0:
-                        p_indel()
-                        indel = 0
-                        _seq = ""
-                    count += 1
-                    entries["SNP" + str(count)] = {
-                        'achr': line[10],
-                        'astart': int(line[0]),
-                        'aend': int(line[0]),
-                        'bchr': line[11],
-                        'bstart': int(line[3]),
-                        'bend': int(line[3]),
-                        'vartype': "SNP",
-                        'parent': _parent,
-                        'aseq': line[1],
-                        'bseq': line[2],
-                        'id': "SNP" + str(count),
-                        'dupclass': "-"
-                    }
-                elif indel == 0:
-                    count += 1
-                    _as = int(line[0])
-                    _ae = int(line[0])
-                    _bs = int(line[3])
-                    _be = int(line[3])
-                    _ac = line[10]
-                    _bc = line[11]
-                    _p = _parent
-                    indel = 1 if line[1] == "." else -1
-                    _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-                elif indel == 1:
-                    if int(line[0]) != _as or line[1] != "." or line[10] != _ac:
-                        p_indel()
-                        _seq = ""
+    hasSNP = True
+    if not os.path.isfile(cwdpath + prefix + "snps.txt"):
+        hasSNP = False
+        logger.info(cwdpath + prefix + "snps.txt"+' cannot be opened. Cannot output SNPs and short indels.')
+
+    if hasSNP:
+        with open(cwdpath + prefix + "snps.txt", "r") as fin:
+            indel = 0                           # marker for indel status. 0 = no_indel, 1 = insertion, -1 = deletion
+            _as = -1                            # astart
+            _ae = -1
+            _bs = -1
+            _be = -1
+            _ac = -1
+            _bc = -1
+            _p = -1
+            _seq = ""
+
+            for line in fin:
+                line = line.strip().split("\t")
+                try:
+                    if line[0] == "#" and len(line) == 7:
+                        if indel != 0:
+                            p_indel()
+                            indel = 0
+                            _seq = ""
+                        _parent = anno.loc[(anno.achr == line[5]) &
+                                           (anno.astart == int(line[1])) &
+                                           (anno.aend == int(line[2])) &
+                                           (anno.bchr == line[6]) &
+                                           (anno.bstart == int(line[3])) &
+                                           (anno.bend == int(line[4])) &
+                                           (anno.parent == "-"), "id"]
+                        if len(_parent) != 1:
+                            logger.error("Error in finding parent for SNP")
+                            logger.error("\t".join(line) + "\t" + _parent.to_string())
+                            sys.exit()
+                        else:
+                            _parent = _parent.to_string(index=False, header=False)
+                        continue
+                    elif line[1] != "." and line[2] != "." and len(line) == 12:
+                        if indel != 0:
+                            p_indel()
+                            indel = 0
+                            _seq = ""
+                        count += 1
+                        entries["SNP" + str(count)] = {
+                            'achr': line[10],
+                            'astart': int(line[0]),
+                            'aend': int(line[0]),
+                            'bchr': line[11],
+                            'bstart': int(line[3]),
+                            'bend': int(line[3]),
+                            'vartype': "SNP",
+                            'parent': _parent,
+                            'aseq': line[1],
+                            'bseq': line[2],
+                            'id': "SNP" + str(count),
+                            'dupclass': "-"
+                        }
+                    elif indel == 0:
                         count += 1
                         _as = int(line[0])
                         _ae = int(line[0])
@@ -298,36 +308,52 @@ def getTSV(cwdpath, prefix, ref):
                         _p = _parent
                         indel = 1 if line[1] == "." else -1
                         _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-                    else:
-                        _be = int(line[3])
-                        _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-                elif indel == -1:
-                    if int(line[3]) != _bs or line[2] != "." or line[11] != _bc:
-                        p_indel()
-                        _seq = ""
-                        count += 1
-                        _as = int(line[0])
-                        _ae = int(line[0])
-                        _bs = int(line[3])
-                        _be = int(line[3])
-                        _ac = line[10]
-                        _bc = line[11]
-                        _p = _parent
-                        indel = 1 if line[1] == "." else -1
-                        _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-                    else:
-                        _ae = int(line[0])
-                        _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-            except IndexError as _e:
-                logger.error(_e)
-                logger.error("\t".join(line))
-                sys.exit()
+                    elif indel == 1:
+                        if int(line[0]) != _as or line[1] != "." or line[10] != _ac:
+                            p_indel()
+                            _seq = ""
+                            count += 1
+                            _as = int(line[0])
+                            _ae = int(line[0])
+                            _bs = int(line[3])
+                            _be = int(line[3])
+                            _ac = line[10]
+                            _bc = line[11]
+                            _p = _parent
+                            indel = 1 if line[1] == "." else -1
+                            _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
+                        else:
+                            _be = int(line[3])
+                            _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
+                    elif indel == -1:
+                        if int(line[3]) != _bs or line[2] != "." or line[11] != _bc:
+                            p_indel()
+                            _seq = ""
+                            count += 1
+                            _as = int(line[0])
+                            _ae = int(line[0])
+                            _bs = int(line[3])
+                            _be = int(line[3])
+                            _ac = line[10]
+                            _bc = line[11]
+                            _p = _parent
+                            indel = 1 if line[1] == "." else -1
+                            _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
+                        else:
+                            _ae = int(line[0])
+                            _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
+                except IndexError as _e:
+                    logger.error(_e)
+                    logger.error("\t".join(line))
+                    sys.exit()
 
-    snpdata = pd.DataFrame.from_dict(entries, orient="index")
-    snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-    snpdata['id'] = snpdata.index.values
-    snpdata = snpdata.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
-    snpdata.sort_values(['achr', 'astart', 'aend'], inplace=True)
+        snpdata = pd.DataFrame.from_dict(entries, orient="index")
+        snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+        snpdata['id'] = snpdata.index.values
+        snpdata = snpdata.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+        snpdata.sort_values(['achr', 'astart', 'aend'], inplace=True)
+    else:
+        snpdata = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
 
     positions = defaultdict()
     for _chr in snpdata.achr.unique():
@@ -372,16 +398,27 @@ def getTSV(cwdpath, prefix, ref):
 
     events = anno.loc[anno.parent == "-"]
     logger.debug('Starting output file generation')
-    with open("syri.out", "w") as fout:
+    with open(cwdpath + prefix + "syri.out", "w") as fout:
         notA = notal.loc[notal.achr != "-"].copy()
         notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
         notB = notal.loc[notal.bchr != "-"].copy()
         notB.loc[:, ["bstart", "bend"]] = notB.loc[:, ["bstart", "bend"]].astype("int")
         row_old = -1
         for row in events.itertuples(index=False):
-            if row_old != -1 and row_old.achr != row.achr:
-                _notA = notA.loc[(notA.achr == row_old.achr) & (notA.aend == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
-                notA.loc[(notA.achr == row_old.achr) & (notA.aend == row_old.aend + 1), 'selected'] = 1
+            if len(notA) > 0:
+                if row_old != -1 and row_old.achr != row.achr:
+                    _notA = notA.loc[(notA.achr == row_old.achr) & (notA.aend == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
+                    notA.loc[(notA.achr == row_old.achr) & (notA.aend == row_old.aend + 1), 'selected'] = 1
+                    if len(_notA) == 0:
+                        pass
+                    elif len(_notA) == 1:
+                        fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+                    else:
+                        logger.error("too many notA regions")
+                        sys.exit()
+
+                _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
+                notA.loc[(notA.achr == row.achr) & (notA.aend == row.aend + 1), 'selected'] = 1
                 if len(_notA) == 0:
                     pass
                 elif len(_notA) == 1:
@@ -389,16 +426,6 @@ def getTSV(cwdpath, prefix, ref):
                 else:
                     logger.error("too many notA regions")
                     sys.exit()
-
-            _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
-            notA.loc[(notA.achr == row.achr) & (notA.aend == row.aend + 1), 'selected'] = 1
-            if len(_notA) == 0:
-                pass
-            elif len(_notA) == 1:
-                fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
-            else:
-                logger.error("too many notA regions")
-                sys.exit()
 
             fout.write("\t".join(list(map(str, row))) + "\n")
             row_old = row
@@ -410,20 +437,20 @@ def getTSV(cwdpath, prefix, ref):
     return 0
 
 
-def getVCF(finname, foutname):
+def getVCF(finname, foutname, cwdpath, prefix):
     """
     does not output notal in qry genome
     :param finname:
     foutname:
     :return:
     """
-    data = pd.read_table(finname, header=None)
+    data = pd.read_table(cwdpath + prefix + finname, header=None)
     data.columns = ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']
     data = data.loc[data['achr'] != "-"].copy()
     data.sort_values(['achr', 'astart', 'aend'], inplace=True)
     data.loc[:, ['astart', 'aend', 'bstart', 'bend']] = data.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype(str)
 
-    with open(foutname, 'w') as fout:
+    with open(cwdpath + prefix + foutname, 'w') as fout:
         fout.write('##fileformat=VCFv4.3\n')
         fout.write('##fileDate=' + str(date.today()).replace('-', '') + '\n')
         fout.write('##source=syri\n')
