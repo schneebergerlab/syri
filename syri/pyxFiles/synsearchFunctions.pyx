@@ -305,7 +305,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     ## and are not overlappign with the syntenic blocks
     ## Merge directed and inverted blocks
 
-
     transBlocks, invTransBlocks, allTransBlocks, allTransIndexOrder = blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo)
 
     logger.debug("Translocations : found blocks" + chromo)

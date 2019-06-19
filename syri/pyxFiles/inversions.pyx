@@ -244,7 +244,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                 rightEnd = aStartSyn[rightSyn] if rightSyn < n_syn else aEnd[r_path.back()]
                 if rightEnd - leftEnd <= tUC:
                     overlapLength = (leftEnd - aStart[r_path.front()]) + (aEnd[r_path.back()] - rightEnd)
-                    if overlapLength/(rightEnd - leftEnd) < tUP:
+                    if (rightEnd - leftEnd)/(aEnd[r_path.back()] - aStart[r_path.front()]) < tUP:
                         cost = 10000000000000
 
                 # Select those candidate inversions for which the score of
