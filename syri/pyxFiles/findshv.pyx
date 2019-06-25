@@ -139,9 +139,9 @@ def getshv(args):
         sspath = args.sspath
         delta = args.delta.name
 
-        if delta not in os.listdir(cwdpath):
-            logger.error("Delta file missing")
-            sys.exit()
+        # if delta not in os.listdir(cwdpath):
+        #     logger.error("Delta file missing")
+        #     sys.exit()
 
         blocklists = [allBlocks[_i:(_i+nc)] for _i in range(0, len(allBlocks), nc)]
 

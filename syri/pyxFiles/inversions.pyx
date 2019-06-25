@@ -26,7 +26,7 @@ cpdef invPath(cpp_map[long, cpp_vec[long]] invpos, long[:, :] neighbour, float[:
         float[:]                    totscore
         Py_ssize_t                  i, j, maxid
         int                         lp = invpos.size()
-        float                       max
+        float                       maxscore
 
     for i in range(lp):
         st.push_back(aStart[invpos[i].front()])
@@ -34,7 +34,8 @@ cpdef invPath(cpp_map[long, cpp_vec[long]] invpos, long[:, :] neighbour, float[:
         stb.push_back(bEnd[invpos[i].back()])
         endb.push_back(bStart[invpos[i].front()])
 
-    totscore = profit
+
+    totscore = profit.copy()
     parents = np.array([-1]*lp, dtype = 'int')
 
     for i in range(lp):
@@ -45,12 +46,13 @@ cpdef invPath(cpp_map[long, cpp_vec[long]] invpos, long[:, :] neighbour, float[:
                         totscore[j] = profit[j] + totscore[i]
                         parents[j] = i
 
+
     maxid = -1
-    max = -1
+    maxscore = -1
 
     for i in range(lp):
-        if totscore[i] > i:
-            max = totscore[i]
+        if totscore[i] > maxscore:
+            maxscore = totscore[i]
             maxid = i
 
     path.push_front(maxid)
