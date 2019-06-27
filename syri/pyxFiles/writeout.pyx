@@ -115,8 +115,11 @@ def getTSV(cwdpath, prefix, ref):
     import sys
     from collections import defaultdict
     logger = logging.getLogger("getTSV")
+
+    logger.debug('Get SR anno')
     anno = getsrtable(cwdpath, prefix)
 
+    logger.debug('Get SV data')
     hasSV = True
     if not os.path.isfile(cwdpath + prefix + "sv.txt"):
         hasSV = False
@@ -167,6 +170,7 @@ def getTSV(cwdpath, prefix, ref):
     else:
         sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
 
+    logger.debug('Get notal data')
     hasNotal = True
     if not os.path.isfile(cwdpath + prefix + "notAligned.txt"):
         hasNotal = False
@@ -238,6 +242,7 @@ def getTSV(cwdpath, prefix, ref):
 
     entries = defaultdict()
 
+    logger.debug('Get SNP data')
     hasSNP = True
     if not os.path.isfile(cwdpath + prefix + "snps.txt"):
         hasSNP = False
@@ -348,10 +353,14 @@ def getTSV(cwdpath, prefix, ref):
                     sys.exit()
 
         snpdata = pd.DataFrame.from_dict(entries, orient="index")
-        snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-        snpdata['id'] = snpdata.index.values
-        snpdata = snpdata.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
-        snpdata.sort_values(['achr', 'astart', 'aend'], inplace=True)
+        try:
+            snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+            snpdata['id'] = snpdata.index.values
+            snpdata = snpdata.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+            snpdata.sort_values(['achr', 'astart', 'aend'], inplace=True)
+        except KeyError as e:
+            snpdata = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
+            logger.warning('No SNPs were found. This could be an error. Remove any old snps.txt and try re-running without --nosnp.')
     else:
         snpdata = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
 
