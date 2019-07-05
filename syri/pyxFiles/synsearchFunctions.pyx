@@ -5,7 +5,7 @@ import numpy as np
 from syri.bin.func.myUsefulFunctions import *
 import sys
 import time
-from igraph import *
+from igraph import Graph
 from collections import Counter, deque, defaultdict
 from scipy.stats import *
 from datetime import datetime, date

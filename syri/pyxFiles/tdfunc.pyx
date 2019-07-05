@@ -58,111 +58,6 @@ class transBlock:
     def addOrderedData(self, orderedData):
         self.orderedData = orderedData
 
-    # def checkOverlapWithSynBlocks(self,inPlaceBlocks, threshold):
-    #     aBlocks, bBlocks = findOverlappingSynBlocks(inPlaceBlocks, self.aStart, self.aEnd, self.bStart, self.bEnd)
-    #
-    #     blockAUni = 0
-    #     blockBUni = 0
-    #
-    #     start = self.aStart
-    #     end = self.aEnd
-    #
-    #     for aBlock in aBlocks:
-    #         if inPlaceBlocks.iat[aBlock,0] - start < threshold and\
-    #             end - inPlaceBlocks.iat[aBlock,1] < threshold:
-    #             start = end
-    #             break
-    #         elif inPlaceBlocks.iat[aBlock,0] < start and inPlaceBlocks.iat[aBlock,1] < end:
-    #             start = inPlaceBlocks.iat[aBlock,1]
-    #         else:
-    #             blockAUni += inPlaceBlocks.iat[aBlock,0] - start
-    #             if inPlaceBlocks.iat[aBlock,1] < end:
-    #                 start = inPlaceBlocks.iat[aBlock,1]
-    #             else:
-    #                 start = end
-    #                 break
-    #     blockAUni += end - start
-    #
-    #     start = self.bStart
-    #     end = self.bEnd
-    #     for bBlock in bBlocks:
-    #         bBlockStart = inPlaceBlocks.iat[bBlock,2]
-    #         bBlockEnd = inPlaceBlocks.iat[bBlock,3]
-    #
-    #         if bBlockStart - start < threshold and\
-    #         end - bBlockEnd < threshold:
-    #             start = end
-    #             break
-    #         elif bBlockStart < start and bBlockEnd < end:
-    #             start = bBlockEnd
-    #         else:
-    #             blockBUni += bBlockStart - start
-    #             if bBlockEnd< end:
-    #                 start = bBlockEnd
-    #             else:
-    #                 start = end
-    #                 break
-    #     blockBUni += end - start
-    #
-    #     self.overlappingInPlaceBlocks.extend([aBlocks, bBlocks])
-    #     self.aUni = True if blockAUni > 1000 or blockAUni > 0.5*(self.aEnd-self.aStart) else False
-    #     self.bUni = True if blockBUni > 1000 or blockBUni > 0.5*(self.bEnd-self.bStart) else False
-    #
-    # def checkOverlapWithSynBlocks_A(self,inPlaceBlocks, threshold):
-    #     aBlocks = list(np.where((inPlaceBlocks.aStart.values < self.aEnd) & (inPlaceBlocks.aEnd.values > self.aStart) == True)[0])
-    #
-    #
-    #     blockAUni = 0
-    #
-    #     astart = self.aStart
-    #     end = self.aEnd
-    #     for aBlock in aBlocks:
-    #         if inPlaceBlocks.iat[aBlock,0] - astart < threshold and\
-    #             end - inPlaceBlocks.iat[aBlock,1] < threshold:
-    #             astart = end
-    #             break
-    #         elif inPlaceBlocks.iat[aBlock,0] < astart and inPlaceBlocks.iat[aBlock, 1] < end:
-    #             astart = inPlaceBlocks.iat[aBlock, 1]
-    #         else:
-    #             blockAUni += inPlaceBlocks.iat[aBlock,0] - astart
-    #             if inPlaceBlocks.iat[aBlock,1] < end:
-    #                 astart = inPlaceBlocks.iat[aBlock, 1]
-    #             else:
-    #                 astart = end
-    #                 break
-    #     blockAUni += end - astart
-    #
-    #     self.overlappingInPlaceBlocks.append(aBlocks)
-    #     self.aUni = True if blockAUni > 1000 or blockAUni > 0.5*(self.aEnd-self.aStart) else False
-    #
-    # def checkOverlapWithSynBlocks_B(self,inPlaceBlocks, threshold):
-    #     bBlocks = list(np.where((inPlaceBlocks.bStart.values < self.bEnd) & (inPlaceBlocks.bEnd.values > self.bStart) == True)[0])
-    #
-    #     blockBUni = 0
-    #     start = self.bStart
-    #     end = self.bEnd
-    #     for bBlock in bBlocks:
-    #         bBlockStart = inPlaceBlocks.iat[bBlock,2]
-    #         bBlockEnd = inPlaceBlocks.iat[bBlock,3]
-    #
-    #         if bBlockStart - start < threshold and\
-    #         end - bBlockEnd < threshold:
-    #             start = end
-    #             break
-    #         elif bBlockStart < start and bBlockEnd < end:
-    #             start = bBlockEnd
-    #         else:
-    #             blockBUni += bBlockStart - start
-    #             if bBlockEnd< end:
-    #                 start = bBlockEnd
-    #             else:
-    #                 start = end
-    #                 break
-    #     blockBUni += end - start
-    #
-    #     self.overlappingInPlaceBlocks.append(bBlocks)
-    #     self.bUni = True if blockBUni > 1000 or blockBUni > 0.5*(self.bEnd-self.bStart) else False
-
     def addMEBlock(self, blockID):
         """List of Blocks which prohibit the entry of current block in the
         optimal solution"""
@@ -979,7 +874,7 @@ cpdef getProfitableTrans(cpp_map[long, cpp_set[long]] graph, long[:] astart, lon
         unsigned long                               cnt
         long                                        nodecnt, edgecnt, len_in = len(inastart)
         long                                        ast, aen, bst, ben
-        long                                        ascore, bscore, agap, bgap
+        float                                       ascore, bscore, agap, bgap
         long                                        al, bl, au, bu
         float                                       score
         float[:]                                    weight
@@ -1199,30 +1094,31 @@ cpdef getProfitableTrans(cpp_map[long, cpp_set[long]] graph, long[:] astart, lon
                 nodepath[topo[j]] = path
                 path.push_front(i)                          ## Found the best path between two co-linear nodes
 
+
                 ## Calculate score of the identified path
-                ascore = alen[path[0]]
-                bscore = blen[path[0]]
+                ascore = float(alen[path[0]])
+                bscore = float(blen[path[0]])
                 agap = 0
                 bgap = 0
 
                 if path.size() > 1:
                     for k in range(1, <Py_ssize_t> path.size()):
-                        ascore += alen[path[k]]
-                        bscore += blen[path[k]]
-                        agap += 0 if 0 > (astart[path[k]] - aend[path[k-1]]) else astart[path[k]] - aend[path[k-1]]
+                        ascore += float(alen[path[k]])
+                        bscore += float(blen[path[k]])
+                        agap += 0 if 0 > (astart[path[k]] - aend[path[k-1]]) else float(astart[path[k]] - aend[path[k-1]])
                         if not isinv:
-                            bgap += 0 if 0 > (bstart[path[k]] - bend[path[k-1]]) else bstart[path[k]] - bend[path[k-1]]
+                            bgap += 0 if 0 > (bstart[path[k]] - bend[path[k-1]]) else float(bstart[path[k]] - bend[path[k-1]])
                         else:
-                            bgap += 0 if 0 > (bstart[path[k-1]] - bend[path[k]]) else bstart[path[k-1]] - bend[path[k]]
+                            bgap += 0 if 0 > (bstart[path[k-1]] - bend[path[k]]) else float(bstart[path[k-1]] - bend[path[k]])
 
                 score = min(((ascore - agap)/ascore),((bscore - bgap)/bscore))
 
 
                 # print([path[id] for id in range(path.size())], score)
-
                 ## Check if the alignments of the path explain sufficient unique alignments and are not excessively overlapped
 
                 # Only process paths for which the alignments explain more than gaps
+
                 if score > 0:
                     al = 0
                     bl = 0
