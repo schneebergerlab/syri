@@ -604,7 +604,7 @@ def outSyn(cwdPath, threshold, prefix):
                    "translocation":"TLCtx",
                    "invTranslocation":"invTLCtx"}
     reCoords =  pd.DataFrame()
-        
+
     synData = []
     with open(cwdPath+prefix+"synOut.txt","r") as fin:
         for line in fin:
@@ -623,10 +623,10 @@ def outSyn(cwdPath, threshold, prefix):
     else:
         synData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","isinInv"]
     synData["class"] = "syn"
-       
-    for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt","ctxOut.txt"]:    
+
+    for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt","ctxOut.txt"]:
         data = []
-        with open(cwdPath+prefix+i,"r") as fin: 
+        with open(cwdPath+prefix+i,"r") as fin:
             if i != "ctxOut.txt":
                 for line in fin:
                     line = line.strip().split("\t")
@@ -644,7 +644,7 @@ def outSyn(cwdPath, threshold, prefix):
                 data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","class"], dtype=object)
                 if len(data)>0:
                     reCoords = reCoords.append(data)
-                
+
     allBlocks = synData[["aStart","aEnd","bStart","bEnd","aChr","bChr","class"]].append(reCoords)
     allBlocks.index = range(allBlocks.shape[0])
     allBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace= True)
@@ -654,7 +654,7 @@ def outSyn(cwdPath, threshold, prefix):
 
     aClusters = []
     currentCluster = []
-    for index, row in allBlocks.iterrows():    
+    for index, row in allBlocks.iterrows():
         if len(currentCluster) == 0:
             if row["class"] != "syn":
                 continue
@@ -668,7 +668,7 @@ def outSyn(cwdPath, threshold, prefix):
                 aClusters.append(currentCluster)
                 currentCluster = [index]
                 curChr = row["aChr"]
-        
+
         elif row["class"] in ["TL", "inv","invTL","TLCtx","invTLCtx"]:
             aClusters.append(currentCluster)
             currentCluster = []
@@ -689,7 +689,7 @@ def outSyn(cwdPath, threshold, prefix):
                     aClusters.append(currentCluster)
                     currentCluster = []
     aClusters.append(currentCluster)
-                    
+
     allBlocks.sort_values(["bChr","bStart","bEnd","bChr","aStart","aEnd"],inplace = True)
     bClusters = []
     currentCluster = []
@@ -715,10 +715,7 @@ def outSyn(cwdPath, threshold, prefix):
             if row["bEnd"] < allBlocks.loc[currentCluster[-1]]["bEnd"] + threshold:
                 continue
             else:
-
                 allClasses = allBlocks["class"][list(allBlocks.index.values).index(index):]
-                if index == 7929:
-                    print(index)
                 if len(np.where(allClasses=="syn")[0]) > 0:
                     nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
                     if max(row["bStart"], allBlocks.loc[currentCluster[-1]]["bEnd"]) > allBlocks.loc[nextSyn]["bStart"] - threshold:
@@ -731,9 +728,9 @@ def outSyn(cwdPath, threshold, prefix):
                     currentCluster = []
     bClusters.append(currentCluster)
     allBlocks.sort_values(["aChr","aStart","aEnd","bChr", "bStart","bEnd"],inplace = True)
-   
+
     outClusters = []
-    aIndex = 0 
+    aIndex = 0
     bIndex = 0
     currentCluster = []
     for i in unlist(aClusters):
@@ -747,9 +744,9 @@ def outSyn(cwdPath, threshold, prefix):
             outClusters.append(currentCluster)
             currentCluster = [i]
     outClusters.append(currentCluster)
-    
+
     hasSynInInv = "isinInv" in synData.columns
-    
+
     with open(cwdPath+prefix+"synOut.txt","w", encoding="utf-8") as fout:
         for i in outClusters:
             fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"aChr"],allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"]])) +"\n")
@@ -758,9 +755,9 @@ def outSyn(cwdPath, threshold, prefix):
                 if hasSynInInv and synData.loc[synLocs[j]]["isinInv"] == "Syn_in_Inv":
                     fout.write("\tSyn_in_Inv\n")
                 else:
-                    fout.write("\n")   
+                    fout.write("\n")
     return None
-    
+
         
 def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn):
     
