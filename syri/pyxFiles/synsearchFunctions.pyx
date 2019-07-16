@@ -701,7 +701,7 @@ def outSyn(cwdPath, threshold, prefix):
                 curChr = row["bChr"]
                 currentCluster.append(index)
         elif row["class"] == "syn":
-            if row["aChr"] == curChr:
+            if row["bChr"] == curChr:
                 currentCluster.append(index)
             else:
                 bClusters.append(currentCluster)
@@ -715,7 +715,10 @@ def outSyn(cwdPath, threshold, prefix):
             if row["bEnd"] < allBlocks.loc[currentCluster[-1]]["bEnd"] + threshold:
                 continue
             else:
-                allClasses = allBlocks["class"][index:]
+
+                allClasses = allBlocks["class"][list(allBlocks.index.values).index(index):]
+                if index == 7929:
+                    print(index)
                 if len(np.where(allClasses=="syn")[0]) > 0:
                     nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
                     if max(row["bStart"], allBlocks.loc[currentCluster[-1]]["bEnd"]) > allBlocks.loc[nextSyn]["bStart"] - threshold:
