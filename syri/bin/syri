@@ -48,7 +48,7 @@ if __name__ == "__main__":
     shvargs.add_argument("--nosnp", dest="nosnp", help="Set to skip SNP/Indel (within alignment) identification", action="store_true", default=False)
     # shvargs.add_argument("-align", dest="align", help="Alignment file to parse to show-snps for SNP/Indel identification", action="store_false", type=argparse.FileType("r"))
     shvargs.add_argument("--all", help="Use duplications too for variant identification",  action="store_true", default=False)
-    shvargs.add_argument("--allow-offset", dest='offset', help='BPs allowed to overlap', default=0, type=int, action="store")
+    shvargs.add_argument("--allow-offset", dest='offset', help='BPs allowed to overlap', default=5, type=int, action="store")
     shvargs.add_argument('--cigar', dest="cigar", help="Find SNPs/indels using CIGAR string. Necessary for alignment generated using aligners other than nucmers", default=False, action='store_true')
     shvargs.add_argument('-s', dest="sspath", help="path to show-snps from mummer", default="show-snps")
     # shvargs.add_argument('-buff', dest="buff", help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=0)
