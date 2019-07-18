@@ -119,17 +119,27 @@ def runss(_id, _sspath, _delta, allAlignments):
                       pd.unique(_block["aChr"])[0],
                       pd.unique(_block["bChr"])[0]])+ "\n" + _out[0].decode("UTF-8")
 
+
 def getshv(args):
     logger = logging.getLogger("ShV")
     cwdpath = args.dir
     prefix = args.prefix
 
-
-    allAlignments = readSRData(cwdpath, prefix, args.all)
-    allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
-    allBlocks = pd.unique(allAlignments.id)
-
     if not args.cigar:
+        allAlignments = readSRData(cwdpath, prefix, args.all)
+        mapit = 0
+        if os.path.isfile(cwdpath+prefix+"mapids.txt"):
+            mapit = 1
+            chroms = {}
+            with open(cwdpath+prefix+"mapids.txt", "r") as m:
+                for line in m:
+                    l = line.strip().split()
+                    chroms[l[1]] = l[0]
+            for k,v in chroms.items():
+                allAlignments.loc[allAlignments.bChr == v,"bChr"] = k
+
+        allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
+        allBlocks = pd.unique(allAlignments.id)
         logger.debug("finding short variation using MUMmer alignments")
         nc = args.nCores
 
@@ -139,13 +149,13 @@ def getshv(args):
         sspath = args.sspath
         delta = args.delta.name
 
-        # if delta not in os.listdir(cwdpath):
-        #     logger.error("Delta file missing")
-        #     sys.exit()
-
         blocklists = [allBlocks[_i:(_i+nc)] for _i in range(0, len(allBlocks), nc)]
 
-        with open(cwdpath + prefix + "snps.txt", "w") as fout:
+        if mapit == 1:
+            fname = "snps_init.txt"
+        else:
+            fname = "snps.txt"
+        with open(cwdpath + prefix + fname, "w") as fout:
             for _id in blocklists:
                 with Pool(processes=nc) as pool:
                     out = pool.map(partial(runss, _sspath=sspath, _delta=delta, allAlignments=allAlignments), _id)
@@ -164,13 +174,32 @@ def getshv(args):
                                 continue
                             else:
                                 fout.write(line)
+
+        if mapit == 1:
+            with open(cwdpath + prefix + "snps.txt", "w") as fout:
+                with open(cwdpath + prefix + "snps_init.txt", "r") as fin:
+                   for line in fin:
+                       l = line.strip().split()
+                       if l[0] == "#":
+                           chr = l[6]
+                           l[6] = chroms[chr]
+                           fout.write("\t".join(l) + "\n")
+                       else:
+                           l[11] = chroms[chr]
+                           fout.write("\t".join(l) + "\n")
+
+            fileRemove(cwdpath + prefix + "snps_init.txt")
         return None
 
     else:
         logger.debug("finding short variation using CIGAR string")
         coordsfin = args.infile.name
         chrmatch = args.chrmatch
-        coords = readCoords(coordsfin, chrmatch, cigar=True)
+        coords = readCoords(coordsfin, chrmatch, cwdpath, prefix, cigar=True)
+        allAlignments = readSRData(cwdpath, prefix, args.all)
+        allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
+        allBlocks = pd.unique(allAlignments.id)
+
         refg = {fasta.id:fasta.seq for fasta in parse(args.ref.name, 'fasta', generic_dna)}
         qryg = {fasta.id:fasta.seq for fasta in parse(args.qry.name, 'fasta', generic_dna)}
 

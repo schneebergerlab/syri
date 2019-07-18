@@ -28,7 +28,7 @@ np.random.seed(1)
 
 from syri.pyxFiles.function cimport getmeblocks, getOverlapWithSynBlocks
 
-def readCoords(coordsfin, chrmatch, cigar = False):
+def readCoords(coordsfin, chrmatch, cwdpath, prefix, cigar = False):
     logger = logging.getLogger('Reading Coords')
 
     chrlink = {}
@@ -150,7 +150,7 @@ def readCoords(coordsfin, chrmatch, cigar = False):
                 logger.error("Unequal number of chromosomes in the genomes. Exiting")
                 sys.exit()
             else:
-                logger.warning("Matching them automatically. For each reference genome, most similar query genome will be selected")
+                logger.warning("Matching them automatically. For each reference genome, most similar query genome will be selected. Check mapids.txt for mapping used.")
                 chromMaps = defaultdict(dict)
                 for i in np.unique(coords.bChr):
                     for j in np.unique(coords.aChr):
@@ -159,15 +159,20 @@ def readCoords(coordsfin, chrmatch, cigar = False):
                         chromMaps[j][i] = len(a) + (a[:, 1] - a[:, 0]).sum()
 
                 assigned = []
+                fout = open(cwdpath+prefix+"mapids.txt", "w")
                 for chrom in np.unique(coords.aChr):
                     maxid = max(chromMaps[chrom].items(), key=lambda x: x[1])[0]
                     if maxid in assigned:
                         logger.error("{} in genome B is best match for two chromosomes in genome A. Cannot assign chromosomes automatically.".format(maxid))
+                        fout.close()
+                        fileRemove(cwdpath+prefix+"mapids.txt")
                         sys.exit()
                     assigned.append(maxid)
+                    fout.write(chrom+"\t"+maxid+"\n")
                     logger.info("setting {} as {}".format(maxid, chrom))
                     coords.loc[coords.bChr == maxid, "bChr"] = chrom
                     chrlink[maxid] = chrom
+                fout.close()
         else:
             logger.warning("--no-chrmatch is set. Not matching chromosomes automatically.")
             aChromo = set(coords["aChr"])
@@ -195,7 +200,7 @@ def startSyri(args):
     logger.warning("starting")
     logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
 
-    coords, chrlink = readCoords(coordsfin, chrmatch)
+    coords, chrlink = readCoords(coordsfin, chrmatch, cwdPath, prefix)
 
     uniChromo = list(np.unique(coords.aChr))
     logger.info('Analysing chromosomes: {}'.format(uniChromo))
