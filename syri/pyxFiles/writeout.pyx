@@ -314,7 +314,7 @@ def getTSV(cwdpath, prefix, ref):
                         indel = 1 if line[1] == "." else -1
                         _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
                     elif indel == 1:
-                        if int(line[0]) != _as or line[1] != "." or line[10] != _ac:
+                        if int(line[0]) != _as or line[1] != "." or line[10] != _ac or int(line[3])!=(_be+1):
                             p_indel()
                             _seq = ""
                             count += 1
@@ -331,7 +331,7 @@ def getTSV(cwdpath, prefix, ref):
                             _be = int(line[3])
                             _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
                     elif indel == -1:
-                        if int(line[3]) != _bs or line[2] != "." or line[11] != _bc:
+                        if int(line[3]) != _bs or line[2] != "." or line[11] != _bc or int(line[0])!=(_ae+1):
                             p_indel()
                             _seq = ""
                             count += 1
