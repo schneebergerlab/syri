@@ -1,6 +1,6 @@
 cwd="."     # Change to working directory
 cd $cwd
-PATH_TO_SYRI="../syri/bin/syri"
+PATH_TO_SYRI="../syri/bin/syri" #Change the path to point to syri
 ## Get Yeast Reference genome
 wget ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/146/045/GCA_000146045.2_R64/GCA_000146045.2_R64_genomic.fna.gz
 gzip -df GCA_000146045.2_R64_genomic.fna.gz
