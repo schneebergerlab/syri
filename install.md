@@ -1,8 +1,11 @@
 ## Pre-requisite for installing SyRI
+
+### C/C++ compiler
+g++
 ### Python
 SyRI needs Python3 (recommended Python3.5 or above) and depends on the following python libraries: [Cython](https://cython.org/#download), [Numpy](https://www.numpy.org/), [Scipy](https://www.scipy.org/install.html), [Pandas](https://pandas.pydata.org/), [Igraph](https://igraph.org/python/), [Biopython](https://biopython.org/), [psutil](https://github.com/giampaolo/psutil)
 
-All these packages are available through and be installed using:
+All these packages are available through anaconda and can be installed using:
 
 ```bash
 conda install cython numpy scipy pandas biopython psutil
@@ -17,7 +20,8 @@ SyRI uses whole genome alignments as input. Users can use any aligner of their c
 2. Open the directory where ```setup.py``` is (we will call it as  ```cwd```) and in the terminal run:
 
 ```bash
-python3 setup.py install
+python3 setup.py install		# Install syri
+chmod +x syri/bin/syri			# Make it executable
 ```
 
 All executables would be in ```cwd/syri/bin/```.
