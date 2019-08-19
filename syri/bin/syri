@@ -21,6 +21,7 @@ if __name__ == "__main__":
 
 # parser.add_argument("-n", dest="threshold", help="Threshold to differentiate estimate whether the",\type=int,
     # default=50)
+    optional.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM", default="T", choices=['T', 'S', 'B'])
     optional.add_argument('-o', dest="fout", help="Output file name", default="syri", type=str)
     optional.add_argument('-k', dest="keep", help="Keep internediate output files", default=False, action="store_true")
     optional.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])

@@ -195,13 +195,20 @@ def getshv(args):
         logger.debug("finding short variation using CIGAR string")
         coordsfin = args.infile.name
         chrmatch = args.chrmatch
-        coords = readCoords(coordsfin, chrmatch, cwdpath, prefix, cigar=True)
+        coords, chrlink = readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar=True)
         allAlignments = readSRData(cwdpath, prefix, args.all)
         allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
         allBlocks = pd.unique(allAlignments.id)
 
         refg = {fasta.id:fasta.seq for fasta in parse(args.ref.name, 'fasta', generic_dna)}
         qryg = {fasta.id:fasta.seq for fasta in parse(args.qry.name, 'fasta', generic_dna)}
+
+        if len(chrlink) > 0 :
+            try:
+                qryg = {chrlink[k]:v for k,v in qryg.items()}
+            except Exception as e:
+                print(e)
+                logger.error("Unequal number of chromosomes in the two genomes.")
 
         with open('snps.txt', 'w') as fout:
             for b in allBlocks:
@@ -218,9 +225,10 @@ def getshv(args):
                         cg = coords.loc[(coords.aStart == row.aStart) &
                                         (coords.aEnd == row.aEnd) &
                                         (coords.bStart == row.bStart) &
-                        (coords.bEnd == row.bEnd) &
-                        (coords.aChr == row.aChr) &
-                        (coords.bChr == row.bChr), 'cigar']
+                                        (coords.bEnd == row.bEnd) &
+                                        (coords.aChr == row.aChr) &
+                                        (coords.bChr == row.bChr), 'cigar']
+
                         brks = findall("(\d+)([IDX=])?", cg.iloc[0])
 
                         # chech for validity of CIGAR string
