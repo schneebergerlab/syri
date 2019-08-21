@@ -11,5 +11,5 @@ Further, SyRI also identifies local variations within all syntenic and structura
 3. [Pseudo-genome generation](scaforder.md)
 4. [File-format](fileformat.md)
 5. [Working example](pipeline.md)
-6. [Citation](#citation)
+6. [Citation](cite.md)
 
