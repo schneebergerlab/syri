@@ -451,7 +451,7 @@ def getTSV(cwdpath, prefix, ref):
                 l = line.strip().split()
                 chroms[l[0]] = l[1]
         lines = open(cwdpath + prefix + "syri.out", "r").readlines()
-        with open(cwdpath + prefix + "syri_temp.out", "w") as fout:
+        with open(cwdpath + prefix + "syri.out", "w") as fout:
             for line in lines:
                 line = line.strip().split('\t')
                 if line[5] != "-":

@@ -109,20 +109,23 @@ def readSAMBAM(fin, type='B'):
 
 def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     logger = logging.getLogger('Reading Coords')
-
+    logger.debug(args.ftype)
     chrlink = {}
     if args.ftype == 'T':
+        logger.info("Reading input from .tsv file")
         try:
             coords = pd.read_table(coordsfin, header = None)
         except pd.errors.ParserError:
             coords = pd.read_table(coordsfin, header = None, engine = "python")
     elif args.ftype == 'S':
+        logger.info("Reading input from .tsv file")
         try:
             coords = readSAMBAM(coordsfin, type='S')
         except:
             logger.error("Error in reading the SAM file")
             sys.exit()
     elif args.ftype == 'B':
+        logger.info("Reading input from .tsv file")
         try:
             coords = readSAMBAM(coordsfin, type='B')
         except:

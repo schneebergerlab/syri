@@ -55,7 +55,9 @@ if __name__ == "__main__":
     # shvargs.add_argument('-buff', dest="buff", help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=0)
 
     args = parser.parse_args()
-
+    
+    print(args)
+    
     import logging
     import logging.config
     import os
@@ -94,10 +96,16 @@ if __name__ == "__main__":
         },
     })
 
+    # Set CWD
     if args.dir is None:
         args.dir = os.getcwd() + os.sep
     else:
         args.dir = args.dir + os.sep
+    
+    # Set CIGAR FLAG
+    if args.ftype in ['S','B']:
+        args.cigar = True
+    
 
     ###################################################################
     # Identify structural rearrangements
