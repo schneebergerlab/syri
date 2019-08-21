@@ -32,121 +32,80 @@ from syri.pyxFiles.function cimport getmeblocks, getOverlapWithSynBlocks
 
 def readSAMBAM(fin, type='B'):
     import pysam
-
-    if type == 'B':
-        logger = logging.getLogger('Reading BAM file')
-        try:
+    logger = logging.getLogger('Reading BAM/SAM file')
+    try:
+        if type == 'B':
             findata = pysam.AlignmentFile(fin,'rb')
-            coords = {}
-            index = 0
-            for aln in findata:
-                index += 1
-
-                ## Check CIGAR:
-                if False in [False if i[0] not in [1,2,4,5,7,8] else True for i in aln.cigartuples]:
-                    sys.exit("Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: " + aln.cigarstring)
-
-                if True in [False if i[0] in [4,5] else False for i in aln.cigartuples[1:-1]]:
-                    sys.exit("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + aln.cigarstring)
-
-                astart = aln.reference_start+1
-                aend = aln.reference_end
-
-                is_inv = True if np.binary_repr(aln.flag,12)[7] == '1' else False
-                if not is_inv:
-                    if aln.cigartuples[0][0] in [4,5]:
-                        bstart = aln.cigartuples[0][1]+1
-                    else:
-                        bstart = 1
-                    bend = bstart + aln.query_alignment_length - 1
-                else:
-                    if aln.cigartuples[-1][0] in [4,5]:
-                        bend = aln.cigartuples[-1][1]+1
-                    else:
-                        bend = 1
-                    bstart = bend + aln.query_alignment_length - 1
-
-                alen = abs(aend - astart) + 1
-                blen = abs(bend - bstart) + 1
-
-                format((sum([i[1] for i in aln.cigartuples if i[0] == 7])/sum([i[1] for i in aln.cigartuples if i[0] in [1,2,7,8]]))*100, '.2f')
-
-                iden = format((sum([i[1] for i in aln.cigartuples if i[0] == 7])/sum([i[1] for i in aln.cigartuples if i[0] in [1,2,7,8]]))*100, '.2f')
-                adir = 1
-                bdir = -1 if is_inv else 1
-
-                achr = aln.reference_name
-                bchr = aln.query_name
-
-                cgdict = {1:'I', 2:'D', 7:'=', 8:'X'}
-                cg = "".join([str(i[1]) + cgdict[i[0]] for i in aln.cigartuples if i[0] not in [4,5]])
-                coords[index] = [astart, aend, bstart, bend, alen, blen, iden, adir, bdir, achr, bchr, cg]
-            coords = pd.DataFrame.from_dict(coords, orient= 'index')
-            coords.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
-            return coords
-        except Exception as error:
-            logger.error("Error in reading BAM file."+ error)
-            sys.exit()
-
-    elif type == 'S':
-        logger = logging.getLogger('Reading SAM file')
-        try:
+        elif type == 'S':
             findata = pysam.AlignmentFile(fin,'r')
+        else:
+            raise ValueError("Wrong parameter")
+    except ValueError as e:
+        logger.error("Error in opening BAM/SAM file. " + e)
+        sys.exit()
+    except OSError as e:
+        print("Error in reading input file.")
+        print(e)
+        sys.exit()
+    except Exception as e:
+        logger.error("Unexpected error in opening BAM/SAM file. " + e)
+        sys.exit()
 
-            coords = {}
-            index = 0
-            for aln in findata:
-                index += 1
+    try:
+        coords = {}
+        index = 0
+        for aln in findata:
+            index += 1
 
-                ## Check CIGAR:
-                if False in [False if i[0] not in [1,2,4,5,7,8] else True for i in aln.cigartuples]:
-                    sys.exit("Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: " + aln.cigarstring)
+            if aln.cigarstring == "*":
+                continue
 
-                if True in [False if i[0] in [4,5] else False for i in aln.cigartuples[1:-1]]:
-                    sys.exit("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + aln.cigarstring)
+            ## Check CIGAR:
+            if False in [False if i[0] not in [1,2,4,5,7,8] else True for i in aln.cigartuples]:
+                sys.exit("Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: " + aln.cigarstring)
 
-                astart = aln.reference_start+1
-                aend = aln.reference_end
+            if True in [False if i[0] in [4,5] else False for i in aln.cigartuples[1:-1]]:
+                sys.exit("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + aln.cigarstring)
 
-                is_inv = True if np.binary_repr(aln.flag,12)[7] == '1' else False
-                if not is_inv:
-                    if aln.cigartuples[0][0] in [4,5]:
-                        bstart = aln.cigartuples[0][1]+1
-                    else:
-                        bstart = 1
-                    bend = bstart + aln.query_alignment_length - 1
+            astart = aln.reference_start+1
+            aend = aln.reference_end
+
+            is_inv = True if np.binary_repr(aln.flag,12)[7] == '1' else False
+            if not is_inv:
+                if aln.cigartuples[0][0] in [4,5]:
+                    bstart = aln.cigartuples[0][1]+1
                 else:
-                    if aln.cigartuples[-1][0] in [4,5]:
-                        bend = aln.cigartuples[-1][1]+1
-                    else:
-                        bend = 1
-                    bstart = bend + aln.query_alignment_length - 1
+                    bstart = 1
+                bend = bstart + aln.query_alignment_length - 1
+            else:
+                if aln.cigartuples[-1][0] in [4,5]:
+                    bend = aln.cigartuples[-1][1]+1
+                else:
+                    bend = 1
+                bstart = bend + aln.query_alignment_length - 1
 
-                alen = abs(aend - astart) + 1
-                blen = abs(bend - bstart) + 1
+            alen = abs(aend - astart) + 1
+            blen = abs(bend - bstart) + 1
 
-                format((sum([i[1] for i in aln.cigartuples if i[0] == 7])/sum([i[1] for i in aln.cigartuples if i[0] in [1,2,7,8]]))*100, '.2f')
+            format((sum([i[1] for i in aln.cigartuples if i[0] == 7])/sum([i[1] for i in aln.cigartuples if i[0] in [1,2,7,8]]))*100, '.2f')
 
-                iden = format((sum([i[1] for i in aln.cigartuples if i[0] == 7])/sum([i[1] for i in aln.cigartuples if i[0] in [1,2,7,8]]))*100, '.2f')
-                adir = 1
-                bdir = -1 if is_inv else 1
+            iden = format((sum([i[1] for i in aln.cigartuples if i[0] == 7])/sum([i[1] for i in aln.cigartuples if i[0] in [1,2,7,8]]))*100, '.2f')
+            adir = 1
+            bdir = -1 if is_inv else 1
 
-                achr = aln.reference_name
-                bchr = aln.query_name
+            achr = aln.reference_name
+            bchr = aln.query_name
 
-                cgdict = {1:'I', 2:'D', 7:'=', 8:'X'}
-                cg = "".join([str(i[1]) + cgdict[i[0]] for i in aln.cigartuples if i[0] not in [4,5]])
-                coords[index] = [astart, aend, bstart, bend, alen, blen, iden, adir, bdir, achr, bchr, cg]
-
-            coords = pd.DataFrame.from_dict(coords, orient= 'index')
-            coords.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
-            return coords
-        except Exception as error:
-            logger.error("Error in reading SAM file."+ error)
-            sys.exit()
-    else:
-        sys.exit("Incorrect type to readSAMBAM")
-
+            cgdict = {1:'I', 2:'D', 7:'=', 8:'X'}
+            cg = "".join([str(i[1]) + cgdict[i[0]] for i in aln.cigartuples if i[0] not in [4,5]])
+            coords[index] = [astart, aend, bstart, bend, alen, blen, iden, adir, bdir, achr, bchr, cg]
+        coords = pd.DataFrame.from_dict(coords, orient= 'index')
+        coords.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
+        return coords
+    except Exception as e:
+        logger.error("Error in reading BAM file.")
+        print(e)
+        sys.exit()
 
 def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     logger = logging.getLogger('Reading Coords')
@@ -172,8 +131,6 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     else:
         logger.error("Incorrect file type specified.")
         sys.exit()
-
-
 
     if not cigar:
         if coords.shape[1] >= 12:

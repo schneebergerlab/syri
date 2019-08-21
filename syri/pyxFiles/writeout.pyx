@@ -443,6 +443,20 @@ def getTSV(cwdpath, prefix, ref):
             outdata.sort_values(["astart", "aend"], inplace=True)
             fout.write(outdata.to_csv(sep="\t", index=False, header=False))
         fout.write(notB.loc[:, notB.columns != 'selected'].to_csv(sep="\t", index=False, header=False))
+
+    if os.path.isfile(cwdpath+prefix+"mapids.txt"):
+        chroms = {}
+        with open(cwdpath+prefix+"mapids.txt", "r") as m:
+            for line in m:
+                l = line.strip().split()
+                chroms[l[0]] = l[1]
+        lines = open(cwdpath + prefix + "syri.out", "r").readlines()
+        with open(cwdpath + prefix + "syri_temp.out", "w") as fout:
+            for line in lines:
+                line = line.strip().split('\t')
+                if line[5] != "-":
+                    line[5] = chroms[line[5]]
+                fout.write("\t".join(line) + '\n')
     return 0
 
 

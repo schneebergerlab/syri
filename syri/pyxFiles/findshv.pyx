@@ -7,7 +7,6 @@ from collections import Counter, deque, defaultdict
 from scipy.stats import *
 from datetime import datetime, date
 import pandas as pd
-from multiprocessing import Pool
 from functools import partial
 import os
 from gc import collect
@@ -23,6 +22,8 @@ cimport cython
 np.random.seed(1)
 
 from syri.pyxFiles.synsearchFunctions import readCoords
+
+chrsnps = defaultdict(dict)
 
 def readSRData(cwdPath, prefix, dup = False):
     if not isinstance(dup, bool):
@@ -101,24 +102,39 @@ def readSRData(cwdPath, prefix, dup = False):
     annoCoords.index = range(len(annoCoords))
     return annoCoords
 
+def getsnps(blocks, allAlignments):
+    global chrsnps
+    outstring = ""
+    for block in blocks:
+        alignments= allAlignments.loc[allAlignments.id == block].copy()
+        achr = pd.unique(alignments['aChr'])[0]
+        bchr = pd.unique(alignments['bChr'])[0]
+        snps = chrsnps[achr][bchr]
+        outsnps = pd.DataFrame()
+        for row in alignments.itertuples(index=False):
+            if not 'inv' in row.state:
+                outsnps = outsnps.append(snps.loc[(snps[0] > row.aStart) &
+                                        (snps[0] < row.aEnd) &
+                                        (snps[3] > row.bStart) &
+                                        (snps[3] < row.bEnd) &
+                                        (snps[9] == 1)])
+            else:
+                outsnps = outsnps.append(snps.loc[(snps[0] > row.aStart) &
+                                        (snps[0] < row.aEnd) &
+                                        (snps[3] < row.bStart) &
+                                        (snps[3] > row.bEnd) &
+                                        (snps[9] == -1)])
 
-def runss(_id, _sspath, _delta, allAlignments):
-    from subprocess import Popen, PIPE
-
-    _block = allAlignments.loc[allAlignments.id == _id].copy()
-
-    if 1 < len(pd.unique(_block["aChr"])) or 1 < len(pd.unique(_block["bChr"])):
-            sys.exit("More than one chromosome found for a SR")
-    _p = Popen([_sspath + " -HrTS " + _delta], stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
-    _out = _p.communicate(input=_block[["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].to_string(index=False, header=False).encode())
-    return "\t".join(["#",
-                      str(_block[["aStart", "aEnd"]].min().min()),
-                      str(_block[["aStart", "aEnd"]].max().max()),
-                      str(_block[["bStart", "bEnd"]].min().min()),
-                      str(_block[["bStart", "bEnd"]].max().max()),
-                      pd.unique(_block["aChr"])[0],
-                      pd.unique(_block["bChr"])[0]])+ "\n" + _out[0].decode("UTF-8")
-
+            outsnps.drop_duplicates(inplace=True)
+            outsnps.sort_values([0,3], inplace=True)
+        outstring = outstring+"\t".join(["#",
+                          str(alignments[["aStart", "aEnd"]].min().min()),
+                          str(alignments[["aStart", "aEnd"]].max().max()),
+                          str(alignments[["bStart", "bEnd"]].min().min()),
+                          str(alignments[["bStart", "bEnd"]].max().max()),
+                          pd.unique(alignments["aChr"])[0],
+                          pd.unique(alignments["bChr"])[0]])+ "\n" + outsnps.to_csv(sep='\t', header=False, index=False)
+    return outstring
 
 def getshv(args):
     logger = logging.getLogger("ShV")
@@ -126,6 +142,11 @@ def getshv(args):
     prefix = args.prefix
 
     if not args.cigar:
+        from subprocess import Popen, PIPE
+        from multiprocessing import Pool
+
+        global chrsnps                          # Use global variable to save SNPs divided based on chromosomes. Using global variable, saves memory when classifying snps/indels using parallel processing
+
         allAlignments = readSRData(cwdpath, prefix, args.all)
         mapit = 0
         if os.path.isfile(cwdpath+prefix+"mapids.txt"):
@@ -149,18 +170,42 @@ def getshv(args):
         sspath = args.sspath
         delta = args.delta.name
 
-        blocklists = [allBlocks[_i:(_i+nc)] for _i in range(0, len(allBlocks), nc)]
-
         if mapit == 1:
             fname = "snps_init.txt"
         else:
             fname = "snps.txt"
         with open(cwdpath + prefix + fname, "w") as fout:
-            for _id in blocklists:
-                with Pool(processes=nc) as pool:
-                    out = pool.map(partial(runss, _sspath=sspath, _delta=delta, allAlignments=allAlignments), _id)
-                for _snp in out:
-                    fout.write(_snp)
+            p = Popen([sspath + " -HrTS " + delta], stdin=PIPE, stdout=fout, stderr=PIPE, shell=True)
+            out = p.communicate(input=allAlignments[["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].to_string(index=False, header=False).encode())
+
+        allsnps = pd.read_table(cwdpath + prefix + fname, header = None)
+
+        # chrsnps = defaultdict(dict)
+        achrs = pd.unique(allAlignments['aChr'])
+        bchrs = pd.unique(allAlignments['bChr'])
+
+        for achr in achrs:
+            for bchr in bchrs:
+                chrsnps[achr][bchr] = allsnps.loc[(allsnps[10] == achr) & (allsnps[11] == bchr)]
+
+        # blocklists = [allBlocks[_i:(_i+nc)] for _i in range(0, len(allBlocks), nc)]
+        blocklists = np.array_split(allBlocks, nc)
+        with open(cwdpath + prefix + fname,'w') as fout:
+            with Pool(processes=nc) as pool:
+                out = pool.map(partial(getsnps, allAlignments=allAlignments), blocklists)
+            for snps in out:
+                fout.write(snps)
+
+
+            #
+            # for blocks in blocklists:
+            #     inpdata = []
+            #     for block in blocks:
+            #         bdf = allAlignments.loc[allAlignments.id == block].copy()
+            #         achr = pd.unique(bdf['aChr'])[0]
+            #         bchr = pd.unique(bdf['bChr'])[0]
+            #         inpdata.append([bdf.copy(), chrsnps[achr][bchr]])
+
 
         if buff > 0:
             with open("snps.txt", "r") as fin:
@@ -177,7 +222,7 @@ def getshv(args):
 
         if mapit == 1:
             with open(cwdpath + prefix + "snps.txt", "w") as fout:
-                with open(cwdpath + prefix + "snps_init.txt", "r") as fin:
+                with open(cwdpath + prefix + fname, "r") as fin:
                    for line in fin:
                        l = line.strip().split()
                        if l[0] == "#":
@@ -188,7 +233,7 @@ def getshv(args):
                            l[11] = chroms[chr]
                            fout.write("\t".join(l) + "\n")
 
-            fileRemove(cwdpath + prefix + "snps_init.txt")
+            fileRemove(cwdpath + prefix + fname)
         return None
 
     else:
