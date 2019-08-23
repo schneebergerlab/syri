@@ -98,7 +98,6 @@ def getsrtable(cwdpath, prefix):
     anno.sort_values(['achr', 'astart', 'aend'], inplace=True)
     return anno
 
-
 def extractseq(_gen, _pos):
     chrs = defaultdict(dict)
     for fasta in parse(_gen, 'fasta'):
@@ -120,6 +119,7 @@ def getTSV(cwdpath, prefix, ref):
     anno = getsrtable(cwdpath, prefix)
 
     logger.debug('Get SV data')
+
     hasSV = True
     if not os.path.isfile(cwdpath + prefix + "sv.txt"):
         hasSV = False
@@ -129,7 +129,7 @@ def getTSV(cwdpath, prefix, ref):
         svdata = pd.read_table(cwdpath + prefix + "sv.txt", header=None)
         svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr']
 
-        entries = defaultdict()
+        entries = deque()
         count = 1
         for row in svdata.itertuples(index=False):
             if row.vartype == "#":
@@ -147,7 +147,7 @@ def getTSV(cwdpath, prefix, ref):
                 else:
                     _parent = _parent.to_string(index=False, header=False)
                 continue
-            entries[row.vartype + str(count)] = {
+            entries.append({
                 'achr': row.achr,
                 'astart': row.astart,
                 'aend': row.aend,
@@ -160,10 +160,11 @@ def getTSV(cwdpath, prefix, ref):
                 'dupclass': "-",
                 'aseq': "-",
                 "bseq": "-"
-            }
+            })
             count += 1
 
-        sv = pd.DataFrame.from_dict(entries, orient="index")
+        sv = pd.DataFrame.from_records(entries)
+        sv.index = sv['id']
         sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
         sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
         sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
@@ -225,7 +226,7 @@ def getTSV(cwdpath, prefix, ref):
 
     def p_indel():
         vtype = "INS" if indel == 1 else "DEL"
-        entries[vtype + str(count)] = {
+        entries.append({
             'achr': _ac,
             'astart': _as,
             'aend': _ae,
@@ -238,9 +239,9 @@ def getTSV(cwdpath, prefix, ref):
             'bseq': "-" if vtype == "DEL" else _seq,
             'id': vtype + str(count),
             'dupclass': "-"
-        }
+        })
 
-    entries = defaultdict()
+    entries = deque()
 
     logger.debug('Get SNP data')
     hasSNP = True
@@ -260,7 +261,9 @@ def getTSV(cwdpath, prefix, ref):
             _p = -1
             _seq = ""
 
+            i = 1
             for line in fin:
+                i += 1
                 line = line.strip().split("\t")
                 try:
                     if line[0] == "#" and len(line) == 7:
@@ -288,7 +291,7 @@ def getTSV(cwdpath, prefix, ref):
                             indel = 0
                             _seq = ""
                         count += 1
-                        entries["SNP" + str(count)] = {
+                        entries.append({
                             'achr': line[10],
                             'astart': int(line[0]),
                             'aend': int(line[0]),
@@ -301,7 +304,7 @@ def getTSV(cwdpath, prefix, ref):
                             'bseq': line[2],
                             'id': "SNP" + str(count),
                             'dupclass': "-"
-                        }
+                        })
                     elif indel == 0:
                         count += 1
                         _as = int(line[0])
@@ -352,10 +355,10 @@ def getTSV(cwdpath, prefix, ref):
                     logger.error("\t".join(line))
                     sys.exit()
 
-        snpdata = pd.DataFrame.from_dict(entries, orient="index")
+        snpdata = pd.DataFrame.from_records(entries)
         try:
             snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-            snpdata['id'] = snpdata.index.values
+            snpdata.index = snpdata['id']
             snpdata = snpdata.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
             snpdata.sort_values(['achr', 'astart', 'aend'], inplace=True)
         except KeyError as e:
@@ -375,7 +378,7 @@ def getTSV(cwdpath, prefix, ref):
     for _chr in snpdata.achr.unique():
         ## Fix coordinates and sequence for insertions
         _indices = snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "INS")].index.values
-        _seq = pd.Series([seq[_chr][_i] for _i in snpdata.loc[_indices, "astart"]], index = _indices)
+        _seq = pd.Series([seq[_chr][_i] for _i in snpdata.loc[_indices, "astart"]], index=_indices)
         _dir = _indices[~snpdata.loc[_indices, "parent"].str.contains("INV")]
         _inv = _indices[snpdata.loc[_indices, "parent"].str.contains("INV")]
 
@@ -407,13 +410,21 @@ def getTSV(cwdpath, prefix, ref):
 
     events = anno.loc[anno.parent == "-"]
     logger.debug('Starting output file generation')
+
     with open(cwdpath + prefix + "syri.out", "w") as fout:
+        annogrp = anno.groupby('parent')
+        svgrp = sv.groupby('parent')
+        snpdatagrp = snpdata.groupby('parent')
+
         notA = notal.loc[notal.achr != "-"].copy()
         notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
         notB = notal.loc[notal.bchr != "-"].copy()
         notB.loc[:, ["bstart", "bend"]] = notB.loc[:, ["bstart", "bend"]].astype("int")
         row_old = -1
         for row in events.itertuples(index=False):
+            if count == 1000:
+                break
+            count+=1
             if len(notA) > 0:
                 if row_old != -1 and row_old.achr != row.achr:
                     _notA = notA.loc[(notA.achr == row_old.achr) & (notA.aend == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
@@ -435,15 +446,35 @@ def getTSV(cwdpath, prefix, ref):
                 else:
                     logger.error("too many notA regions")
                     sys.exit()
-
             fout.write("\t".join(list(map(str, row))) + "\n")
             row_old = row
+            try:
+                a = annogrp.get_group(row.id)
+            except KeyError:
+                a = pd.DataFrame()
+            except Exception as e:
+                logger.debug('Error in finding key for anno.' + e)
 
-            outdata = pd.concat([anno.loc[anno.parent == row.id], sv.loc[sv.parent == row.id], snpdata.loc[(snpdata.parent == row.id)]])
+            try:
+                b = svgrp.get_group(row.id)
+            except KeyError:
+                b = pd.DataFrame()
+            except Exception as e:
+                logger.debug('Error in finding key for anno.' + e)
+
+            try:
+                c = snpdatagrp.get_group(row.id)
+            except KeyError:
+                c = pd.DataFrame()
+            except Exception as e:
+                logger.debug('Error in finding key for anno.' + e)
+
+            outdata = pd.concat([a, b, c])
             outdata.sort_values(["astart", "aend"], inplace=True)
             fout.write(outdata.to_csv(sep="\t", index=False, header=False))
         fout.write(notB.loc[:, notB.columns != 'selected'].to_csv(sep="\t", index=False, header=False))
 
+    logger.debug('Remapping query genome ids')
     if os.path.isfile(cwdpath+prefix+"mapids.txt"):
         chroms = {}
         with open(cwdpath+prefix+"mapids.txt", "r") as m:
