@@ -8,9 +8,7 @@ This is a temporary script file.
 
 import argparse
 
-
 def getdata(reflength, refid, refdir):
-
     # Each node corresponds to a continuous genomic region aligning to a scaffold
     class node:
         def __init__(self, id, name, pos):

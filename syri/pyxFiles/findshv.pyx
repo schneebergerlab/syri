@@ -173,12 +173,16 @@ def getshv(args):
         if mapit == 1:
             fname = "snps_init.txt"
         else:
-            fname = "snps.txt"
+            fname = "snps_GARB.txt"
         with open(cwdpath + prefix + fname, "w") as fout:
             p = Popen([sspath + " -HrTS " + delta], stdin=PIPE, stdout=fout, stderr=PIPE, shell=True)
-            out = p.communicate(input=allAlignments[["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].to_string(index=False, header=False).encode())
-
-        allsnps = pd.read_table(cwdpath + prefix + fname, header = None)
+            out = p.communicate(input=allAlignments.iloc[[0,1,2]][["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].to_string(index=False, header=False).encode())
+        if out[1] != b'':
+            logger.error('Error in finding SNPs using show-snps: ' + out[1].decode())
+            sys.exit()
+        else:
+            logger.debug('finished writing SNPs')
+            allsnps = pd.read_table(cwdpath + prefix + fname, header = None)
 
         # chrsnps = defaultdict(dict)
         achrs = pd.unique(allAlignments['aChr'])
