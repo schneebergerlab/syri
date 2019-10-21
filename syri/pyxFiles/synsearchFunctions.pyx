@@ -226,6 +226,8 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     if len(check) > 1:
         logger.error('Inconsistent start and end position for inverted alignment in genome B. For inverted alignments, either all bstart < bend or all bend > bstart')
         sys.exit()
+    elif len(check) == 0:
+        logger.debug('No Inverted alignments present.')
     elif check[0] == True:
         pass
     else:
