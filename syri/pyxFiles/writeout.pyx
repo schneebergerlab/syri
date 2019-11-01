@@ -114,12 +114,13 @@ def getTSV(cwdpath, prefix, ref):
     import sys
     from collections import defaultdict
     logger = logging.getLogger("getTSV")
+    logger.debug('cwdpath:' + cwdpath + ", prefix:" + prefix + ", ref:" + ref)
 
     logger.debug('Get SR anno')
     anno = getsrtable(cwdpath, prefix)
+    logger.debug("Number of SR annotations: " + str(anno.shape[0]))
 
     logger.debug('Get SV data')
-
     hasSV = True
     if not os.path.isfile(cwdpath + prefix + "sv.txt"):
         hasSV = False
@@ -127,6 +128,7 @@ def getTSV(cwdpath, prefix, ref):
 
     if hasSV:
         svdata = pd.read_table(cwdpath + prefix + "sv.txt", header=None)
+        logger.debug("Number of SV annotations read from file: " + str(svdata.shape[0]))
         svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr']
 
         entries = deque()
@@ -170,6 +172,7 @@ def getTSV(cwdpath, prefix, ref):
         sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
     else:
         sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
+    logger.debug("Number of SV annotations to output: " + str(sv.shape[0]))
 
     logger.debug('Get notal data')
     hasNotal = True
@@ -179,6 +182,8 @@ def getTSV(cwdpath, prefix, ref):
 
     if hasNotal:
         notal = pd.read_table(cwdpath + prefix + "notAligned.txt", header=None)
+        logger.debug("Number of NOTAL annotations read from file: " + str(notal.shape[0]))
+
         notal.columns = ["gen", "start", "end", "chr"]
         notal[["start", "end"]] = notal[["start", "end"]].astype("int")
         entries = defaultdict()
@@ -222,6 +227,7 @@ def getTSV(cwdpath, prefix, ref):
         notal['selected'] = -1
     else:
         notal = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass', 'selected'])
+    logger.debug("Number of NOTAL annotations to output: " + str(notal.shape[0]))
 
 
     def p_indel():
@@ -366,6 +372,7 @@ def getTSV(cwdpath, prefix, ref):
             logger.warning('No SNPs were found. This could be an error. Remove any old snps.txt and try re-running without --nosnp.')
     else:
         snpdata = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
+    logger.debug("Number of SNPs annotations read: " + str(snpdata.shape[0]))
 
     positions = defaultdict()
     for _chr in snpdata.achr.unique():
@@ -412,6 +419,7 @@ def getTSV(cwdpath, prefix, ref):
     logger.debug('Starting output file generation')
 
     with open(cwdpath + prefix + "syri.out", "w") as fout:
+        logger.debug("All annotation count. " + "SR anno: " + str(anno.shape[0]) + " SV anno: " + str(sv.shape[0]) + " ShV anno: " + str(snpdata.shape[0]) + " notal anno: " + str(notal.shape[0]))
         annogrp = anno.groupby('parent')
         svgrp = sv.groupby('parent')
         snpdatagrp = snpdata.groupby('parent')
@@ -422,13 +430,10 @@ def getTSV(cwdpath, prefix, ref):
         notB.loc[:, ["bstart", "bend"]] = notB.loc[:, ["bstart", "bend"]].astype("int")
         row_old = -1
         for row in events.itertuples(index=False):
-            if count == 1000:
-                break
-            count+=1
             if len(notA) > 0:
                 if row_old != -1 and row_old.achr != row.achr:
-                    _notA = notA.loc[(notA.achr == row_old.achr) & (notA.aend == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
-                    notA.loc[(notA.achr == row_old.achr) & (notA.aend == row_old.aend + 1), 'selected'] = 1
+                    _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
+                    notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
                     if len(_notA) == 0:
                         pass
                     elif len(_notA) == 1:
@@ -436,9 +441,8 @@ def getTSV(cwdpath, prefix, ref):
                     else:
                         logger.error("too many notA regions")
                         sys.exit()
-
                 _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
-                notA.loc[(notA.achr == row.achr) & (notA.aend == row.aend + 1), 'selected'] = 1
+                notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart - 1), 'selected'] = 1
                 if len(_notA) == 0:
                     pass
                 elif len(_notA) == 1:
@@ -472,6 +476,17 @@ def getTSV(cwdpath, prefix, ref):
             outdata = pd.concat([a, b, c])
             outdata.sort_values(["astart", "aend"], inplace=True)
             fout.write(outdata.to_csv(sep="\t", index=False, header=False))
+        if len(notA) > 0:
+            if row_old != -1 and row_old.achr != row.achr:
+                _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
+                notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
+                if len(_notA) == 0:
+                    pass
+                elif len(_notA) == 1:
+                    fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+                else:
+                    logger.error("too many notA regions")
+                    sys.exit()
         fout.write(notB.loc[:, notB.columns != 'selected'].to_csv(sep="\t", index=False, header=False))
 
     logger.debug('Remapping query genome ids')
