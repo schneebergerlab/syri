@@ -3,13 +3,14 @@
 ### C/C++ compiler
 g++
 ### Python
-SyRI needs Python3 (recommended Python3.5 or above) and depends on the following python libraries: [Cython](https://cython.org/#download), [Numpy](https://www.numpy.org/), [Scipy](https://www.scipy.org/install.html), [Pandas](https://pandas.pydata.org/), [Igraph](https://igraph.org/python/), [Biopython](https://biopython.org/), [psutil](https://github.com/giampaolo/psutil), [pysam](https://pysam.readthedocs.io/en/latest/index.html)
+SyRI needs Python3.5 and depends on the following python libraries: [Cython](https://cython.org/#download), [Numpy](https://www.numpy.org/), [Scipy](https://www.scipy.org/install.html), [Pandas](https://pandas.pydata.org/), [Igraph](https://igraph.org/python/), [Biopython](https://biopython.org/), [psutil](https://github.com/giampaolo/psutil), [pysam](https://pysam.readthedocs.io/en/latest/index.html)
 
 All these packages are available through anaconda and can be installed using:
 
 ```bash
-conda install cython numpy scipy pandas biopython psutil pysam
+conda install cython numpy scipy pandas biopython psutil
 conda install -c conda-forge python-igraph
+conda install -c bioconda pysam
 ```
 
 ### Whole genome aligner 
