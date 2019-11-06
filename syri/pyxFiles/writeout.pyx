@@ -98,12 +98,14 @@ def getsrtable(cwdpath, prefix):
     anno.sort_values(['achr', 'astart', 'aend'], inplace=True)
     return anno
 
+
 def extractseq(_gen, _pos):
     chrs = defaultdict(dict)
     for fasta in parse(_gen, 'fasta'):
         if fasta.id in _pos.keys():
             chrs[fasta.id] = {_i:fasta.seq[_i-1] for _i in _pos[fasta.id]}
     return chrs
+
 
 def getTSV(cwdpath, prefix, ref):
     """
@@ -452,6 +454,7 @@ def getTSV(cwdpath, prefix, ref):
                     sys.exit()
             fout.write("\t".join(list(map(str, row))) + "\n")
             row_old = row
+
             try:
                 a = annogrp.get_group(row.id)
             except KeyError:
@@ -461,7 +464,7 @@ def getTSV(cwdpath, prefix, ref):
 
             try:
                 b = svgrp.get_group(row.id)
-            except KeyError:
+            except KeyError as k:
                 b = pd.DataFrame()
             except Exception as e:
                 logger.debug('Error in finding key for anno.' + e)
@@ -477,16 +480,15 @@ def getTSV(cwdpath, prefix, ref):
             outdata.sort_values(["astart", "aend"], inplace=True)
             fout.write(outdata.to_csv(sep="\t", index=False, header=False))
         if len(notA) > 0:
-            if row_old != -1 and row_old.achr != row.achr:
-                _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
-                notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
-                if len(_notA) == 0:
-                    pass
-                elif len(_notA) == 1:
-                    fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
-                else:
-                    logger.error("too many notA regions")
-                    sys.exit()
+            _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
+            notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
+            if len(_notA) == 0:
+                pass
+            elif len(_notA) == 1:
+                fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+            else:
+                logger.error("too many notA regions")
+                sys.exit()
         fout.write(notB.loc[:, notB.columns != 'selected'].to_csv(sep="\t", index=False, header=False))
 
     logger.debug('Remapping query genome ids')
@@ -497,7 +499,7 @@ def getTSV(cwdpath, prefix, ref):
                 l = line.strip().split()
                 chroms[l[0]] = l[1]
         lines = open(cwdpath + prefix + "syri.out", "r").readlines()
-        with open(cwdpath + prefix + "syri.out", "w") as fout:
+        with open(cwdpath + prefix + "syri.out", "w") as fout:                 ## CHANGE THIS BEFORE PUSHING
             for line in lines:
                 line = line.strip().split('\t')
                 if line[5] != "-":

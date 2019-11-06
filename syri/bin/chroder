@@ -96,6 +96,9 @@ def getdata(reflength, refid, refdir):
                     if v >= 3:
                         scaflist.append(k)
             scaflist = list(np.unique(scaflist))
+            if len(scaflist) == 0:
+                print('Error: For contig ', rid, ' no matching contig was found. This could be a result of incorrect assembly or extensive repeats or ', rid, ' could be a novel region. Pseudo-genome cannot be generated. Try removing this contig.')
+                sys.exit()
         else:
             scaflist = list(np.unique(list(reflength[rid].values())))
 
