@@ -284,7 +284,6 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
 
 def startSyri(args):
     coordsfin = args.infile.name
-
     nCores = args.nCores
     bRT = args.bruteRunTime
     threshold = 50  ##args.threshold

@@ -286,6 +286,8 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
         if totscore[i] > maxscore:
             maxscore = totscore[i]
             maxid = i
+    if maxid == -1:
+        return out
     path.push_front(maxid)
     while parents[maxid] != -1:
         path.push_front(parents[maxid])

@@ -1428,7 +1428,6 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
 @cython.wraparound(False)
 cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] seedBlocks, cpp_map[long, cpp_vec[long]] agroup, cpp_map[long, cpp_vec[long]] bgroup, int threshold):
     np.random.seed(1)
-
     cdef:
         ssize_t                                         i, j, k, l
         cpp_bool                                        fnd
@@ -1443,10 +1442,8 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
         unsigned short int[:]                           tempcluster, outblocks, skiplist
         unsigned short int[:]                           intrlist
 
-
     bestScore = 0
     bestComb = []
-
     astart = np.array([transBlocksData[i].aStart for i in range(n)], dtype=np.uint)
     aend = np.array([transBlocksData[i].aEnd for i in range(n)], dtype=np.uint)
     bstart = np.array([transBlocksData[i].bStart for i in range(n)], dtype=np.uint)
@@ -1467,7 +1464,6 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
         else:
             garb.append(3)
     meclass = np.array(list(garb), np.uint16)
-
 
     ntmp = 0
     tempcluster = np.zeros(len(transBlocksData), dtype=np.uint16)
