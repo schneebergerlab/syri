@@ -1429,18 +1429,18 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
 cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] seedBlocks, cpp_map[long, cpp_vec[long]] agroup, cpp_map[long, cpp_vec[long]] bgroup, int threshold):
     np.random.seed(1)
     cdef:
-        ssize_t                                         i, j, k, l
-        cpp_bool                                        fnd
+        Py_ssize_t                                      i, j, k, l
+        cpp_bool                                        fnd, askip, bskip
         long                                            n = len(transBlocksData)
         long                                            ncls = len(cluster)
         long                                            length=0, ntmp=0            # number of temp cluster still need to be classified
-        unsigned long                                   newblock
         unsigned long[:]                                astart, aend, bstart, bend, aindex, bindex, clstrsize
         unsigned short int[:]                           meclass
         unsigned long[:]                                meto, mealist, meblist
         unsigned short int                              auni, buni, status
         unsigned short int[:]                           tempcluster, outblocks, skiplist
         unsigned short int[:]                           intrlist
+        long[:]                                         outblockindex, skipindexmap
 
     bestScore = 0
     bestComb = []
@@ -1464,87 +1464,103 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
         else:
             garb.append(3)
     meclass = np.array(list(garb), np.uint16)
-
     ntmp = 0
-    tempcluster = np.zeros(len(transBlocksData), dtype=np.uint16)
-    outblocks = np.zeros(len(transBlocksData), dtype=np.uint16)
-    skiplist = np.zeros(len(transBlocksData), dtype=np.uint16)
-    intrlist = np.zeros(len(transBlocksData), dtype=np.uint16)
-
+    tempcluster = np.zeros(n, dtype=np.uint16)
+    outblocks = np.zeros(n, dtype=np.uint16)
+    skiplist = np.zeros(n, dtype=np.uint16)
+    intrlist = np.zeros(n, dtype=np.uint16)
     for i in range(ncls):
         tempcluster[cluster[i]] = 1
         ntmp+=1
-
     for i in range(len(seedBlocks)):
         outblocks[seedBlocks[i]] = 1
         tempcluster[seedBlocks[i]] = 0
         ntmp-=1
-
     transBlocksScore = {}
     for i in range(n):
         if tempcluster[i] == 1:
             transBlocksScore[i] = aend[i] - astart[i] + bend[i] - bstart[i] + 2
 
-
+    outblockindex = np.where(np.array(outblocks) == 1)[0]
     for i in range(n):
         if tempcluster[i] == 0:
             continue
         ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
-        if meclass[i] == 1 or meclass[i] == 2:
-            meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
-            for j in meto:
+        if meclass[i] == 1:
+            for j in outblockindex:
                 if outblocks[j] == 1:
-                    tempcluster[i] = 0
-                    ntmp-=1
-                    skiplist[i]=1
-                    break
-        ## when the tempcluster element does not overlap with inplace blocks
-        elif meclass[i] == 3:
-            mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]],  bgroup[bindex[i]], i, threshold, meclass[i])
-            ## remove candidate when at least ME candidate on both genomes has already been selected
-            for j in mealist:
-                if outblocks[j] == 1:
-                    for k in meblist:
-                        if outblocks[k] == 1:
+                    if bstart[j] - threshold < bstart[i]:
+                        if bend[j] + threshold > bend[i]:
                             tempcluster[i] = 0
                             ntmp-=1
                             skiplist[i]=1
                             break
-                    break
+        elif meclass[i] == 2:
+            for j in outblockindex:
+                if outblocks[j] == 1:
+                    if astart[j] - threshold < astart[i]:
+                        if aend[j] + threshold > aend[i]:
+                            tempcluster[i] = 0
+                            ntmp-=1
+                            skiplist[i]=1
+                            break
+        elif meclass[i] == 3:
+            askip = False
+            bskip = False
+            for j in outblockindex:
+                if outblocks[j] == 1:
+                    if not askip:
+                        if astart[j] - threshold < astart[i]:
+                            if aend[j] + threshold > aend[i]:
+                                askip = True
+                    if not bskip:
+                        if bstart[j] - threshold < bstart[i]:
+                            if bend[j] + threshold > bend[i]:
+                                bskip = True
+                    if askip and bskip:
+                        tempcluster[i] = 0
+                        ntmp-=1
+                        skiplist[i]=1
+                        break
 
+    skipindexmap = np.zeros(n, np.int)      ## smallest index for a tempcluster for which to check the skiplist
     ## For a given candidate, if all of its ME candidates have already been added to the skiplist, then that candidate will be selected as part of output
     for i in range(n):
         if tempcluster[i] ==0:
             continue
-        ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
-        if meclass[i] == 1 or meclass[i] == 2:
-            meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
-            fnd = True
-            for j in meto:
-                if skiplist[j] == 0:
-                    fnd = False
-                    break
-            if fnd:
-                tempcluster[i]=0
-                ntmp-=1
-                outblocks[i]=1
-        ## when the tempcluster element does not overlap with inplace blocks
-        elif meclass[i] == 3:
-            mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
-            fnd = True
-            for j in mealist:
-                if skiplist[j]==0:
-                    fnd = False
-                    break
-            if fnd:
-                for j in meblist:
-                    if skiplist[j] ==0:
-                        fnd = False
-                        break
-            if fnd:
-                tempcluster[i] = 0
-                ntmp-=1
-                outblocks[i] = 1
+        fnd = True
+        for j in range(skipindexmap[i], n):
+            if skiplist[j] == 0:
+                ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
+                if meclass[i] == 1:
+                    if bstart[j] - threshold < bstart[i]:
+                        if bend[j] + threshold > bend[i]:
+                            fnd = False
+                            skipindexmap[i] = j
+                            break
+                elif meclass[i] == 2:
+                    if astart[j] - threshold < astart[i]:
+                        if aend[j] + threshold > aend[i]:
+                            fnd = False
+                            skipindexmap[i] = j
+                            break
+                ## when the tempcluster element does not overlap with inplace blocks
+                elif meclass[i]==3:
+                    if astart[j] - threshold < astart[i]:
+                        if aend[j] + threshold > aend[i]:
+                            fnd = False
+                            skipindexmap[i] = j
+                            break
+                    if bstart[j] - threshold < bstart[i]:
+                        if bend[j] + threshold > bend[i]:
+                            fnd = False
+                            skipindexmap[i] = j
+                            break
+        if fnd:
+            tempcluster[i]=0
+            ntmp-=1
+            outblocks[i]=1
+            skipindexmap[i] = n
 
     while ntmp>0:
         ## select one of the twenty highest scoring candidate randomly to break the deadlock
@@ -1561,7 +1577,6 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
         tempcluster[i] = 0
         ntmp-=1
         outblocks[i] = 1
-
 
         ## Remove ME candidates
         if meclass[i] == 1 or meclass[i] == 2:
@@ -1592,8 +1607,6 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
                                 ntmp -=1
                             skiplist[k] = 1
                         break
-
-
             ## Also remove candidates which are ME to the selected candidate on both genomes
             for j in range(n):
                 intrlist[j] = 0
@@ -1609,59 +1622,89 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
                     skiplist[j] = 1
 
 
+        outblockindex = np.where(np.array(outblocks) == 1)[0]
         ## Check which of the candidates in the same group can't be added now
         for j in agroup[aindex[i]]:
             if tempcluster[j] == 0:
                 continue
             ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
-            if meclass[j] == 1 or meclass[j] == 2:
-                meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[j]], bgroup[bindex[j]], j, threshold, meclass[j])
-                for k in meto:
+            if meclass[j] == 1:
+                for k in outblockindex:
                     if outblocks[k] == 1:
-                        tempcluster[j] = 0
-                        ntmp-=1
-                        skiplist[j]=1
-                        break
-            ## when the tempcluster element does not overlap with inplace blocks
-            elif meclass[j] == 3:
-                mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[j]],  bgroup[bindex[j]], j, threshold, meclass[j])
-                ## remove candidate when at least ME candidate on both genomes has already been selected
-                for k in mealist:
-                    if outblocks[k] == 1:
-                        for l in meblist:
-                            if outblocks[l] == 1:
+                        if bstart[k] - threshold < bstart[j]:
+                            if bend[k] + threshold > bend[j]:
                                 tempcluster[j] = 0
                                 ntmp-=1
                                 skiplist[j]=1
                                 break
-                        break
+            elif meclass[j] == 2:
+                for k in outblockindex:
+                    if outblocks[k] == 1:
+                        if astart[k] - threshold < astart[j]:
+                            if aend[k] + threshold > aend[j]:
+                                tempcluster[j] = 0
+                                ntmp-=1
+                                skiplist[j]=1
+                                break
+            elif meclass[j] == 3:
+                askip = False
+                bskip = False
+                for k in outblockindex:
+                    if outblocks[k] == 1:
+                        if not askip:
+                            if astart[k] - threshold < astart[j]:
+                                if aend[k] + threshold > aend[j]:
+                                    askip = True
+                        if not bskip:
+                            if bstart[k] - threshold < bstart[j]:
+                                if bend[k] + threshold > bend[j]:
+                                    bskip = True
+                        if askip and bskip:
+                            tempcluster[j] = 0
+                            ntmp-=1
+                            skiplist[j]=1
+                            break
 
         for j in bgroup[bindex[i]]:
             if tempcluster[j] == 0:
                 continue
             ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
-            if meclass[j] == 1 or meclass[j] == 2:
-                meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[j]], bgroup[bindex[j]], j, threshold, meclass[j])
-                for k in meto:
+            if meclass[j] == 1:
+                for k in outblockindex:
                     if outblocks[k] == 1:
-                        tempcluster[j] = 0
-                        ntmp-=1
-                        skiplist[j]=1
-                        break
-            ## when the tempcluster element does not overlap with inplace blocks
-            elif meclass[j] == 3:
-                mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[j]],  bgroup[bindex[j]], j, threshold, meclass[j])
-                ## remove candidate when at least ME candidate on both genomes has already been selected
-                for k in mealist:
-                    if outblocks[k] == 1:
-                        for l in meblist:
-                            if outblocks[l] == 1:
+                        if bstart[k] - threshold < bstart[j]:
+                            if bend[k] + threshold > bend[j]:
                                 tempcluster[j] = 0
                                 ntmp-=1
                                 skiplist[j]=1
                                 break
-                        break
-
+            elif meclass[j] == 2:
+                for k in outblockindex:
+                    if outblocks[k] == 1:
+                        if astart[k] - threshold < astart[j]:
+                            if aend[k] + threshold > aend[j]:
+                                tempcluster[j] = 0
+                                ntmp-=1
+                                skiplist[j]=1
+                                break
+            elif meclass[j] == 3:
+                askip = False
+                bskip = False
+                for k in outblockindex:
+                    if outblocks[k] == 1:
+                        if not askip:
+                            if astart[k] - threshold < astart[j]:
+                                if aend[k] + threshold > aend[j]:
+                                    askip = True
+                        if not bskip:
+                            if bstart[k] - threshold < bstart[j]:
+                                if bend[k] + threshold > bend[j]:
+                                    bskip = True
+                        if askip and bskip:
+                            tempcluster[j] = 0
+                            ntmp-=1
+                            skiplist[j]=1
+                            break
     bestScore, bestComb = updateBestComb(bestScore, bestComb, np.nonzero(outblocks)[0], transBlocksData)
     return bestScore, bestComb
 
