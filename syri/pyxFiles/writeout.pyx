@@ -168,10 +168,14 @@ def getTSV(cwdpath, prefix, ref):
             count += 1
 
         sv = pd.DataFrame.from_records(entries)
-        sv.index = sv['id']
-        sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-        sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
-        sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
+        if sv.shape[0] != 0:
+            logger.debug("NO SV found in SV file. NO SV will be reported." + str(sv.shape[0]))
+            sv.index = sv['id']
+            sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+            sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+            sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
+        else:
+            sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
     else:
         sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
     logger.debug("Number of SV annotations to output: " + str(sv.shape[0]))
@@ -183,50 +187,57 @@ def getTSV(cwdpath, prefix, ref):
         logger.info(cwdpath + prefix + "notAligned.txt"+' cannot be opened. Cannot output not aligned regions.')
 
     if hasNotal:
-        notal = pd.read_table(cwdpath + prefix + "notAligned.txt", header=None)
-        logger.debug("Number of NOTAL annotations read from file: " + str(notal.shape[0]))
+        isempty = False
+        try:
+            notal = pd.read_table(cwdpath + prefix + "notAligned.txt", header=None)
+        except pd.errors.EmptyDataError as e:
+            isempty = True
+            logger.debug("NOTAL file is empty")
+            notal = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass', 'selected'])
 
-        notal.columns = ["gen", "start", "end", "chr"]
-        notal[["start", "end"]] = notal[["start", "end"]].astype("int")
-        entries = defaultdict()
-        _c = 0
-        for row in notal.itertuples(index=False):
-            _c += 1
-            if row.gen == "R":
-                entries["NOTAL" + str(_c)] = {
-                    'achr': row.chr,
-                    'astart': row.start,
-                    'aend': row.end,
-                    'bchr': "-",
-                    'bstart': "-",
-                    'bend': "-",
-                    'vartype': "NOTAL",
-                    'parent': "-",
-                    'id': "NOTAL" + str(_c),
-                    'dupclass': "-",
-                    'aseq': "-",
-                    "bseq": "-"
-                }
-            elif row.gen == "Q":
-                entries["NOTAL" + str(_c)] = {
-                    'achr': "-",
-                    'astart': "-",
-                    'aend': "-",
-                    'bchr': row.chr,
-                    'bstart': row.start,
-                    'bend': row.end,
-                    'vartype': "NOTAL",
-                    'parent': "-",
-                    'id': "NOTAL" + str(_c),
-                    'dupclass': "-",
-                    'aseq': "-",
-                    'bseq': "-"
-                }
-        notal = pd.DataFrame.from_dict(entries, orient="index")
-        # notal.loc[:, ['astart', 'aend', 'bstart', 'bend']] = notal.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-        notal = notal.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
-        notal.sort_values(['achr', 'astart', 'aend'], inplace=True)
-        notal['selected'] = -1
+        if not isempty:
+            logger.debug("Number of NOTAL annotations read from file: " + str(notal.shape[0]))
+
+            notal.columns = ["gen", "start", "end", "chr"]
+            notal[["start", "end"]] = notal[["start", "end"]].astype("int")
+            entries = defaultdict()
+            _c = 0
+            for row in notal.itertuples(index=False):
+                _c += 1
+                if row.gen == "R":
+                    entries["NOTAL" + str(_c)] = {
+                        'achr': row.chr,
+                        'astart': row.start,
+                        'aend': row.end,
+                        'bchr': "-",
+                        'bstart': "-",
+                        'bend': "-",
+                        'vartype': "NOTAL",
+                        'parent': "-",
+                        'id': "NOTAL" + str(_c),
+                        'dupclass': "-",
+                        'aseq': "-",
+                        "bseq": "-"
+                    }
+                elif row.gen == "Q":
+                    entries["NOTAL" + str(_c)] = {
+                        'achr': "-",
+                        'astart': "-",
+                        'aend': "-",
+                        'bchr': row.chr,
+                        'bstart': row.start,
+                        'bend': row.end,
+                        'vartype': "NOTAL",
+                        'parent': "-",
+                        'id': "NOTAL" + str(_c),
+                        'dupclass': "-",
+                        'aseq': "-",
+                        'bseq': "-"
+                    }
+            notal = pd.DataFrame.from_dict(entries, orient="index")
+            notal = notal.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+            notal.sort_values(['achr', 'astart', 'aend'], inplace=True)
+            notal['selected'] = -1
     else:
         notal = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass', 'selected'])
     logger.debug("Number of NOTAL annotations to output: " + str(notal.shape[0]))
