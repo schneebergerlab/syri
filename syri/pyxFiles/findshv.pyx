@@ -185,8 +185,6 @@ def getshv(args):
             allsnps = pd.read_table(cwdpath + prefix + fname, header = None)
             logger.debug('finished writing SNPs')
 
-
-        # chrsnps = defaultdict(dict)
         achrs = pd.unique(allAlignments['aChr'])
         bchrs = pd.unique(allAlignments['bChr'])
 
@@ -194,24 +192,12 @@ def getshv(args):
             for bchr in bchrs:
                 chrsnps[achr][bchr] = allsnps.loc[(allsnps[10] == achr) & (allsnps[11] == bchr)]
 
-        # blocklists = [allBlocks[_i:(_i+nc)] for _i in range(0, len(allBlocks), nc)]
         blocklists = np.array_split(allBlocks, nc)
         with open(cwdpath + prefix + fname,'w') as fout:
             with Pool(processes=nc) as pool:
                 out = pool.map(partial(getsnps, allAlignments=allAlignments), blocklists)
             for snps in out:
                 fout.write(snps)
-
-
-            #
-            # for blocks in blocklists:
-            #     inpdata = []
-            #     for block in blocks:
-            #         bdf = allAlignments.loc[allAlignments.id == block].copy()
-            #         achr = pd.unique(bdf['aChr'])[0]
-            #         bchr = pd.unique(bdf['bChr'])[0]
-            #         inpdata.append([bdf.copy(), chrsnps[achr][bchr]])
-
 
         if buff > 0:
             with open("snps.txt", "r") as fin:
@@ -261,7 +247,7 @@ def getshv(args):
                 print(e)
                 logger.error("Unequal number of chromosomes in the two genomes.")
 
-        with open('snps.txt', 'w') as fout:
+        with open(cwdpath + prefix + 'snps.txt', 'w') as fout:
             for b in allBlocks:
                 block = allAlignments.loc[allAlignments.id == b].copy()
                 fout.write("\t".join(["#",
