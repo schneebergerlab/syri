@@ -526,7 +526,7 @@ def getVCF(finname, foutname, cwdpath, prefix):
     foutname:
     :return:
     """
-    data = pd.read_table(cwdpath + prefix + finname, header=None)
+    data = pd.read_table(cwdpath + prefix + finname, header=None, keep_default_na=False)
     data.columns = ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']
     data = data.loc[data['achr'] != "-"].copy()
     data.sort_values(['achr', 'astart', 'aend'], inplace=True)
