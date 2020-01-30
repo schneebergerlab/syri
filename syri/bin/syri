@@ -95,6 +95,19 @@ if __name__ == "__main__":
             },
         },
     })
+    
+    ## Check that correct version of python is being used
+    try:
+        assert sys.version_info.major == 3
+        assert sys.version_info.minor == 5
+    except AssertionError:
+        sys.exit('\nSyRI is compatible with Python3.5. Currently using Python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'. Exiting')
+    except KeyboardInterrupt:
+        raise()
+    except Exception as E:
+        sys.exit(E)
+
+    
 
     # Set CWD
     if args.dir is None:
