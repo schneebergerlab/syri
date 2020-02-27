@@ -169,12 +169,13 @@ def getTSV(cwdpath, prefix, ref):
 
         sv = pd.DataFrame.from_records(entries)
         if sv.shape[0] != 0:
-            logger.debug("NO SV found in SV file. NO SV will be reported." + str(sv.shape[0]))
+            logger.debug("SV found in SV file. Number of SV that will be reported." + str(sv.shape[0]))
             sv.index = sv['id']
             sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
             sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
             sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
         else:
+            logger.debug("NO SV found in SV file. NO SV will be reported.")
             sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
     else:
         sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
@@ -526,11 +527,29 @@ def getVCF(finname, foutname, cwdpath, prefix):
     foutname:
     :return:
     """
-    data = pd.read_table(cwdpath + prefix + finname, header=None, keep_default_na=False)
+    logger = logging.getLogger("getVCF")
+    data = pd.read_table(cwdpath + prefix + finname, header=None, keep_default_na=False, dtype=object)
     data.columns = ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']
     data = data.loc[data['achr'] != "-"].copy()
+    dtypes = {'achr': str,
+              'astart': int,
+              'aend': int,
+              'aseq': str,
+              'bseq': str,
+              'bchr': str,
+              'bstart': str,
+              'bend': str,
+              'id': str,
+              'parent': str,
+              'vartype': str,
+              'dupclass': str}
+    data = data.astype(dtypes)
+    try:
+        data['achr'] = data['achr'].astype('int')
+    except ValueError as ve:
+        logger.debug('Chromosome values are sorted lexicographically.')
     data.sort_values(['achr', 'astart', 'aend'], inplace=True)
-    data.loc[:, ['astart', 'aend', 'bstart', 'bend']] = data.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype(str)
+    data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']] = data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']].astype(str)
 
     with open(cwdpath + prefix + foutname, 'w') as fout:
         fout.write('##fileformat=VCFv4.3\n')
@@ -572,7 +591,7 @@ def getVCF(finname, foutname, cwdpath, prefix):
 
         fout.write('\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']) + '\n')
         for line in data.itertuples(index=False):
-            pos = [line[0], line[1], ".", 'N', '<' + line[10] + '>', '.', 'PASS']
+            pos = [line[0], line[1], line[8], 'N', '<' + line[10] + '>', '.', 'PASS']
 
             if line[10] in ["SYN", "INV", "TRANS", "INVTR", "DUP", "INVDUP"]:
                 _info = ';'.join(['END='+line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=.', 'VarType='+'SR', 'DupType='+line[11]])
@@ -599,13 +618,13 @@ def getVCF(finname, foutname, cwdpath, prefix):
 
             elif line[10] in ['SNP', 'DEL', 'INS']:
                 if (line[3] == '-') != (line[4] == '-'):
-                    sys.exit("Inconsistency in annotation type. Either need seq for both or for none.")
+                    logger.error("Inconsistency in annotation type. Either need seq for both or for none.")
                 elif line[3] == '-' and line[4] == '-':
                     _info = ";".join(['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=ShV', 'DupType=.'])
                     pos.append(_info)
                     fout.write('\t'.join(pos) + '\n')
                 elif line[3] != '-' and line[4] != '-':
-                    pos = [line[0], line[1], ".", line[3], line[4], '.', 'PASS']
+                    pos = [line[0], line[1], line[8], line[3], line[4], '.', 'PASS']
                     _info = ";".join(['END=' + line[2], 'ChrB=' + line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=' + line[9], 'VarType=ShV', 'DupType=.'])
                     pos.append(_info)
                     fout.write('\t'.join(pos) + '\n')
