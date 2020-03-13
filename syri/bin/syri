@@ -55,9 +55,8 @@ if __name__ == "__main__":
     # shvargs.add_argument('-buff', dest="buff", help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=0)
 
     args = parser.parse_args()
-    
-    # print(args)
-    
+
+    # Check that correct version of python is being used
     import logging
     import logging.config
     import os
@@ -95,43 +94,72 @@ if __name__ == "__main__":
             },
         },
     })
-    
-    ## Check that correct version of python is being used
-    try:
-        assert sys.version_info.major == 3
-        assert sys.version_info.minor == 5
-    except AssertionError:
-        sys.exit('\nSyRI is compatible with Python3.5. Currently using Python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'. Exiting')
-    except KeyboardInterrupt:
-        raise()
-    except Exception as E:
-        sys.exit(E)
-
-    
 
     # Set CWD
     if args.dir is None:
         args.dir = os.getcwd() + os.sep
     else:
         args.dir = args.dir + os.sep
-    
+
     # Set CIGAR FLAG
-    if args.ftype in ['S','B']:
+    if args.ftype in ['S', 'B']:
         args.cigar = True
-    
+
+    ###################################################################
+    # Check python and pandas version. Add other checks later if required!!
+    ###################################################################
+    logger = logging.getLogger("Running SyRI")
+    try:
+        assert sys.version_info.major == 3
+        assert sys.version_info.minor == 5
+    except AssertionError:
+        logger.error('\nSyRI uses Python3.5. Currently using Python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'. Exiting')
+        sys.exit()
+    except KeyboardInterrupt:
+        raise()
+    except Exception as E:
+        sys.exit(E)
+
+    from pandas import __version__ as pdversion
+    if pdversion != '0.23.4':
+        logger.warning('Using pandas version: ' + pdversion + '. Expected vesion: 0.23.4. This might result in unexpected errors.')
+    logger.debug('Python and Pandas version are ok')
+
+    ###################################################################
+    # Read alignments and compare lengths with genome fasta
+    ###################################################################
+    from syri.pyxFiles.synsearchFunctions import readCoords
+    from Bio.SeqIO import parse
+
+    coords, chrlink = readCoords(args.infile.name, args.chrmatch, args.dir, args.prefix, args)
+    achrs = np.unique(coords.aChr).tolist()
+    achr_size = {}
+    bchr_size = {}
+    for achr in achrs:
+        achr_size[achr] = np.max(np.max(coords.loc[coords.aChr == achr, ['aStart', 'aEnd']]))
+        bchr_size[achr] = np.max(np.max(coords.loc[coords.bChr == achr, ['bStart', 'bEnd']]))
+    for fasta in parse(args.ref.name, 'fasta', generic_dna):
+        if fasta.id in list(achr_size.keys()):
+            if len(fasta.seq) < achr_size[fasta.id]:
+                logger.error('Length of reference sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                sys.exit()
+    for fasta in parse(args.qry.name, 'fasta', generic_dna):
+        if chrlink[fasta.id] in list(bchr_size.keys()):
+            if len(fasta.seq) < bchr_size[chrlink[fasta.id]]:
+                logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                sys.exit()
 
     ###################################################################
     # Identify structural rearrangements
     ###################################################################
     from syri.pyxFiles.synsearchFunctions import startSyri
     if not args.nosr:
-        chrlink = startSyri(args)
+        startSyri(args, coords)
 
     ###################################################################
     # Identify structural variations
     ###################################################################
     logger = logging.getLogger("local_variation")
-
     if not args.nosv:
         if args.all:
             fin = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt"]
@@ -139,18 +167,14 @@ if __name__ == "__main__":
             fin = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "ctxOut.txt"]
         logger.info("Finding SVs in " + ", ".join(fin))
         listDir = os.listdir(args.dir)
-
         for file in fin:
             if args.prefix+file not in listDir:
                 logger.error(file + " is not present in the directory. Exiting")
                 sys.exit()
-
         from syri.findsv import readSRData, getSV, getNotAligned
-
         if args.ref is None or args.qry is None:
             logger.error("Reference and query assembly fasta files are required for SV identification.")
             sys.exit()
-
         allAlignments = readSRData(args.dir, args.prefix, args.all)
         getSV(args.dir, allAlignments, args.prefix, args.offset)
         getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name, chrlink)
@@ -166,10 +190,7 @@ if __name__ == "__main__":
                 logger.error("Please provide delta file. Exiting")
                 sys.exit()
 
-            # if args.delta.name not in os.listdir(args.dir):
-            #     logger.error("Delta file is missing. Exiting")
-            #     sys.exit()
-        getshv(args)
+        getshv(args, coords, chrlink)
 
     ###################################################################
     # Combine Output
@@ -179,26 +200,18 @@ if __name__ == "__main__":
         from syri.writeout import getTSV, getVCF
         listDir = os.listdir(args.dir)
         files = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", 'sv.txt', 'notAligned.txt', 'snps.txt']
-        # for file in files:
-        #     if args.prefix+file not in listDir:
-        #         logger.error(file + " is not present in the directory. Exiting")
-        #         sys.exit()
         logger.info('Generating table output')
-
         if args.ref is None:
             logger.error("Reference genome fasta file is required for combining outputs.")
             sys.exit()
-
         getTSV(args.dir, args.prefix, args.ref.name)
         logger.info('Generating VCF')
         getVCF("syri.out", "syri.vcf", args.dir, args.prefix)
 
     from syri.bin.func.myUsefulFunctions import fileRemove
-
     if not args.keep:
         for fin in ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", "sv.txt", "notAligned.txt", "snps.txt"]:
             fileRemove(args.prefix + fin)
-
     print("Finished syri")
 
 

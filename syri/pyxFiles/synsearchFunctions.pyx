@@ -44,32 +44,52 @@ def readSAMBAM(fin, type='B'):
         logger.error("Error in opening BAM/SAM file. " + e)
         sys.exit()
     except OSError as e:
-        print("Error in reading input file.")
-        print(e)
+        logger.error("Error in reading input file." + e)
         sys.exit()
     except Exception as e:
         logger.error("Unexpected error in opening BAM/SAM file. " + e)
         sys.exit()
 
+
     try:
+        qry_prim = {}
+        ref_prim = {}
+        cgdict = {1:'I', 2:'D', 7:'=', 8:'X'}
         coords = {}
         index = 0
         for aln in findata:
             index += 1
+            ## Check whether every sequence has at least one primary alignment
+            if aln.reference_name is not None:
+                if aln.reference_name not in ref_prim.keys():
+                    ref_prim[aln.reference_name] = False
+            if aln.query_name not in qry_prim.keys():
+                qry_prim[aln.query_name] = False
+            if aln.reference_name is not None:
+                if not ref_prim[aln.reference_name]:
+                    if aln.flag < 256:
+                        ref_prim[aln.reference_name] = True
+            if not qry_prim[aln.query_name]:
+                if aln.flag < 256:
+                    qry_prim[aln.query_name] = True
 
-            if aln.cigarstring == "*":
+            ## Pass non-alinging chromosomes
+            if aln.cigarstring is None:
+                logger.warning(aln.query_name + ' do not align with any reference chromosome and cannot be analysed')
                 continue
 
             ## Check CIGAR:
             if False in [False if i[0] not in [1,2,4,5,7,8] else True for i in aln.cigartuples]:
-                sys.exit("Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: " + aln.cigarstring)
+                logger.error("Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: " + str(aln.cigarstring))
+                sys.exit()
+            if len(aln.cigartuples) > 2:
+                if True in [True if i[0] in [4,5] else False for i in aln.cigartuples[1:-1]]:
+                    logger.error("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + aln.cigarstring)
+                    sys.exit()
 
-            if True in [False if i[0] in [4,5] else False for i in aln.cigartuples[1:-1]]:
-                sys.exit("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + aln.cigarstring)
-
+            ## Parse information from the aln object
             astart = aln.reference_start+1
             aend = aln.reference_end
-
             is_inv = True if np.binary_repr(aln.flag,12)[7] == '1' else False
             if not is_inv:
                 if aln.cigartuples[0][0] in [4,5]:
@@ -83,28 +103,31 @@ def readSAMBAM(fin, type='B'):
                 else:
                     bend = 1
                 bstart = bend + aln.query_alignment_length - 1
-
             alen = abs(aend - astart) + 1
             blen = abs(bend - bstart) + 1
-
-            format((sum([i[1] for i in aln.cigartuples if i[0] == 7])/sum([i[1] for i in aln.cigartuples if i[0] in [1,2,7,8]]))*100, '.2f')
-
             iden = format((sum([i[1] for i in aln.cigartuples if i[0] == 7])/sum([i[1] for i in aln.cigartuples if i[0] in [1,2,7,8]]))*100, '.2f')
             adir = 1
             bdir = -1 if is_inv else 1
-
             achr = aln.reference_name
             bchr = aln.query_name
-
-            cgdict = {1:'I', 2:'D', 7:'=', 8:'X'}
             cg = "".join([str(i[1]) + cgdict[i[0]] for i in aln.cigartuples if i[0] not in [4,5]])
             coords[index] = [astart, aend, bstart, bend, alen, blen, iden, adir, bdir, achr, bchr, cg]
+
+        ## Give warning for chromosomes which do not have any primary alignment
+        for k,v in ref_prim.items():
+            if not v:
+                logger.warning('No primary alignment found for reference sequence ' + k +'. This could mean that the entire chromosome '+ k +' is reapeated.')
+        for k,v in qry_prim.items():
+            if not v:
+                logger.warning('No primary alignment found for query sequence ' + k +'. This could mean that the entire chromosome '+ k + ' is reapeated.')
+
+        ## Return alignments
         coords = pd.DataFrame.from_dict(coords, orient= 'index')
         coords.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
         return coords
     except Exception as e:
-        logger.error("Error in reading BAM file.")
-        print(e)
+        print('fail')
+        logger.error("Error in reading BAM/SAM file. " + e)
         sys.exit()
 
 def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
@@ -117,23 +140,27 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
             coords = pd.read_table(coordsfin, header = None)
         except pd.errors.ParserError:
             coords = pd.read_table(coordsfin, header = None, engine = "python")
+        except Exception as e:
+            logger.error("Error in reading the alignment file. " + e)
+            sys.exit()
     elif args.ftype == 'S':
-        logger.info("Reading input from .tsv file")
+        logger.info("Reading input from SAM file")
         try:
             coords = readSAMBAM(coordsfin, type='S')
-        except:
-            logger.error("Error in reading the SAM file")
+        except Exception as e:
+            logger.error("Error in reading the alignment file. " + e)
             sys.exit()
     elif args.ftype == 'B':
-        logger.info("Reading input from .tsv file")
+        logger.info("Reading input from BAM file")
         try:
             coords = readSAMBAM(coordsfin, type='B')
-        except:
-            logger.error("Error in reading the BAM file")
+        except Exception as e:
+            logger.error("Error in reading the alignment file" + e)
             sys.exit()
     else:
-        logger.error("Incorrect file type specified.")
+        logger.error("Incorrect alignment file type specified.")
         sys.exit()
+
 
     if not cigar:
         if coords.shape[1] >= 12:
@@ -143,7 +170,6 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
         if coords.shape[1] > 12:
             coords = coords.iloc[:, 0:12]
         coords.columns = ["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr", 'cigar']
-
 
     # Sanity check input file
     try:
@@ -221,17 +247,17 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
         logger.error('bChr is not string')
         sys.exit()
 
-    #check for bstart > bend when bdir is -1
+    ## check for bstart > bend when bdir is -1
     check = np.unique(coords.loc[coords.bDir == -1, 'bStart'] > coords.loc[coords.bDir == -1, 'bEnd'])
     if len(check) > 1:
-        logger.error('Inconsistent start and end position for inverted alignment in genome B. For inverted alignments, either all bstart < bend or all bend > bstart')
+        logger.error('Inconsistent start and end position for inverted alignment in query genome. For inverted alignments, either all bstart < bend or all bend > bstart')
         sys.exit()
     elif len(check) == 0:
-        logger.debug('No Inverted alignments present.')
+        logger.info('No Inverted alignments present.')
     elif check[0] == True:
         pass
     else:
-        logger.warning('For inverted alignments, bstart was less than bend. Swapping them.')
+        logger.info('For inverted alignments, bstart was less than bend. Swapping them.')
         coords.loc[coords.bDir == -1, 'bStart'] = coords.loc[coords.bDir == -1, 'bStart'] + coords.loc[coords.bDir == -1, 'bEnd']
         coords.loc[coords.bDir == -1, 'bEnd'] = coords.loc[coords.bDir == -1, 'bStart'] - coords.loc[coords.bDir == -1, 'bEnd']
         coords.loc[coords.bDir == -1, 'bStart'] = coords.loc[coords.bDir == -1, 'bStart'] - coords.loc[coords.bDir == -1, 'bEnd']
@@ -241,7 +267,6 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     ## Ensure that chromosome IDs are same for the two genomes.
     ## Either find best query match for every reference genome.
     ## Or if --no-chrmatch is set then remove non-matching chromosomes.
-
     if np.unique(coords.aChr).tolist() != np.unique(coords.bChr).tolist():
         logger.warning('Chromosomes IDs do not match.')
         if not chrmatch:
@@ -277,13 +302,45 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
             aChromo = set(coords["aChr"])
             bChromo = set(coords["bChr"])
             badChromo = list(aChromo - bChromo) + list(bChromo - aChromo)
-            logger.warning(", ".join(badChromo) + " present in only one genome. Removing corresponding alignments")
+            if len(badChromo) > 0:
+                logger.warning(", ".join(badChromo) + " present in only one genome. Removing corresponding alignments")
             coords = coords.loc[~coords.aChr.isin(badChromo) & ~coords.bChr.isin(badChromo)]
 
+    ## Check for presence of directed alignments
+    achrs = np.unique(coords.aChr).tolist()
+    for achr in achrs:
+        if coords.loc[(coords.aChr==achr) & (coords.bChr==achr) & (coords.bDir == 1),].shape[0] == 0:
+            hombchr = [k for k,v in chrlink.items() if v==achr]
+            if len(hombchr) == 1:
+                hombchr = hombchr[0]
+            elif len(hombchr) == 0:
+                hombchr = achr
+            else:
+                logger.error('Homologous chromosomes were not identified correctly. Try assigning the chromosome ids manually.')
+                sys.exit()
+            logger.warning('Reference chromosome ' + achr + ' do not have any directed alignments with its homologous chromosome in the query genome (' + hombchr + '). Filtering out all corresponding alignments.')
+            coords = coords.loc[~(coords.aChr == achr)]
+            coords = coords.loc[~(coords.bChr == achr)]
+
+    ## Check for presence of too many inverted alignments
+    for achr in achrs:
+        dir_range = mergeRanges(np.array(coords.loc[(coords.aChr==achr) & (coords.bChr==achr) & (coords.bDir==1), ["aStart", "aEnd"]]))
+        dir_len = len(dir_range) + (dir_range[:, 1] - dir_range[:, 0]).sum()
+        inv_range = mergeRanges(np.array(coords.loc[(coords.aChr==achr) & (coords.bChr==achr) & (coords.bDir==-1), ["aStart", "aEnd"]]))
+        inv_len = len(inv_range) + (inv_range[:, 1] - inv_range[:, 0]).sum()
+        if inv_len > dir_len:
+            hombchr = [k for k,v in chrlink.items() if v==achr]
+            if len(hombchr) == 1:
+                hombchr = hombchr[0]
+            elif len(hombchr) == 0:
+                hombchr = achr
+            else:
+                logger.error('Homologous chromosomes were not identified correctly. Try assigning the chromosome ids manually.')
+                sys.exit()
+            logger.warning('Reference chromosome ' + achr + ' has high fraction of inverted alignments with its homologous chromosome in the query genome (' + hombchr + '). Ensure that same chromosome-strands are being compared in the two genomes, as different strand can result in unexpected errors.')
     return coords, chrlink
 
-def startSyri(args):
-    coordsfin = args.infile.name
+def startSyri(args, coords):
     nCores = args.nCores
     bRT = args.bruteRunTime
     threshold = 50  ##args.threshold
@@ -291,15 +348,10 @@ def startSyri(args):
     prefix = args.prefix
     tUC = args.TransUniCount
     tUP = args.TransUniPercent
-    chrmatch = args.chrmatch
 
-    # LOG_FORMAT = "%(asctime)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s"
-    # logging.basicConfig(filename=cwdPath+args.log_fin.name, level=args.log, format=LOG_FORMAT)
     logger = logging.getLogger("syri")
-    logger.warning("starting")
+    logger.info("starting")
     logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
-
-    coords, chrlink = readCoords(coordsfin, chrmatch, cwdPath, prefix, args)
 
     uniChromo = list(np.unique(coords.aChr))
     logger.info('Analysing chromosomes: {}'.format(uniChromo))
@@ -317,32 +369,15 @@ def startSyri(args):
 
     # Recalculate syntenic blocks by considering the blocks introduced by CX events
     outSyn(cwdPath, threshold, prefix)
-    return chrlink
+    return 'Finished'
 
 def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     logger = logging.getLogger("syri."+chromo)
-
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
-
     logger.info(chromo+" " + str(coordsData.shape))
     logger.info("Identifying Synteny for chromosome " + chromo)
-
-    # df = pd.DataFrame(apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold), index = coordsData.index.values, columns = coordsData.index.values)
-
     df = apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold)
-
-    # nrow = len(df)
-
-    # blocks = [alignmentBlock(i, np.where(df.iloc[i,] == True)[0], coordsData.iloc[i]) for i in range(nrow)]
-
-    # blocks = deque()
-    # keys = df
-    # for i in range(nrow(coordsData)):
-    #     if i in
-    #     blocks.append(alignmentBlock(i, df[i], coordsData.iloc[i]))
     blocks = [alignmentBlock(i, df[i], coordsData.iloc[i]) for i in df.keys()]
-
-    # blocks = list(blocks)
     for block in blocks:
         i = 0
         while(i < len(block.children)):

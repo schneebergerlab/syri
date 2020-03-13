@@ -136,7 +136,7 @@ def getsnps(blocks, allAlignments):
                           pd.unique(alignments["bChr"])[0]])+ "\n" + outsnps.to_csv(sep='\t', header=False, index=False)
     return outstring
 
-def getshv(args):
+def getshv(args, coords, chrlink):
     logger = logging.getLogger("ShV")
     cwdpath = args.dir
     prefix = args.prefix
@@ -230,9 +230,9 @@ def getshv(args):
 
     else:
         logger.debug("finding short variation using CIGAR string")
-        coordsfin = args.infile.name
-        chrmatch = args.chrmatch
-        coords, chrlink = readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar=True)
+        # coordsfin = args.infile.name
+        # chrmatch = args.chrmatch
+        # coords, chrlink = readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar=True)
         allAlignments = readSRData(cwdpath, prefix, args.all)
         allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
         allBlocks = pd.unique(allAlignments.id)
