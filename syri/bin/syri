@@ -130,6 +130,8 @@ if __name__ == "__main__":
     ###################################################################
     from syri.pyxFiles.synsearchFunctions import readCoords
     from Bio.SeqIO import parse
+    from Bio.Alphabet import generic_dna
+    import numpy as np
 
     coords, chrlink = readCoords(args.infile.name, args.chrmatch, args.dir, args.prefix, args)
     achrs = np.unique(coords.aChr).tolist()
@@ -138,15 +140,20 @@ if __name__ == "__main__":
     for achr in achrs:
         achr_size[achr] = np.max(np.max(coords.loc[coords.aChr == achr, ['aStart', 'aEnd']]))
         bchr_size[achr] = np.max(np.max(coords.loc[coords.bChr == achr, ['bStart', 'bEnd']]))
-	print(achr_size, bchr_size)
+    print(achr_size, bchr_size, len(chrlink))
     for fasta in parse(args.ref.name, 'fasta', generic_dna):
         if fasta.id in list(achr_size.keys()):
             if len(fasta.seq) < achr_size[fasta.id]:
                 logger.error('Length of reference sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                 sys.exit()
     for fasta in parse(args.qry.name, 'fasta', generic_dna):
-        if chrlink[fasta.id] in list(bchr_size.keys()):
-            if len(fasta.seq) < bchr_size[chrlink[fasta.id]]:
+        if len(chrlink) > 0:
+            if chrlink[fasta.id] in list(bchr_size.keys()):
+                if len(fasta.seq) < bchr_size[chrlink[fasta.id]]:
+                    logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                    sys.exit()
+        elif fasta.id in list(bchr_size.keys()):
+            if len(fasta.seq) < bchr_size[fasta.id]:
                 logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                 sys.exit()
 
