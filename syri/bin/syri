@@ -133,7 +133,7 @@ if __name__ == "__main__":
     from Bio.Alphabet import generic_dna
     import numpy as np
 
-    coords, chrlink = readCoords(args.infile.name, args.chrmatch, args.dir, args.prefix, args)
+    coords, chrlink = readCoords(args.infile.name, args.chrmatch, args.dir, args.prefix, args, args.cigar)
     achrs = np.unique(coords.aChr).tolist()
     achr_size = {}
     bchr_size = {}
