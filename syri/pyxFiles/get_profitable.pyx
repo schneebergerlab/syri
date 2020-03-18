@@ -178,7 +178,6 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
     # Find shortest path to all other nodes from each node
     for i in n:
         if i in uniend:
-            print('skipping: ', i)
             continue
         nodepath.clear()
         pred = np.array([-1]* <Py_ssize_t> len(n), dtype = np.int)
@@ -343,11 +342,11 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
         maxid = parents[maxid]
     goodinvs = set([path[i] for i in range(<Py_ssize_t> path.size())])
     
-    print(goodinvs)
-    return
-
+    #print(goodinvs)
     count = 0
     for i in n:
+        if i in uniend:
+            continue
         nodepath.clear()
         pred = np.array([-1]* <Py_ssize_t> len(n), dtype = np.int)
         dist = np.array([np.float32('inf')]*  <Py_ssize_t> len(n), dtype = np.float32)
@@ -365,6 +364,8 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
                 index+=1
 
         for j in range(n_topo):
+            if j in unistart:
+                continue
             # Find all connected paths which are profitable
             if dist[topo[j]] != float("inf"):
                 current = topo[j]

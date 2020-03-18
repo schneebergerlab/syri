@@ -126,13 +126,30 @@ if __name__ == "__main__":
     logger.debug('Python and Pandas version are ok')
 
     ###################################################################
+    # Check if input files are present
+    ###################################################################
+  
+    ## Check presence of input files for SV identification
+    if not args.nosv:
+        if args.ref is None or args.qry is None:
+            logger.error("Reference and query assembly fasta files are required for SV identification.")
+            sys.exit()
+    
+    ## Check presence of input files ShV identification
+    if not args.nosnp:
+        if not args.cigar:
+            if args.delta is None:
+                logger.error("CIGAR string or .delta file is required for SNPs/indels identification. Exiting")
+                sys.exit()
+    
+    ###################################################################
     # Read alignments and compare lengths with genome fasta
     ###################################################################
     from syri.pyxFiles.synsearchFunctions import readCoords
     from Bio.SeqIO import parse
     from Bio.Alphabet import generic_dna
     import numpy as np
-
+    
     coords, chrlink = readCoords(args.infile.name, args.chrmatch, args.dir, args.prefix, args, args.cigar)
     achrs = np.unique(coords.aChr).tolist()
     achr_size = {}
@@ -141,22 +158,46 @@ if __name__ == "__main__":
         achr_size[achr] = np.max(np.max(coords.loc[coords.aChr == achr, ['aStart', 'aEnd']]))
         bchr_size[achr] = np.max(np.max(coords.loc[coords.bChr == achr, ['bStart', 'bEnd']]))
     print(achr_size, bchr_size, len(chrlink))
-    for fasta in parse(args.ref.name, 'fasta', generic_dna):
-        if fasta.id in list(achr_size.keys()):
-            if len(fasta.seq) < achr_size[fasta.id]:
-                logger.error('Length of reference sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
-                sys.exit()
-    for fasta in parse(args.qry.name, 'fasta', generic_dna):
-        if len(chrlink) > 0:
-            if chrlink[fasta.id] in list(bchr_size.keys()):
-                if len(fasta.seq) < bchr_size[chrlink[fasta.id]]:
-                    logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+    
+    key_found = []
+    if args.ref is not None:
+        for fasta in parse(args.ref.name, 'fasta', generic_dna):
+            if fasta.id in achrs:
+                key_found = key_found + [fasta.id]
+                if len(fasta.seq) < achr_size[fasta.id]:
+                    logger.error('Length of reference sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                     sys.exit()
-        elif fasta.id in list(bchr_size.keys()):
-            if len(fasta.seq) < bchr_size[fasta.id]:
-                logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
-                sys.exit()
+        for achr in achrs:
+            if achr not in key_found:
+                logger.error('Chromosome ID ' + achr + ' is available in alignments but not in reference genome fasta. Exiting.')
+                    sys.exit()
+    
+    key_found = []
+    if args.qry is not None:
+        if len(chrlink) > 0:
+            for fasta in parse(args.qry.name, 'fasta', generic_dna):
+                if fasta.id in list(chrlink.keys()):
+                    key_found = key_found + [fasta.id]
+                    if len(fasta.seq) < bchr_size[chrlink[fasta.id]]:
+                        logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                        sys.exit()
+            for bchr in list(chrlink.keys()):
+                if bchr not in key_found:
+                    logger.error('Chromosome ID ' + bchr + ' is available in alignments but not in query genome fasta. Exiting.')
+                        sys.exit()
+        else:
+            for fasta in parse(args.qry.name, 'fasta', generic_dna):
+                elif fasta.id in list(bchr_size.keys()):
+                    key_found = key_found + [fasta.id]
+                    if len(fasta.seq) < bchr_size[fasta.id]:
+                        logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                        sys.exit()
+            for bchr in list(bchr_size.keys()):
+                if bchr not in key_found:
+                    logger.error('Chromosome ID ' + bchr + ' is available in alignments but not in query genome fasta. Exiting.')
+                        sys.exit()
 
+    
     ###################################################################
     # Identify structural rearrangements
     ###################################################################
@@ -183,6 +224,7 @@ if __name__ == "__main__":
         if args.ref is None or args.qry is None:
             logger.error("Reference and query assembly fasta files are required for SV identification.")
             sys.exit()
+    if not args.nosv:
         allAlignments = readSRData(args.dir, args.prefix, args.all)
         getSV(args.dir, allAlignments, args.prefix, args.offset)
         getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name, chrlink)
