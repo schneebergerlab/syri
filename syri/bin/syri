@@ -187,7 +187,7 @@ if __name__ == "__main__":
                     sys.exit()
         else:
             for fasta in parse(args.qry.name, 'fasta', generic_dna):
-                elif fasta.id in list(bchr_size.keys()):
+                if fasta.id in list(bchr_size.keys()):
                     key_found = key_found + [fasta.id]
                     if len(fasta.seq) < bchr_size[fasta.id]:
                         logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
