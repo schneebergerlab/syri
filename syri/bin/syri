@@ -170,7 +170,7 @@ if __name__ == "__main__":
         for achr in achrs:
             if achr not in key_found:
                 logger.error('Chromosome ID ' + achr + ' is available in alignments but not in reference genome fasta. Exiting.')
-                    sys.exit()
+                sys.exit()
     
     key_found = []
     if args.qry is not None:

@@ -895,7 +895,6 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
         cpp_deq[float]                  profit
         cpp_deq[long]                   stsyn, endsyn
     
-    print('starting')
     n_syn = len(synBlockScore)
     invG = getConnectivityGraph(invblocks)
     out = deque()
@@ -981,14 +980,12 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                     continue
                     
                 if bothuni == 2:
-                    #print(i, outlist[i], inlist[outlist[i][0]] )
                     unistart.append(i)
                     uniend.append(outlist[i][0])
         
     unistart = set(list(unistart))
     uniend = set(list(uniend))
     
-    print('finding candidates')
     # Find shortest path to all other nodes from each node
     for i in n:
         if i in uniend:
@@ -1128,12 +1125,9 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
     stb_list  = np.array([stb[i] for i in range(<Py_ssize_t> stb.size())], dtype=np.int)
     endb_list  = np.array([endb[i] for i in range(<Py_ssize_t> endb.size())], dtype=np.int)
     
-    print('found ', lp, ' candidates. Finding best inversions')
     parents = np.array([-1]*lp, dtype = 'int')
 
     for i in range(lp):
-        if i%100==0:
-            print(i, str(datetime.now()))
         for j in range(lp-1,i,-1):
             if st_list[j] > end_list[i]-threshold:
                 if stb_list[j] > endb_list[i] -threshold:
