@@ -184,7 +184,7 @@ if __name__ == "__main__":
             for bchr in list(chrlink.keys()):
                 if bchr not in key_found:
                     logger.error('Chromosome ID ' + bchr + ' is available in alignments but not in query genome fasta. Exiting.')
-                        sys.exit()
+                    sys.exit()
         else:
             for fasta in parse(args.qry.name, 'fasta', generic_dna):
                 elif fasta.id in list(bchr_size.keys()):
@@ -195,7 +195,7 @@ if __name__ == "__main__":
             for bchr in list(bchr_size.keys()):
                 if bchr not in key_found:
                     logger.error('Chromosome ID ' + bchr + ' is available in alignments but not in query genome fasta. Exiting.')
-                        sys.exit()
+                    sys.exit()
 
     
     ###################################################################
