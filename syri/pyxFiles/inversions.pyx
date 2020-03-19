@@ -895,6 +895,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
         cpp_deq[float]                  profit
         cpp_deq[long]                   stsyn, endsyn
     
+    print('starting')
     n_syn = len(synBlockScore)
     invG = getConnectivityGraph(invblocks)
     out = deque()
@@ -903,6 +904,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
     for i in range(<Py_ssize_t> neighbourSyn.size()):
         nsynmap[i, 0] = neighbourSyn[i][0]
         nsynmap[i, 1] = neighbourSyn[i][1]
+
     ## Get topological ordering of the graph
     indegree = invG.vs.degree('IN')
     q = deque()
@@ -923,6 +925,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
 
     if cnt != len(indegree):
         print('Cycle found')
+        sys.exit()
 
     topo = np.array(toporder, dtype = np.int)
     n_topo = len(topo)
@@ -944,6 +947,9 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
             index += 1
     n_edges = len(source)
     
+    # Find nodes which have unique high scoring parent/children node.
+    # These nodes could not be the first/last element of a candidate.
+    # This decreases the number of candidates, increasing the performance.
     outlist = invG.get_adjlist('OUT')
     inlist = invG.get_adjlist('IN')
     unistart = deque()
@@ -961,7 +967,6 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                 for j in range(nsynmap[outlist[i][0]][0]+1, nsynmap[outlist[i][0]][1]):
                     if j <= nsynmap[i][0] or j >= nsynmap[i][1]:
                         endsyn.push_back(j)
-                
                 if stsyn.size()==0 and endsyn.size()==0:
                     unistart.append(i)
                     uniend.append(outlist[i][0])
@@ -978,14 +983,12 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                     bothuni += 1
                 else:
                     continue
-                    
                 if bothuni == 2:
                     unistart.append(i)
                     uniend.append(outlist[i][0])
-        
     unistart = set(list(unistart))
-    uniend = set(list(uniend))
-    
+    uniend = set(list(uniend))    
+
     # Find shortest path to all other nodes from each node
     for i in n:
         if i in uniend:
@@ -994,8 +997,6 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
         pred = np.array([-1]* <Py_ssize_t> len(n), dtype = np.int)
         dist = np.array([np.float32('inf')]*  <Py_ssize_t> len(n), dtype = np.float32)
         dist[i] = 0
-        
-
         # Process vertices in topological order
         index = 0
         for j in range(n_topo):
@@ -1008,10 +1009,10 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                 index+=1
 
         for j in range(n_topo):
-            if j in unistart:
+            if topo[j] in unistart:
                 continue
             # Find all connected paths which are profitable
-            if dist[topo[j]] != float("inf"):
+            if dist[topo[j]] != float("inf"):                    
                 current = topo[j]
                 path.clear()
                 while current!=i:
@@ -1025,7 +1026,6 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                 nodepath[topo[j]] = path
                 path.push_back(i)
                 r_path.clear()
-
                 current = path.size()
                 for index in range(<Py_ssize_t> path.size()):
                     r_path.push_back(path[current-index-1])
@@ -1085,7 +1085,8 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                         iden.clear()
                     else:
                         print('ERROR in calculating revenue')
-
+                        
+                
                 # Calculate cost of the identified path
 
                 # Get left and right syntenic neighbours
@@ -1114,9 +1115,10 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                     stb.push_back(bEnd[r_path.back()])
                     endb.push_back(bStart[r_path.front()])
                     profit.push_back(revenue - cost)
+                    
         if i == brk:
             break
-    
+
     path.clear()
     lp = st.size()
     totscore = np.array([profit[i] for i in range(<Py_ssize_t> profit.size())], dtype=np.float32)
@@ -1124,7 +1126,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
     end_list  = np.array([end[i] for i in range(<Py_ssize_t> end.size())], dtype=np.int)
     stb_list  = np.array([stb[i] for i in range(<Py_ssize_t> stb.size())], dtype=np.int)
     endb_list  = np.array([endb[i] for i in range(<Py_ssize_t> endb.size())], dtype=np.int)
-    
+
     parents = np.array([-1]*lp, dtype = 'int')
 
     for i in range(lp):
@@ -1150,7 +1152,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
         maxid = parents[maxid]
     goodinvs = set([path[i] for i in range(<Py_ssize_t> path.size())])
     
-    print('found best inversions, getting their alignmetns')
+    #print(goodinvs)
     count = 0
     for i in n:
         if i in uniend:
@@ -1172,7 +1174,7 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                 index+=1
 
         for j in range(n_topo):
-            if j in unistart:
+            if topo[j] in unistart:
                 continue
             # Find all connected paths which are profitable
             if dist[topo[j]] != float("inf"):
@@ -1278,7 +1280,6 @@ cpdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, lon
                     count += 1
         if i == brk:
             return out
-    print('finished')
     return out
 
    

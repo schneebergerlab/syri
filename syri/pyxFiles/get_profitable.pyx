@@ -85,7 +85,7 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
     for i in range(<Py_ssize_t> neighbourSyn.size()):
         nsynmap[i, 0] = neighbourSyn[i][0]
         nsynmap[i, 1] = neighbourSyn[i][1]
-    print('1')
+
     ## Get topological ordering of the graph
     indegree = invG.vs.degree('IN')
     q = deque()
@@ -106,10 +106,10 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
 
     if cnt != len(indegree):
         print('Cycle found')
+        sys.exit()
 
     topo = np.array(toporder, dtype = np.int)
     n_topo = len(topo)
-    print('2')
     # Get order in which the edges need to be transversed
     source = np.zeros_like(invG.es['source'], dtype=int)
     target = np.zeros_like(invG.es['source'], dtype=int)
@@ -128,7 +128,9 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
             index += 1
     n_edges = len(source)
     
-    print('3')
+    # Find nodes which have unique high scoring parent/children node.
+    # These nodes could not be the first/last element of a candidate.
+    # This decreases the number of candidates, increasing the performance.
     outlist = invG.get_adjlist('OUT')
     inlist = invG.get_adjlist('IN')
     unistart = deque()
@@ -146,9 +148,7 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
                 for j in range(nsynmap[outlist[i][0]][0]+1, nsynmap[outlist[i][0]][1]):
                     if j <= nsynmap[i][0] or j >= nsynmap[i][1]:
                         endsyn.push_back(j)
-                
                 if stsyn.size()==0 and endsyn.size()==0:
-                    print(i, outlist[i], inlist[outlist[i][0]] )
                     unistart.append(i)
                     uniend.append(outlist[i][0])
                 
@@ -164,16 +164,11 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
                     bothuni += 1
                 else:
                     continue
-                    
                 if bothuni == 2:
-                    #print(i, outlist[i], inlist[outlist[i][0]] )
                     unistart.append(i)
                     uniend.append(outlist[i][0])
-        
-    print('unistart size: ', len(unistart))
-    print('uniend size: ', len(uniend))
     unistart = set(list(unistart))
-    uniend = set(list(uniend))
+    uniend = set(list(uniend))    
 
     # Find shortest path to all other nodes from each node
     for i in n:
@@ -183,8 +178,6 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
         pred = np.array([-1]* <Py_ssize_t> len(n), dtype = np.int)
         dist = np.array([np.float32('inf')]*  <Py_ssize_t> len(n), dtype = np.float32)
         dist[i] = 0
-        
-
         # Process vertices in topological order
         index = 0
         for j in range(n_topo):
@@ -197,10 +190,10 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
                 index+=1
 
         for j in range(n_topo):
-            if j in unistart:
+            if topo[j] in unistart:
                 continue
             # Find all connected paths which are profitable
-            if dist[topo[j]] != float("inf"):
+            if dist[topo[j]] != float("inf"):                    
                 current = topo[j]
                 path.clear()
                 while current!=i:
@@ -214,7 +207,6 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
                 nodepath[topo[j]] = path
                 path.push_back(i)
                 r_path.clear()
-
                 current = path.size()
                 for index in range(<Py_ssize_t> path.size()):
                     r_path.push_back(path[current-index-1])
@@ -274,7 +266,8 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
                         iden.clear()
                     else:
                         print('ERROR in calculating revenue')
-
+                        
+                
                 # Calculate cost of the identified path
 
                 # Get left and right syntenic neighbours
@@ -303,10 +296,10 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
                     stb.push_back(bEnd[r_path.back()])
                     endb.push_back(bStart[r_path.front()])
                     profit.push_back(revenue - cost)
+                    
         if i == brk:
             break
-    print(st.size())
-    
+
     path.clear()
     lp = st.size()
     totscore = np.array([profit[i] for i in range(<Py_ssize_t> profit.size())], dtype=np.float32)
@@ -318,8 +311,6 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
     parents = np.array([-1]*lp, dtype = 'int')
 
     for i in range(lp):
-        if i%100==0:
-            print(i, str(datetime.now()))
         for j in range(lp-1,i,-1):
             if st_list[j] > end_list[i]-threshold:
                 if stb_list[j] > endb_list[i] -threshold:
@@ -364,7 +355,7 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
                 index+=1
 
         for j in range(n_topo):
-            if j in unistart:
+            if topo[j] in unistart:
                 continue
             # Find all connected paths which are profitable
             if dist[topo[j]] != float("inf"):
@@ -474,7 +465,7 @@ cpdef getProfitable_test(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart
 
 
 import pickle
-with open("/srv/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/tests/trash/syri_test_genomes/analysis3/profitable_arguments.pickle", 'rb') as fin:
+with open("profitable_arguments.pickle", 'rb') as fin:
     input = pickle.load(fin)
     invblocks = input[0]
     invertedCoordsOri = input[1]
@@ -486,4 +477,4 @@ with open("/srv/netscratch/dep_coupland/grp_schneeberger/projects/SynSearch/test
     threshold = input[7]
 
 print('running')
-getProfitable_test(invblocks, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values.astype('float32'), neighbourSyn, np.array(synBlockScore, dtype = 'float32'), synData.aStart.values, synData.aEnd.values, tUC, tUP, threshold)
+print(getProfitable_test(invblocks, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values.astype('float32'), neighbourSyn, np.array(synBlockScore, dtype = 'float32'), synData.aStart.values, synData.aEnd.values, tUC, tUP, threshold))
