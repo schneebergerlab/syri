@@ -203,7 +203,7 @@ if __name__ == "__main__":
     ###################################################################
     from syri.pyxFiles.synsearchFunctions import startSyri
     if not args.nosr:
-        startSyri(args, coords)
+        startSyri(args, coords[["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr"]])
 
     ###################################################################
     # Identify structural variations
