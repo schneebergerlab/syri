@@ -462,7 +462,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
         long[:]                                                             sorted_sa
     
     
-    print('starting')
+    #print('starting')
     n_syn = len(synBlockScore)
     invG = getConnectivityGraph(invblocks)
     out = deque()

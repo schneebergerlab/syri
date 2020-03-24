@@ -157,7 +157,7 @@ if __name__ == "__main__":
     for achr in achrs:
         achr_size[achr] = np.max(np.max(coords.loc[coords.aChr == achr, ['aStart', 'aEnd']]))
         bchr_size[achr] = np.max(np.max(coords.loc[coords.bChr == achr, ['bStart', 'bEnd']]))
-    print(achr_size, bchr_size, len(chrlink))
+    #print(achr_size, bchr_size, len(chrlink))
     
     key_found = []
     if args.ref is not None:

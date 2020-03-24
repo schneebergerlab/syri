@@ -333,6 +333,7 @@ def mergeTransBlocks(transBlocks, orderedBlocks, invTransBlocks, invertedBlocks,
 
 
 def bruteSubsetSelector(cluster, transBlocksData, seedBlocks, bRT):
+    logger = logging.getLogger('Brute-force TD identification')
     posComb = [seedBlocks]
     skipList = [seedBlocks]
     for i in cluster:
@@ -399,8 +400,8 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks, bRT):
         remainingIterations = len(cluster) - cluster.index(i)
 
         if (timeTaken*(1.5**remainingIterations) > bRT):
-            print("Cluster is too big for Brute Force\nTime taken for last iteration ",
-                  timeTaken, " iterations remaining ",remainingIterations)
+            logger.info("Cluster is too big for Brute Force\nTime taken for last iteration " +
+                  str(timeTaken) + ". iterations remaining " + str(remainingIterations))
             return "Failed"
 
 
@@ -1893,7 +1894,7 @@ def getTransClasses(clusterSolutionBlocks, transData, transagroups, transbgroups
         elif transData[j].dir == -1:
             transClasses["invTranslocation"].append(j)
         else:
-            print("ERROR ERROR ERROR", j)
+            logger.info("Wrong alignment direction" + j)
 
     def setdup(j):
         if transData[j].dir == 1:
@@ -1901,7 +1902,7 @@ def getTransClasses(clusterSolutionBlocks, transData, transagroups, transbgroups
         elif transData[j].dir == -1:
             transClasses["invDuplication"].append(j)
         else:
-            print("ERROR ERROR ERROR", j)
+            logger.info("Wrong alignment direction" + j)
 
     transClasses = {"translocation":[],
                     "invTranslocation":[],
@@ -1967,7 +1968,7 @@ def getTransClasses(clusterSolutionBlocks, transData, transagroups, transbgroups
                         else:
                             settl(j)
                     else:
-                        print("ERROR ERROR ERROR LOL", j)
+                        logger.info("Wrong candidate class" + j)
     return transClasses
 
 
