@@ -1028,9 +1028,9 @@ def getInversions(coords,chromo, threshold, synData, tUC, tUP):
     synBlockScore = [(i.aLen + i.bLen)*i.iden for index, i in synData.iterrows()]
     
     ## Save(pickle) all intermediate objects so that getProfitable can be quickly optimised
-    import pickle
-    with open("profitable_arguments.pickle", 'wb') as fout:
-        pickle.dump([invblocks, invertedCoordsOri, neighbourSyn, synBlockScore, synData, tUC, tUP, threshold], fout)
+    #import pickle
+    #with open("profitable_arguments.pickle", 'wb') as fout:
+    #    pickle.dump([invblocks, invertedCoordsOri, neighbourSyn, synBlockScore, synData, tUC, tUP, threshold], fout)
         
     profitable = [inversion(i) for i in getProfitable(invblocks, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values.astype('float32'), neighbourSyn, np.array(synBlockScore, dtype = 'float32'), synData.aStart.values, synData.aEnd.values, tUC, tUP, threshold)]
     logger.debug("found profitable " + chromo)
