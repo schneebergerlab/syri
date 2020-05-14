@@ -1,6 +1,11 @@
 ## Pre-requisite:
-1. Python3.5 and the following packages: Cython, numpy, scipy, pandas, python-igraph, biopython, psutil, and pysam
-2. C/C++ compiler: g++ 
+1. Python3.5 and the following packages: Cython, numpy, scipy, pandas (version: 0.23.4), python-igraph, biopython, psutil, pysam, and matplotlib
+2. C/C++ compiler: g++
+
+## Recent major updates:
+* Added a new method `plotsr` in `./syri/bin/` for plotting genomic structures (syntenic and structurally rearranged regions)
+* Optimised inversion identification improving worst-case performance by many folds.
+ 
 
 ## Installation:
 Download/clone the repository, open the folder and run:
