@@ -73,7 +73,7 @@ if __name__ == '__main__':
     # Get region length and filter out smaller SR
     df['alen'] = df[2] - df[1]
     df['blen'] = df[7] - df[6]
-    df = df.loc[(df['alen'] >= args.s) | (df['blen'] >= args.s)]
+    df = df.loc[(df['alen'] >= args.s) | (df['blen'] >= args.s) | (df[10]=='SYN')]
     df = df.loc[df[5] == [chrid_dict[i] for i in df[0]]]
 
     # invert coord for inverted query genome
@@ -109,8 +109,8 @@ if __name__ == '__main__':
     m = len(str(ax.get_xticks()[1]).split('.')[0])
     xticks = xticks/(10**m)
     ax.set_xticklabels(xticks)
-    ax.set_xlabel('chromosome position ($x10^{}$)'.format(m))
-    ax.set_ylabel('chromosome id')
+    ax.set_xlabel('chromosome position ($x10^{}$ bp)'.format(m))
+    ax.set_ylabel('reference chromosome id')
     ax.xaxis.grid(True, which='major', linestyle='--')
     ax.set_axisbelow(True)
 
@@ -125,14 +125,14 @@ if __name__ == '__main__':
     for i in range(len(chrid)):
         if not adRefLab:
             ax.axhline(len(chrid)-0.02-i, 0, reflenghts[chrid[i][0]]/max_x, color=COLORS[6], linewidth=3, label='Reference')
-            adRefLab=True
+            adRefLab = True
         else:
             ax.axhline(len(chrid)-0.02-i, 0, reflenghts[chrid[i][0]]/max_x, color=COLORS[6], linewidth=3)
 
     for i in range(len(chrid)):
         if not adQryLab:
             ax.axhline(len(chrid)-0.02-i-0.7, 0, qrylenghts[chrid[i][1]]/max_x, color=COLORS[7], linewidth=3, label='Query')
-            adQryLab=True
+            adQryLab = True
         else:
             ax.axhline(len(chrid)-0.02-i-0.7, 0, qrylenghts[chrid[i][1]]/max_x, color=COLORS[7], linewidth=3)
 
@@ -172,7 +172,7 @@ if __name__ == '__main__':
                 p = Polygon(np.array([[row[1], len(chrid)-0.02-i],
                          [row[2], len(chrid)-0.02-i],
                          [row[5], len(chrid)-0.02-i-0.7],
-                         [row[4], len(chrid)-0.02-i-0.7,]]), closed=True, color=COLORS[2], alpha=alpha, linewidth=0, label='Translocation')
+                         [row[4], len(chrid)-0.02-i-0.7]]), closed=True, color=COLORS[2], alpha=alpha, linewidth=0, label='Translocation')
                 adTraLab = True
             else:
                 p = Polygon(np.array([[row[1], len(chrid)-0.02-i],
@@ -186,15 +186,15 @@ if __name__ == '__main__':
                 p = Polygon(np.array([[row[1], len(chrid)-0.02-i],
                          [row[2], len(chrid)-0.02-i],
                          [row[5], len(chrid)-0.02-i-0.7],
-                         [row[4], len(chrid)-0.02-i-0.7,]]), closed=True, color=COLORS[4], alpha=alpha, linewidth=0, label='Duplication')
+                         [row[4], len(chrid)-0.02-i-0.7]]), closed=True, color=COLORS[4], alpha=alpha, linewidth=0, label='Duplication')
                 adDupLab=True
             else:
                 p = Polygon(np.array([[row[1], len(chrid)-0.02-i],
                          [row[2], len(chrid)-0.02-i],
                          [row[5], len(chrid)-0.02-i-0.7],
-                         [row[4], len(chrid)-0.02-i-0.7,]]), closed=True, color=COLORS[4], alpha=alpha, linewidth=0)
+                         [row[4], len(chrid)-0.02-i-0.7]]), closed=True, color=COLORS[4], alpha=alpha, linewidth=0)
             ax.add_patch(p)
 
-    ax.legend(loc='lower left', bbox_to_anchor=(0, 1.01, 1, 1.01), ncol =3, mode='expand', borderaxespad=0., frameon=False)
+    ax.legend(loc='lower left', bbox_to_anchor=(0, 1.01, 1, 1.01), ncol=3, mode='expand', borderaxespad=0., frameon=False)
 
     fig.savefig('syri.'+O, dpi=D, bbox_inches='tight', pad_inches=0.01)
