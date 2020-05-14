@@ -3,6 +3,7 @@
 ```
 cwd="."     # Change to working directory
 PATH_TO_SYRI="../syri/bin/syri" #Change the path to point to syri executable
+PATH_TO_PLOTSR="../syri/bin/plotsr" #Change the path to point to plotsr executable
 ```
 
 ### Got to the working directory and downloand the Yeast reference genome and a query assembly
@@ -45,8 +46,13 @@ OR
 samtools view -b out.sam > out.bam
 python3 $PATH_TO_SYRI -c out.bam -r refgenome -q qrygenome -k -F B
 ```
+
 SyRI would report genomic structural differences in syri.out and syri.vcf.
 
+### Plotting genomic structures predicted by SyRI
+```
+python3 $PATH_TO_PLOTSR syri.out refgenome qrygenome -H 8 -W 5
+```
 
 ### Using SyRI to identify genomic rearrangements from whole-genome alignments generated using MUMmer
 ```
@@ -54,4 +60,7 @@ nucmer --maxmatch -c 100 -b 500 -l 50 refgenome qrygenome       # Whole genome a
 delta-filter -m -i 90 -l 100 out.delta > out.filtered.delta     # Remove small and lower quality alignments
 show-coords -THrd out.filtered.delta > out.filtered.coords      # Convert alignment information to a .TSV format as required by SyRI
 python3 $PATH_TO_SYRI -c out.filtered.coords -d out.filtered.delta -r refgenome -q qrygenome
+python3 $PATH_TO_PLOTSR syri.out refgenome qrygenome -H 8 -W 5
 ```
+
+

@@ -8,7 +8,7 @@ SyRI needs Python3.5 and depends on the following python libraries: [Cython](htt
 All these packages are available through anaconda and can be installed using:
 
 ```bash
-conda install cython numpy scipy pandas biopython psutil
+conda install cython numpy scipy pandas=0.23.4 biopython psutil matplotlib=3.0.0
 conda install -c conda-forge python-igraph
 conda install -c bioconda pysam
 ```
@@ -22,7 +22,7 @@ SyRI uses whole genome alignments as input. Users can use any aligner of their c
 
 ```bash
 python3 setup.py install		            # Install syri
-chmod +x syri/bin/syri syri/bin/chroder		# Make it executable
+chmod +x syri/bin/syri syri/bin/chroder	syri/bin/plotsr	# Make files executable
 ```
 
 All executables would be in ```cwd/syri/bin/```.

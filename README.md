@@ -7,9 +7,10 @@ Further, SyRI also identifies local variations within all syntenic and structura
 
 # Contents
 1. [Installation guide](install.md)
-2. [Genomic difference identification](example.md)
-3. [Pseudo-genome generation](scaforder.md)
-4. [File-format](fileformat.md)
-5. [Working example](pipeline.md)
-6. [Citation](cite.md)
+2. [Working example](pipeline.md)
+3. [File-format](fileformat.md)
+4. [Genomic difference identification](example.md)
+5. [Pseudo-genome generation](scaforder.md)
+6. [Plotting genomic structure](plotsr.md)
+7. [Citation](cite.md)
 
