@@ -247,7 +247,7 @@ if __name__ == "__main__":
     ###################################################################
     logger.info("Combining outputs")
     if not args.novcf:
-        from syri.writeout import getTSV, getVCF
+        from syri.writeout import getTSV, getVCF, getsum
         listDir = os.listdir(args.dir)
         files = ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", 'sv.txt', 'notAligned.txt', 'snps.txt']
         logger.info('Generating table output')

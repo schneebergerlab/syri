@@ -8,24 +8,27 @@ if __name__ == '__main__':
     parser.add_argument(dest='r', help='path to reference genome', type=argparse.FileType('r'))
     parser.add_argument(dest='q', help='path to query genome', type=argparse.FileType('r'))
     parser.add_argument('-s', help='minimum size of a SR to be plotted', type=int, default=10000)
+    parser.add_argument('-R', help='Create ribbons', default=False, action="store_true")
     parser.add_argument('-f', help='font size', type=int, default=6)
     parser.add_argument('-H', help='height of the plot', type=int)
     parser.add_argument('-W', help='width of the plot', type=int)
     parser.add_argument('-o', help='output file format (pdf, png, svg)', default="pdf", choices=['pdf', 'png', 'svg'])
     parser.add_argument('-d', help='DPI for the final image', default="300", type=int)
 
+
     args = parser.parse_args()
 
     # CONSTANTS
     VARS = ['SYN', 'INV', 'TRANS', 'INVTR', 'DUP', 'INVDP']
     COLORS = ['#DEDEDE', '#FFA500', '#9ACD32', '#9ACD32', '#00BBFF', '#00BBFF', '#83AAFF', '#FF6A33']
-    FS = args.f
 
     # Set Figure height and width. Change later based on chromosome number and size
+    FS = args.f
     H = args.H
     W = args.W
     O = args.o
     D = args.d
+    R = args.R
 
     from Bio.SeqIO import parse
     reflenghts = {i.id: len(i.seq) for i in parse(args.r.name, 'fasta')}
@@ -40,7 +43,7 @@ if __name__ == '__main__':
             if l[10] in VARS:
                 syri_regs.append(l)
 
-    from pandas import DataFrame
+    from pandas import DataFrame, concat
     import numpy as np
 
     df = DataFrame(list(syri_regs))[[0, 1, 2, 5, 6, 7, 10]]
@@ -71,10 +74,74 @@ if __name__ == '__main__':
             raise SystemExit('For chromosome ID ' + i + ' in query genome, max coordinate in syri.out is more than length of chromosome. Exiting.')
 
     # Get region length and filter out smaller SR
-    df['alen'] = df[2] - df[1]
-    df['blen'] = df[7] - df[6]
-    df = df.loc[(df['alen'] >= args.s) | (df['blen'] >= args.s) | (df[10]=='SYN')]
+    df = df.loc[((df[2] - df[1]) >= args.s) | ((df[7] - df[6]) >= args.s) | (df[10]=='SYN')]
     df = df.loc[df[5] == [chrid_dict[i] for i in df[0]]]
+
+    df.sort_values([5, 6, 7], inplace=True)
+    df['b'] = list(range(df.shape[0]))
+    df.sort_values([0, 1, 2], inplace=True)
+    df['a'] = list(range(df.shape[0]))
+
+    # Combine Ribbon is selected than combine rows
+    if R:
+        # Group syntenic regions
+        groups = deque()
+        cg = deque()
+        ca = -1
+        cb = -1
+        issyn = list(df[10] == 'SYN')
+        a = list(df['a'])
+        b = list(df['b'])
+        chrchange = np.where((np.array(df[0][1:]) == np.array(df[0][0:-1])) == False)[0] + 1
+        for i in range(df.shape[0]):
+            if i in chrchange:
+                groups.append(list(cg))
+                cg = deque()
+                if issyn[i]:
+                    cg.append(i)
+                    ca = i
+                    cb = i
+            elif not issyn[i]:
+                if len(cg) > 0:
+                    groups.append(list(cg))
+                    cg = deque()
+            else:
+                if len(cg) == 0:
+                    cg.append(i)
+                    ca = i
+                    cb = i
+                elif i == ca+1 and i == cb+1:
+                        cg.append(i)
+                        ca = i
+                        cb = i
+                else:
+                    groups.append(cg)
+                    cg = deque()
+                    cg.append(i)
+                    ca = i
+                    cb = i
+        groups.append(cg)
+
+        newsyn = deque()
+        for i in groups:
+            tmpdf = df.iloc[i]
+            newsyn.append([
+                list(tmpdf[0])[0],
+                list(tmpdf[1])[0],
+                list(tmpdf[2])[-1],
+                list(tmpdf[5])[0],
+                list(tmpdf[6])[0],
+                list(tmpdf[7])[-1]
+            ])
+        newsyn = DataFrame(list(newsyn), columns=[0, 1, 2, 5, 6, 7])
+        newsyn[10] = 'SYN'
+
+        df = df.drop(['a', 'b'], axis=1)
+        df = df.loc[-(df[10] == 'SYN')]
+        df = df.append(newsyn)
+        df.sort_values([0, 1, 2], inplace=True)
+
+
 
     # invert coord for inverted query genome
     invindex = ['INV' in i for i in df[10]]
@@ -84,6 +151,7 @@ if __name__ == '__main__':
 
     from matplotlib import pyplot as plt
     from matplotlib.patches import Polygon
+    plt.switch_backend('Qt5Agg')
     plt.rcParams['font.size'] = FS
     if H is None and W is None:
         H = len(chrid)
@@ -106,10 +174,19 @@ if __name__ == '__main__':
     ax.set_xlim(0, max_x)
     ax.ticklabel_format(axis='x', useOffset=False, style='plain')
     xticks = ax.get_xticks()
-    m = len(str(ax.get_xticks()[1]).split('.')[0])
-    xticks = xticks/(10**m)
+    if max_x >= 1000000000:
+        xticks = xticks/1000000000
+        ax.set_xlabel('chromosome position (in Gbp)')
+    elif max_x >= 1000000:
+        xticks = xticks/1000000
+        ax.set_xlabel('chromosome position (in Mbp)')
+    elif max_x >= 1000:
+        xticks = xticks/1000
+        ax.set_xlabel('chromosome position (in Kbp)')
     ax.set_xticklabels(xticks)
-    ax.set_xlabel('chromosome position ($x10^{}$ bp)'.format(m))
+
+    # m = len(str(ax.get_xticks()[1]).split('.')[0])
+
     ax.set_ylabel('reference chromosome id')
     ax.xaxis.grid(True, which='major', linestyle='--')
     ax.set_axisbelow(True)
@@ -136,7 +213,7 @@ if __name__ == '__main__':
         else:
             ax.axhline(len(chrid)-0.02-i-0.7, 0, qrylenghts[chrid[i][1]]/max_x, color=COLORS[7], linewidth=3)
 
-    alpha=0.8
+    alpha = 0.8
     for i in range(len(chrid)):
         # data
         for row in df.loc[(df[0] == chrid[i][0]) & (df[10] == 'SYN')].itertuples(index=False):
@@ -144,13 +221,13 @@ if __name__ == '__main__':
                 p = Polygon(np.array([[row[1], len(chrid)-0.02-i],
                          [row[2], len(chrid)-0.02-i],
                          [row[5], len(chrid)-0.02-i-0.7],
-                         [row[4], len(chrid)-0.02-i-0.7,]]), closed=True, color=COLORS[0], linewidth=0, label='Syntenic')
-                adSynLab=True
+                         [row[4], len(chrid)-0.02-i-0.7]]), closed=True, color=COLORS[0], alpha=alpha-0.2, linewidth=0, label='Syntenic')
+                adSynLab = True
             else:
                 p = Polygon(np.array([[row[1], len(chrid)-0.02-i],
                          [row[2], len(chrid)-0.02-i],
                          [row[5], len(chrid)-0.02-i-0.7],
-                         [row[4], len(chrid)-0.02-i-0.7,]]), closed=True, color=COLORS[0], linewidth=0)
+                         [row[4], len(chrid)-0.02-i-0.7]]), closed=True, color=COLORS[0], alpha=alpha-0.2, linewidth=0)
             ax.add_patch(p)
 
         for row in df.loc[(df[0] == chrid[i][0]) & (df[10] == 'INV')].itertuples(index=False):

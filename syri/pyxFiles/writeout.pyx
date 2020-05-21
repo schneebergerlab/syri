@@ -635,7 +635,7 @@ def getsum(finname, foutname, cwdpath, prefix):
     """
     Read syri.out file and output summary statistics
     """
-    logger = logging.getsum("getting summary")
+    logger = logging.getLogger("getting summary")
     logger.debug('starting generating summary file')
 
     # save counts ref_length and qry_length
