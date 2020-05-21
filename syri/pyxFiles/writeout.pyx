@@ -635,105 +635,135 @@ def getsum(finname, foutname, cwdpath, prefix):
     """
     Read syri.out file and output summary statistics
     """
-    logger = logging.getLogger("getVCF")
-    data = pd.read_table(cwdpath + prefix + finname, header=None, keep_default_na=False, dtype=object)
-    data.columns = ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']
-    data = data.loc[data['achr'] != "-"].copy()
-    dtypes = {'achr': str,
-              'astart': int,
-              'aend': int,
-              'aseq': str,
-              'bseq': str,
-              'bchr': str,
-              'bstart': str,
-              'bend': str,
-              'id': str,
-              'parent': str,
-              'vartype': str,
-              'dupclass': str}
-    data = data.astype(dtypes)
+    logger = logging.getsum("getting summary")
+    logger.debug('starting generating summary file')
+
+    # save counts ref_length and qry_length
+    stats = {'SYN': [0, 0, 0],
+             'INV': [0, 0, 0],
+             'TRANS': [0, 0, 0],
+             'DUP': [0, 0, 0],
+             'NOTALR': [0, 0, 0],
+             'NOTALQ': [0, 0, 0],
+             'SNP': [0, 0, 0],
+             'INS': [0, 0, 0],
+             'DEL': [0, 0, 0],
+             'CPG': [0, 0, 0],
+             'CPL': [0, 0, 0],
+             'HDR': [0, 0, 0],
+             'TDM': [0, 0, 0]}
+
+    logger.debug('reading syri.out')
+
     try:
-        data['achr'] = data['achr'].astype('int')
-    except ValueError as ve:
-        logger.debug('Chromosome values are sorted lexicographically.')
-    data.sort_values(['achr', 'astart', 'aend'], inplace=True)
-    data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']] = data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']].astype(str)
+        with open(cwdpath + prefix + finname, 'r') as fin:
+            for line in fin:
+                line = line.strip().split('\t')
+                if line[10] == 'SYN':
+                    stats['SYN'][0] += 1
+                    stats['SYN'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    stats['SYN'][2] += abs(int(line[6]) - int(line[7])) + 1
+                if line[10] == 'INV':
+                    stats['INV'][0] += 1
+                    stats['INV'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    stats['INV'][2] += abs(int(line[6]) - int(line[7])) + 1
 
-    with open(cwdpath + prefix + foutname, 'w') as fout:
-        fout.write('##fileformat=VCFv4.3\n')
-        fout.write('##fileDate=' + str(date.today()).replace('-', '') + '\n')
-        fout.write('##source=syri\n')
-        fout.write('##ALT=<ID=SYN,Description="Syntenic region">' + '\n')
-        fout.write('##ALT=<ID=INV,Description="Inversion">' + '\n')
-        fout.write('##ALT=<ID=TRANS,Description="Translocation">' + '\n')
-        fout.write('##ALT=<ID=INVTR,Description="Inverted Translocation">' + '\n')
-        fout.write('##ALT=<ID=DUP,Description="Duplication">' + '\n')
-        fout.write('##ALT=<ID=INVDP,Description="Inverted Duplication">' + '\n')
-        fout.write('##ALT=<ID=SYNAL,Description="Syntenic alignment">' + '\n')
-        fout.write('##ALT=<ID=INVAL,Description="Inversion alignment">' + '\n')
-        fout.write('##ALT=<ID=TRANSAL,Description="Translocation alignment">' + '\n')
-        fout.write('##ALT=<ID=INVTRAL,Description="Inverted Translocation alignment">' + '\n')
-        fout.write('##ALT=<ID=DUPAL,Description="Duplication alignment">' + '\n')
-        fout.write('##ALT=<ID=INVDPAL,Description="Inverted Duplication alignment">' + '\n')
-        fout.write('##ALT=<ID=HDR,Description="Highly diverged regions">' + '\n')
-        fout.write('##ALT=<ID=INS,Description="Insertion in non-reference genome">' + '\n')
-        fout.write('##ALT=<ID=DEL,Description="Deletion in non-reference genome">' + '\n')
-        fout.write('##ALT=<ID=CPG,Description="Copy gain in non-reference genome">' + '\n')
-        fout.write('##ALT=<ID=CPL,Description="Copy loss in non-reference genome">' + '\n')
-        fout.write('##ALT=<ID=SNP,Description="Single nucleotide polymorphism">' + '\n')
-        fout.write('##ALT=<ID=TDM,Description="Tandem repeat">' + '\n')
-        fout.write('##ALT=<ID=NOTAL,Description="Not Aligned region">' + '\n')
-        fout.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position on reference genome">' + '\n')
-        fout.write(
-            '##INFO=<ID=ChrB,Number=1,Type=String,Description="Chromoosme ID on the non-reference genome">' + '\n')
-        fout.write(
-            '##INFO=<ID=StartB,Number=1,Type=Integer,Description="Start position on non-reference genome">' + '\n')
-        fout.write(
-            '##INFO=<ID=EndB,Number=1,Type=Integer,Description="End position on non-reference genome">' + '\n')
-        fout.write('##INFO=<ID=Parent,Number=1,Type=String,Description="ID of the parent SR">' + '\n')
-        fout.write(
-            '##INFO=<ID=VarType,Number=1,Type=String,Description="Start position on non-reference genome">' + '\n')
-        fout.write(
-            '##INFO=<ID=DupType,Number=1,Type=String,Description="Copy gain or loss in the non-reference genome">' + '\n')
-        # fout.write('##INFO=<ID=NotAlGen,Number=1,Type=String,Description="Genome containing the not aligned region">' + '\n')
+                if line[10] in ['TRANS', 'INVTR']:
+                    stats['TRANS'][0] += 1
+                    stats['TRANS'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    stats['TRANS'][2] += abs(int(line[6]) - int(line[7])) + 1
 
-        fout.write('\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']) + '\n')
-        for line in data.itertuples(index=False):
-            pos = [line[0], line[1], line[8], 'N', '<' + line[10] + '>', '.', 'PASS']
+                ## Discuss DUP length stat
+                if line[10] in ['DUP', 'INVDP']:
+                    stats['DUP'][0] += 1
+                    stats['DUP'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    stats['DUP'][2] += abs(int(line[6]) - int(line[7])) + 1
 
-            if line[10] in ["SYN", "INV", "TRANS", "INVTR", "DUP", "INVDUP"]:
-                _info = ';'.join(['END='+line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=.', 'VarType='+'SR', 'DupType='+line[11]])
-                pos.append(_info)
-                fout.write('\t'.join(pos) + '\n')
+                if line[10] == 'NOTAL':
+                    try:
+                        stats['NOTALR'][1] += abs(int(line[1]) - int(line[2])) + 1
+                        stats['NOTALR'][0] += 1
+                    except ValueError:
+                        stats['NOTALQ'][2] += abs(int(line[6]) - int(line[7])) + 1
+                        stats['NOTALQ'][0] += 1
 
-            elif line[10] == "NOTAL":
-                if line[0] != "-":
-                    _info = ';'.join(
-                        ['END=' + line[2], 'ChrB=.', 'StartB=.', 'EndB=.', 'Parent=.', 'VarType=.', 'DupType=.'])
-                    pos.append(_info)
-                    fout.write('\t'.join(pos) + '\n')
+                if line[10] == 'SNP':
+                    stats['SNP'][0] += 1
+                    stats['SNP'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    stats['SNP'][2] += abs(int(line[6]) - int(line[7])) + 1
 
-            elif line[10] in ["SYNAL", "INVAL", "TRANSAL", "INVTRAL", "DUPAL", "INVDUPAL"]:
-                _info = ';'.join(
-                    ['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=.', 'DupType=.'])
-                pos.append(_info)
-                fout.write('\t'.join(pos) + '\n')
+                if line[10] == 'INS':
+                    stats['INS'][0] += 1
+                    stats['INS'][2] += abs(int(line[6]) - int(line[7]))
+                if line[10] == 'DEL':
+                    stats['DEL'][0] += 1
+                    stats['DEL'][1] += abs(int(line[1]) - int(line[2]))
 
-            elif line[10] in ['CPG', 'CPL', 'TDM', 'HDR']:
-                _info = ";".join(['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=ShV', 'DupType=.'])
-                pos.append(_info)
-                fout.write('\t'.join(pos) + '\n')
+                # Discuss Copychange statistics
+                if line[10] == 'CPG':
+                    stats['CPG'][0] += 1
+                    stats['CPG'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    stats['CPG'][2] += abs(int(line[6]) - int(line[7])) + 1
+                if line[10] == 'CPL':
+                    stats['CPL'][0] += 1
+                    stats['CPL'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    stats['CPL'][2] += abs(int(line[6]) - int(line[7])) + 1
 
-            elif line[10] in ['SNP', 'DEL', 'INS']:
-                if (line[3] == '-') != (line[4] == '-'):
-                    logger.error("Inconsistency in annotation type. Either need seq for both or for none.")
-                elif line[3] == '-' and line[4] == '-':
-                    _info = ";".join(['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=ShV', 'DupType=.'])
-                    pos.append(_info)
-                    fout.write('\t'.join(pos) + '\n')
-                elif line[3] != '-' and line[4] != '-':
-                    pos = [line[0], line[1], line[8], line[3], line[4], '.', 'PASS']
-                    _info = ";".join(['END=' + line[2], 'ChrB=' + line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=' + line[9], 'VarType=ShV', 'DupType=.'])
-                    pos.append(_info)
-                    fout.write('\t'.join(pos) + '\n')
+                if line[10] == 'HDR':
+                    stats['HDR'][0] += 1
+                    stats['HDR'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    stats['HDR'][2] += abs(int(line[6]) - int(line[7])) + 1
+                if line[10] == 'TDM':
+                    stats['TDM'][0] += 1
+                    stats['TDM'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    stats['TDM'][2] += abs(int(line[6]) - int(line[7])) + 1
+    except FileNotFoundError:
+        logger.error(cwdpath + prefix + finname + 'not found.')
+        sys.exit()
+    except Exception as e:
+        logger.error('Error in reading SyRI\'s output' + e)
+        sys.exit()
+
+    try:
+        with open(cwdpath + prefix + foutname, 'w') as fout:
+            fout.write('#Variation_type\tCount\tLength_ref\tLength_qry\n')
+            fout.write('{}\t{}\t{}\t{}\n'.format('Syntenic regions', stats['SYN'][0], stats['SYN'][1], stats['SYN'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Inversions', stats['INV'][0], stats['INV'][1], stats['INV'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Translocations', stats['TRANS'][0], stats['TRANS'][1], stats['TRANS'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Duplications', stats['DUP'][0], stats['DUP'][1], stats['DUP'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('SNPs', stats['SNP'][0], stats['SNP'][1], stats['SNP'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Insertions', stats['INS'][0], '-', stats['INS'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Deletions', stats['DEL'][0], stats['DEL'][1], '-'))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Copygains', stats['CPG'][0], stats['CPG'][1], stats['CPG'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Copylosses', stats['CPL'][0], stats['CPL'][1], stats['CPL'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Highly diverged regions', stats['HDR'][0], stats['HDR'][1], stats['HDR'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Tandem repeats', stats['TDM'][0], stats['TDM'][1], stats['TDM'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Not aligned regions (reference)', stats['NOTALR'][0], stats['NOTALR'][1], '-'))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Not aligned regions (query)', stats['NOTALQ'][0], '-', stats['NOTALQ'][2]))
+    except PermissionError:
+        logger.error('Cannot create file' + cwdpath + prefix + foutname + '. Permission denied.')
+        sys.exit()
     return 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
