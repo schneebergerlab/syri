@@ -203,7 +203,7 @@ if __name__ == "__main__":
     ###################################################################
     from syri.pyxFiles.synsearchFunctions import startSyri
     if not args.nosr:
-        startSyri(args, coords[["aStart","aEnd","bStart","bEnd","aLen","bLen","iden","aDir","bDir","aChr","bChr"]])
+        startSyri(args, coords[["aStart", "aEnd", "bStart", "bEnd", "aLen", "bLen", "iden", "aDir", "bDir", "aChr", "bChr"]])
 
     ###################################################################
     # Identify structural variations
@@ -257,6 +257,7 @@ if __name__ == "__main__":
         getTSV(args.dir, args.prefix, args.ref.name)
         logger.info('Generating VCF')
         getVCF("syri.out", "syri.vcf", args.dir, args.prefix)
+        getsum("syri.out", "syri.summary", args.dir, args.prefix)
 
     from syri.bin.func.myUsefulFunctions import fileRemove
     if not args.keep:

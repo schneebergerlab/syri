@@ -391,13 +391,12 @@ def getTSV(cwdpath, prefix, ref):
     positions = defaultdict()
     for _chr in snpdata.achr.unique():
         positions[_chr] = snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "INS"), "astart"].tolist() + (snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "DEL"), "astart"] - 1).tolist()
-        # positions[chrom] = (snpdata.loc[(snpdata.achr == chrom) & (snpdata.vartype == "DEL"), "astart"] - 1).tolist()
 
     seq = extractseq(ref, positions)
     logger.debug('Fixing coords for insertions and deletions')
 
     for _chr in snpdata.achr.unique():
-        ## Fix coordinates and sequence for insertions
+        # Fix coordinates and sequence for insertions
         _indices = snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "INS")].index.values
         _seq = pd.Series([seq[_chr][_i] for _i in snpdata.loc[_indices, "astart"]], index=_indices)
         _dir = _indices[~snpdata.loc[_indices, "parent"].str.contains("INV")]
@@ -414,7 +413,7 @@ def getTSV(cwdpath, prefix, ref):
         snpdata.loc[_inv, "bstart"] = snpdata.loc[_inv, "bend"] - snpdata.loc[_inv, "bstart"] + 1
         snpdata.loc[_inv, "bend"] = snpdata.loc[_inv, "bend"] - snpdata.loc[_inv, "bstart"] + 1
 
-        ## Fix coordinates and sequence for deletions
+        # Fix coordinates and sequence for deletions
         _indices = snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "DEL")].index.values
         _seq = pd.Series([seq[_chr][_i-1] for _i in snpdata.loc[_indices, "astart"]], index=_indices)
         _dir = _indices[~snpdata.loc[_indices, "parent"].str.contains("INV")]
@@ -511,7 +510,7 @@ def getTSV(cwdpath, prefix, ref):
                 l = line.strip().split()
                 chroms[l[0]] = l[1]
         lines = open(cwdpath + prefix + "syri.out", "r").readlines()
-        with open(cwdpath + prefix + "syri.out", "w") as fout:                 ## CHANGE THIS BEFORE PUSHING
+        with open(cwdpath + prefix + "syri.out", "w") as fout:
             for line in lines:
                 line = line.strip().split('\t')
                 if line[5] != "-":
@@ -526,6 +525,115 @@ def getVCF(finname, foutname, cwdpath, prefix):
     :param finname:
     foutname:
     :return:
+    """
+    logger = logging.getLogger("getVCF")
+    data = pd.read_table(cwdpath + prefix + finname, header=None, keep_default_na=False, dtype=object)
+    data.columns = ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']
+    data = data.loc[data['achr'] != "-"].copy()
+    dtypes = {'achr': str,
+              'astart': int,
+              'aend': int,
+              'aseq': str,
+              'bseq': str,
+              'bchr': str,
+              'bstart': str,
+              'bend': str,
+              'id': str,
+              'parent': str,
+              'vartype': str,
+              'dupclass': str}
+    data = data.astype(dtypes)
+    try:
+        data['achr'] = data['achr'].astype('int')
+    except ValueError as ve:
+        logger.debug('Chromosome values are sorted lexicographically.')
+    data.sort_values(['achr', 'astart', 'aend'], inplace=True)
+    data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']] = data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']].astype(str)
+
+    with open(cwdpath + prefix + foutname, 'w') as fout:
+        fout.write('##fileformat=VCFv4.3\n')
+        fout.write('##fileDate=' + str(date.today()).replace('-', '') + '\n')
+        fout.write('##source=syri\n')
+        fout.write('##ALT=<ID=SYN,Description="Syntenic region">' + '\n')
+        fout.write('##ALT=<ID=INV,Description="Inversion">' + '\n')
+        fout.write('##ALT=<ID=TRANS,Description="Translocation">' + '\n')
+        fout.write('##ALT=<ID=INVTR,Description="Inverted Translocation">' + '\n')
+        fout.write('##ALT=<ID=DUP,Description="Duplication">' + '\n')
+        fout.write('##ALT=<ID=INVDP,Description="Inverted Duplication">' + '\n')
+        fout.write('##ALT=<ID=SYNAL,Description="Syntenic alignment">' + '\n')
+        fout.write('##ALT=<ID=INVAL,Description="Inversion alignment">' + '\n')
+        fout.write('##ALT=<ID=TRANSAL,Description="Translocation alignment">' + '\n')
+        fout.write('##ALT=<ID=INVTRAL,Description="Inverted Translocation alignment">' + '\n')
+        fout.write('##ALT=<ID=DUPAL,Description="Duplication alignment">' + '\n')
+        fout.write('##ALT=<ID=INVDPAL,Description="Inverted Duplication alignment">' + '\n')
+        fout.write('##ALT=<ID=HDR,Description="Highly diverged regions">' + '\n')
+        fout.write('##ALT=<ID=INS,Description="Insertion in non-reference genome">' + '\n')
+        fout.write('##ALT=<ID=DEL,Description="Deletion in non-reference genome">' + '\n')
+        fout.write('##ALT=<ID=CPG,Description="Copy gain in non-reference genome">' + '\n')
+        fout.write('##ALT=<ID=CPL,Description="Copy loss in non-reference genome">' + '\n')
+        fout.write('##ALT=<ID=SNP,Description="Single nucleotide polymorphism">' + '\n')
+        fout.write('##ALT=<ID=TDM,Description="Tandem repeat">' + '\n')
+        fout.write('##ALT=<ID=NOTAL,Description="Not Aligned region">' + '\n')
+        fout.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position on reference genome">' + '\n')
+        fout.write(
+            '##INFO=<ID=ChrB,Number=1,Type=String,Description="Chromoosme ID on the non-reference genome">' + '\n')
+        fout.write(
+            '##INFO=<ID=StartB,Number=1,Type=Integer,Description="Start position on non-reference genome">' + '\n')
+        fout.write(
+            '##INFO=<ID=EndB,Number=1,Type=Integer,Description="End position on non-reference genome">' + '\n')
+        fout.write('##INFO=<ID=Parent,Number=1,Type=String,Description="ID of the parent SR">' + '\n')
+        fout.write(
+            '##INFO=<ID=VarType,Number=1,Type=String,Description="Start position on non-reference genome">' + '\n')
+        fout.write(
+            '##INFO=<ID=DupType,Number=1,Type=String,Description="Copy gain or loss in the non-reference genome">' + '\n')
+        # fout.write('##INFO=<ID=NotAlGen,Number=1,Type=String,Description="Genome containing the not aligned region">' + '\n')
+
+        fout.write('\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']) + '\n')
+        for line in data.itertuples(index=False):
+            pos = [line[0], line[1], line[8], 'N', '<' + line[10] + '>', '.', 'PASS']
+
+            if line[10] in ["SYN", "INV", "TRANS", "INVTR", "DUP", "INVDUP"]:
+                _info = ';'.join(['END='+line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=.', 'VarType='+'SR', 'DupType='+line[11]])
+                pos.append(_info)
+                fout.write('\t'.join(pos) + '\n')
+
+            elif line[10] == "NOTAL":
+                if line[0] != "-":
+                    _info = ';'.join(
+                        ['END=' + line[2], 'ChrB=.', 'StartB=.', 'EndB=.', 'Parent=.', 'VarType=.', 'DupType=.'])
+                    pos.append(_info)
+                    fout.write('\t'.join(pos) + '\n')
+
+            elif line[10] in ["SYNAL", "INVAL", "TRANSAL", "INVTRAL", "DUPAL", "INVDUPAL"]:
+                _info = ';'.join(
+                    ['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=.', 'DupType=.'])
+                pos.append(_info)
+                fout.write('\t'.join(pos) + '\n')
+
+            elif line[10] in ['CPG', 'CPL', 'TDM', 'HDR']:
+                _info = ";".join(['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=ShV', 'DupType=.'])
+                pos.append(_info)
+                fout.write('\t'.join(pos) + '\n')
+
+            elif line[10] in ['SNP', 'DEL', 'INS']:
+                if (line[3] == '-') != (line[4] == '-'):
+                    logger.error("Inconsistency in annotation type. Either need seq for both or for none.")
+                elif line[3] == '-' and line[4] == '-':
+                    _info = ";".join(['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=ShV', 'DupType=.'])
+                    pos.append(_info)
+                    fout.write('\t'.join(pos) + '\n')
+                elif line[3] != '-' and line[4] != '-':
+                    pos = [line[0], line[1], line[8], line[3], line[4], '.', 'PASS']
+                    _info = ";".join(['END=' + line[2], 'ChrB=' + line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=' + line[9], 'VarType=ShV', 'DupType=.'])
+                    pos.append(_info)
+                    fout.write('\t'.join(pos) + '\n')
+    return 0
+
+
+
+def getsum(finname, foutname, cwdpath, prefix):
+    """
+    Read syri.out file and output summary statistics
     """
     logger = logging.getLogger("getVCF")
     data = pd.read_table(cwdpath + prefix + finname, header=None, keep_default_na=False, dtype=object)
