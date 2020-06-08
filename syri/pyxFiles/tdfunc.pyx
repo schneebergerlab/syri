@@ -651,18 +651,6 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
 
     logger.debug("Finding best subset of clusters")
 
-    # clusterSolutions = []
-    # for i in range(len(ctxCluster)):
-    #     tempCluster = ctxCluster[i].copy()
-    #     if len(tempCluster) == 0:
-    #         continue
-    #     if len(tempCluster) > 10000:
-    #         clusterSolutions.append(getBestClusterSubset(tempCluster, ctxBlocksData, bRT, 'CTX', aGroups, bGroups, threshold))
-    #     else:
-    #         clusterSolutions.append(getBestClusterSubset(tempCluster, ctxBlocksData, bRT))
-    #
-    # clusterSolutionBlocks = [i[1] for i in clusterSolutions if i != None]
-
     with Pool(processes=nCores) as pool:
         clusterSolutions = pool.map(partial(getBestClusterSubset,
                                              transBlocksData=ctxBlocksData,
@@ -687,7 +675,6 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
         else:
             garb.append(3)
     meclass = np.array(list(garb), np.uint16)
-
 
     transClasses = getTransClasses(clusterSolutionBlocks,
                                    ctxBlocksData,
@@ -735,13 +722,6 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
                 fout.write("\t".join(map(str,invertedBlocks.iloc[i,[0,1,3,2]])) + "\n")
     fout.close()
 
-    #
-    # (cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks, transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks, genomeagroups, genomebgroups):
-    #
-    #
-    #
-    #
-    # printCTX(cwdPath, clusterSolutionBlocks, ctxBlocksData, orderedBlocks, invertedBlocks ,transBlocks, invTransBlocks, ctxTransIndexOrder, ctxTransBlocks, ctxTransGenomeAGroups, ctxTransGenomeBGroups)
     return 0
 
 
@@ -761,7 +741,6 @@ cpdef makeBlocksTree(long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd,
         ssize_t                                     i,j, n = len(aStart)
         cpp_map[long, cpp_deq[long]]                out
         cpp_map[long, cpp_deq[long]].iterator       it
-    # cdef np.ndarray allRanges = np.array([range(left[i]+1, right[i]) for i in range(n)])
 
     for i in range(<Py_ssize_t> n):
         for j in range(<Py_ssize_t> i, <Py_ssize_t> n):
@@ -934,6 +913,7 @@ cpdef getProfitableTrans(cpp_map[long, cpp_set[long]] graph, long[:] astart, lon
     while mapit != graph.end():
         edgecnt += <Py_ssize_t> deref(mapit).second.size()
         inc(mapit)
+
 
     # Find the topological order in which the nodes should be processed to find paths
 
