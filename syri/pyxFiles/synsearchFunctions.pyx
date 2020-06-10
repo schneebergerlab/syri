@@ -347,6 +347,7 @@ def startSyri(args, coords):
     prefix = args.prefix
     tUC = args.TransUniCount
     tUP = args.TransUniPercent
+    tdgl = args.tdgl
 
     logger = logging.getLogger("syri")
     logger.info("starting")
@@ -357,20 +358,20 @@ def startSyri(args, coords):
     # Identify intra-chromosomal events (synteny, inversions, intra-trans, intra-dup) for each chromosome as a separate
     # process in parallel
     with Pool(processes = nCores) as pool:
-        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP), uniChromo)
+        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, tdgl=tdgl), uniChromo)
 
     # Merge output of all chromosomes
     mergeOutputFiles(uniChromo,cwdPath, prefix)
 
     #Identify cross-chromosomal events in all chromosomes simultaneously
     from syri.tdfunc import getCTX
-    getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores)
+    getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores, tdgl)
 
     # Recalculate syntenic blocks by considering the blocks introduced by CX events
     outSyn(cwdPath, threshold, prefix)
     return 'Finished'
 
-def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
+def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
     logger = logging.getLogger("syri."+chromo)
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
     logger.info(chromo+" " + str(coordsData.shape))
@@ -443,7 +444,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP):
     ## and are not overlappign with the syntenic blocks
     ## Merge directed and inverted blocks
 
-    transBlocks, invTransBlocks, allTransBlocks, allTransIndexOrder = blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo)
+    transBlocks, invTransBlocks, allTransBlocks, allTransIndexOrder = blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
 
     logger.debug("Translocations : found blocks" + chromo)
 

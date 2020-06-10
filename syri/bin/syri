@@ -36,6 +36,7 @@ if __name__ == "__main__":
     # Parameters for identification of structural rearrangements
     srargs = parser.add_argument_group("SR identification")
     srargs.add_argument("--nosr", dest="nosr", help="Set to skip structural rearrangement identification", action="store_true", default=False)
+    srargs.add_argument("--tdgaplen", dest="tdgl", help="Maximum allowed gap-length between two alignments of a multi-alignment translocation or duplication (TD). Larger values increases TD identification sensitivity but also runtime.", type=int, default=500000)
     srargs.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
     srargs.add_argument("--unic", dest="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type=int, default=1000)
     srargs.add_argument("--unip", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would selection of translocation which are more overlapped with \
@@ -95,6 +96,8 @@ if __name__ == "__main__":
         },
     })
 
+    logger = logging.getLogger("Running SyRI")
+
     # Set CWD
     if args.dir is None:
         args.dir = os.getcwd() + os.sep
@@ -105,10 +108,19 @@ if __name__ == "__main__":
     if args.ftype in ['S', 'B']:
         args.cigar = True
 
+    # Check TDGL flag
+    if args.tdgl < 0:
+        logger.error('--tdgaplen cannot be negative.')
+        sys.exit()
+    elif args.tdgl < 50000:
+        logger.warning('A low value for --tdgaplen is provided (' + str(args.tdgl) + '). TDs might be missed.')
+    elif args.tdgl > 10000000:
+        logger.warning('A high value for --tdgaplen is provided (' + str(args.tdgl) + '). TDs identification may take a lot of time.')
+
     ###################################################################
     # Check python and pandas version. Add other checks later if required!!
     ###################################################################
-    logger = logging.getLogger("Running SyRI")
+
     try:
         assert sys.version_info.major == 3
         assert sys.version_info.minor == 5
