@@ -642,7 +642,8 @@ def getsum(finname, foutname, cwdpath, prefix):
     stats = {'SYN': [0, 0, 0],
              'INV': [0, 0, 0],
              'TRANS': [0, 0, 0],
-             'DUP': [0, 0, 0],
+             'DUPA': [0, 0, 0],
+             'DUPB': [0, 0, 0],
              'NOTALR': [0, 0, 0],
              'NOTALQ': [0, 0, 0],
              'SNP': [0, 0, 0],
@@ -675,9 +676,12 @@ def getsum(finname, foutname, cwdpath, prefix):
 
                 ## Discuss DUP length stat
                 if line[10] in ['DUP', 'INVDP']:
-                    stats['DUP'][0] += 1
-                    stats['DUP'][1] += abs(int(line[1]) - int(line[2])) + 1
-                    stats['DUP'][2] += abs(int(line[6]) - int(line[7])) + 1
+                    if line[11] == 'copygain':
+                        stats['DUPB'][0] += 1
+                        stats['DUPB'][2] += abs(int(line[6]) - int(line[7])) + 1
+                    if line[11] == 'copyloss':
+                        stats['DUPA'][0] += 1
+                        stats['DUPA'][1] += abs(int(line[1]) - int(line[2])) + 1
 
                 if line[10] == 'NOTAL':
                     try:
@@ -702,12 +706,12 @@ def getsum(finname, foutname, cwdpath, prefix):
                 # Discuss Copychange statistics
                 if line[10] == 'CPG':
                     stats['CPG'][0] += 1
-                    stats['CPG'][1] += abs(int(line[1]) - int(line[2])) + 1
+                    # stats['CPG'][1] += abs(int(line[1]) - int(line[2])) + 1
                     stats['CPG'][2] += abs(int(line[6]) - int(line[7])) + 1
                 if line[10] == 'CPL':
                     stats['CPL'][0] += 1
                     stats['CPL'][1] += abs(int(line[1]) - int(line[2])) + 1
-                    stats['CPL'][2] += abs(int(line[6]) - int(line[7])) + 1
+                    # stats['CPL'][2] += abs(int(line[6]) - int(line[7])) + 1
 
                 if line[10] == 'HDR':
                     stats['HDR'][0] += 1
@@ -726,20 +730,26 @@ def getsum(finname, foutname, cwdpath, prefix):
 
     try:
         with open(cwdpath + prefix + foutname, 'w') as fout:
+            fout.write('#Structural annotations\n')
             fout.write('#Variation_type\tCount\tLength_ref\tLength_qry\n')
             fout.write('{}\t{}\t{}\t{}\n'.format('Syntenic regions', stats['SYN'][0], stats['SYN'][1], stats['SYN'][2]))
             fout.write('{}\t{}\t{}\t{}\n'.format('Inversions', stats['INV'][0], stats['INV'][1], stats['INV'][2]))
             fout.write('{}\t{}\t{}\t{}\n'.format('Translocations', stats['TRANS'][0], stats['TRANS'][1], stats['TRANS'][2]))
-            fout.write('{}\t{}\t{}\t{}\n'.format('Duplications', stats['DUP'][0], stats['DUP'][1], stats['DUP'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Duplications (reference)', stats['DUPA'][0], stats['DUPA'][1], '-'))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Duplications (query)', stats['DUPB'][0], '-', stats['DUPB'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Not aligned (reference)', stats['NOTALR'][0], stats['NOTALR'][1], '-'))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Not aligned (query)', stats['NOTALQ'][0], '-', stats['NOTALQ'][2]))
+
+            fout.write('\n\n#Sequence annotations\n')
+            fout.write('#Variation_type\tCount\tLength_ref\tLength_qry\n')
             fout.write('{}\t{}\t{}\t{}\n'.format('SNPs', stats['SNP'][0], stats['SNP'][1], stats['SNP'][2]))
             fout.write('{}\t{}\t{}\t{}\n'.format('Insertions', stats['INS'][0], '-', stats['INS'][2]))
             fout.write('{}\t{}\t{}\t{}\n'.format('Deletions', stats['DEL'][0], stats['DEL'][1], '-'))
-            fout.write('{}\t{}\t{}\t{}\n'.format('Copygains', stats['CPG'][0], stats['CPG'][1], stats['CPG'][2]))
-            fout.write('{}\t{}\t{}\t{}\n'.format('Copylosses', stats['CPL'][0], stats['CPL'][1], stats['CPL'][2]))
-            fout.write('{}\t{}\t{}\t{}\n'.format('Highly diverged regions', stats['HDR'][0], stats['HDR'][1], stats['HDR'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Copygains', stats['CPG'][0], '-', stats['CPG'][2]))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Copylosses', stats['CPL'][0], stats['CPL'][1], '-'))
+            fout.write('{}\t{}\t{}\t{}\n'.format('Highly diverged', stats['HDR'][0], stats['HDR'][1], stats['HDR'][2]))
             fout.write('{}\t{}\t{}\t{}\n'.format('Tandem repeats', stats['TDM'][0], stats['TDM'][1], stats['TDM'][2]))
-            fout.write('{}\t{}\t{}\t{}\n'.format('Not aligned regions (reference)', stats['NOTALR'][0], stats['NOTALR'][1], '-'))
-            fout.write('{}\t{}\t{}\t{}\n'.format('Not aligned regions (query)', stats['NOTALQ'][0], '-', stats['NOTALQ'][2]))
+
     except PermissionError:
         logger.error('Cannot create file' + cwdpath + prefix + foutname + '. Permission denied.')
         sys.exit()

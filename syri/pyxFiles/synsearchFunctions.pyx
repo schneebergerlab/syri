@@ -28,8 +28,6 @@ np.random.seed(1)
 
 from syri.pyxFiles.function cimport getmeblocks, getOverlapWithSynBlocks
 
-
-
 def readSAMBAM(fin, type='B'):
     import pysam
     logger = logging.getLogger('Reading BAM/SAM file')
@@ -410,7 +408,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
     logger.info("Identifying translocation and duplication for chromosome " + chromo)
 
     # Import functions
-    from syri.tdfunc import blocksdata, makeTransGroupList, getTransCluster, transBlock, getBestClusterSubset, getTransClasses, getDupGenome
+    from syri.tdfunc import blocksdata, makeTransGroupList, transBlock, getBestClusterSubset, getTransClasses, getDupGenome, getTransCluster
 
     chromBlocks = coords[(coords.aChr == chromo) & (coords.bChr == chromo)]
     inPlaceIndices = sorted(list(synData.index.values) + list(invData.index.values))
@@ -461,8 +459,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
             allTransGroupIndices[block].append(i)
     
     logger.debug("Translocations : getting clusters " + chromo)
-    allTransCluster = getTransCluster(allTransGroupIndices, allTransGenomeAGroups, allTransGenomeBGroups)
-    
+    allTransCluster = getTransCluster(allTransGroupIndices, {i:allTransGenomeAGroups[i].member for i in range(len(allTransGenomeAGroups))}, {i:allTransGenomeBGroups[i].member for i in range(len(allTransGenomeBGroups))})
+
     allTransClusterIndices = dict()
     for i in range(len(allTransCluster)):
         allTransClusterIndices.update(dict.fromkeys(allTransCluster[i], i))
@@ -562,7 +560,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
             else:
                 clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT, chromo))
 
-    
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
     #clusterBlocks = unlist(clusterSolutionBlocks)
     

@@ -154,51 +154,98 @@ cdef inline getmeblocks2(unsigned long[:] ast, unsigned long[:] aen, unsigned lo
         return np.array([amem[index] for index in range(<Py_ssize_t>amem.size()) if meb_a[index]==1], np.uint), np.array([bmem[index] for index in range(<Py_ssize_t>bmem.size()) if meb_b[index] == 1], np.uint)
 
 
+#
+# def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
+#     assert(list(transGroupIndices.keys()) == list(range(len(transGroupIndices))))
+#     nodeStack = np.zeros(len(transGroupIndices), dtype='uint8')
+#     visitedTransBlock = np.zeros(len(transGroupIndices), dtype='uint8')
+#     visitedIndices = deque()
+#     transCluster = []
+#     addedAGroups = []
+#     addedBGroups = []
+#     count = 0
+#     for key,value in transGroupIndices.items():
+#         if visitedTransBlock[key] == 0:
+#             visitedTransBlock[key]=1
+#             visitedIndices.append(key)
+#             newGroup = [key]
+#             node1 = value[0]
+#             node2 = value[1]
+#             addedAGroups.append(value[0])
+#             addedBGroups.append(value[1])
+#             nodeStack[transGenomeAGroups[node1].member] = 1
+#             nodeStack[transGenomeBGroups[node2].member] = 1
+#             nodeStack[visitedIndices] = 0
+# #            nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
+#             while 1 in nodeStack:
+#                 count=count+1
+#                 newKey = np.where(nodeStack == 1)[0][0]
+#                 if visitedTransBlock[newKey]== 0:
+#                     visitedTransBlock[newKey] = 1
+#                     visitedIndices.append(newKey)
+#                     newGroup.append(newKey)
+#                     aInd = transGroupIndices[newKey][0]
+#                     bInd = transGroupIndices[newKey][1]
+#                     nodeStack[newKey] = 0
+#
+#                     if aInd not in addedAGroups:
+#                         nodeStack[transGenomeAGroups[aInd].member] = 1
+#                         addedAGroups.append(aInd)
+#                         nodeStack[visitedIndices] = 0
+#                     if bInd not in addedBGroups:
+#                         nodeStack[transGenomeBGroups[bInd].member] = 1
+#                         addedBGroups.append(bInd)
+#                         nodeStack[visitedIndices] = 0
+#             newGroup.sort()
+#             transCluster.append(list(newGroup))
+#     return(transCluster)
 
-def getTransCluster(transGroupIndices, transGenomeAGroups, transGenomeBGroups):
-    assert(list(transGroupIndices.keys()) == list(range(len(transGroupIndices))))
-    nodeStack = np.zeros(len(transGroupIndices), dtype='uint8')
-    visitedTransBlock = np.zeros(len(transGroupIndices), dtype='uint8')
-    visitedIndices = deque()
-    transCluster = []
-    addedAGroups = []
-    addedBGroups = []
-    count = 0
-    for key,value in transGroupIndices.items():
-        if visitedTransBlock[key] == 0:
-            visitedTransBlock[key]=1
-            visitedIndices.append(key)
-            newGroup = [key]
-            node1 = value[0]
-            node2 = value[1]
-            addedAGroups.append(value[0])
-            addedBGroups.append(value[1])
-            nodeStack[transGenomeAGroups[node1].member] = 1
-            nodeStack[transGenomeBGroups[node2].member] = 1
-            nodeStack[visitedIndices] = 0
-#            nodeStack[np.nonzero(visitedTransBlock)[0]] = 0
-            while 1 in nodeStack:
-                count=count+1
-                newKey = np.where(nodeStack == 1)[0][0]
-                if visitedTransBlock[newKey]== 0:
-                    visitedTransBlock[newKey] = 1
-                    visitedIndices.append(newKey)
-                    newGroup.append(newKey)
-                    aInd = transGroupIndices[newKey][0]
-                    bInd = transGroupIndices[newKey][1]
-                    nodeStack[newKey] = 0
 
-                    if aInd not in addedAGroups:
-                        nodeStack[transGenomeAGroups[aInd].member] = 1
-                        addedAGroups.append(aInd)
-                        nodeStack[visitedIndices] = 0
-                    if bInd not in addedBGroups:
-                        nodeStack[transGenomeBGroups[bInd].member] = 1
-                        addedBGroups.append(bInd)
-                        nodeStack[visitedIndices] = 0
-            newGroup.sort()
-            transCluster.append(list(newGroup))
-    return(transCluster)
+cdef gtc(cpp_map[int, cpp_vec[int]] gind, cpp_map[int, cpp_vec[int]] agrp, cpp_map[int, cpp_vec[int]] bgrp):
+    cdef:
+        Py_ssize_t                  i, j, k, n = gind.size()
+        long[:]                     vtr = np.zeros(n, dtype='int')  #visited trans
+        long[:]                     vtra = np.zeros(agrp.size(), dtype='int') # visited agrp
+        long[:]                     vtrb = np.zeros(bgrp.size(), dtype='int') # visited bgrp
+        cpp_que[long]               nque        # nodes to check
+        cpp_deq[long]               cgrp        # current group
+        cpp_map[int, cpp_vec[int]].iterator gindit
+    out = deque()
+
+    gindit = gind.begin()
+    while gindit != gind.end():
+        if vtr[deref(gindit).first] == 0:
+            vtr[deref(gindit).first] = 1
+            cgrp.push_back(deref(gindit).first)
+            vtra[deref(gindit).second[0]] = 1
+            vtrb[deref(gindit).second[1]] = 1
+            # Append elements to the queue
+            for i in agrp[deref(gindit).second[0]]:
+                nque.push(i)
+            for i in bgrp[deref(gindit).second[1]]:
+                nque.push(i)
+
+            while not nque.empty():
+                i = nque.front()
+                nque.pop()
+                if vtr[i] == 0:
+                    vtr[i] = 1
+                    cgrp.push_back(i)
+                    if vtra[gind[i][0]] == 0:
+                        vtra[gind[i][0]] = 1
+                        for j in agrp[gind[i][0]]:
+                            nque.push(j)
+                    if vtrb[gind[i][1]] == 0:
+                        vtrb[gind[i][1]] = 1
+                        for j in bgrp[gind[i][1]]:
+                            nque.push(j)
+            out.append(sorted([cgrp[i] for i in range(<Py_ssize_t> cgrp.size())]))
+            cgrp.clear()
+        inc(gindit)
+    return out
+
+def getTransCluster(gind, agrp, bgrp):
+    return gtc(gind, agrp, bgrp)
 
 
 def makeTransGroupList(transBlocksData, startC, endC, threshold):
@@ -399,7 +446,7 @@ def bruteSubsetSelector(cluster, transBlocksData, seedBlocks, bRT):
         remainingIterations = len(cluster) - cluster.index(i)
 
         if (timeTaken*(1.5**remainingIterations) > bRT):
-            logger.info("Cluster is too big for Brute Force\nTime taken for last iteration " +
+            logger.info("Cluster is too big for Brute Force, using randomized-greedy approach\nTime taken for last iteration " +
                   str(timeTaken) + ". iterations remaining " + str(remainingIterations))
             return "Failed"
 
@@ -562,7 +609,8 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
             ctxGroupIndices[block].append(i)
 
     logger.debug("Getting clusters")
-    ctxCluster = getTransCluster(ctxGroupIndices, ctxTransGenomeAGroups, ctxTransGenomeBGroups)
+    # ctxCluster = getTransCluster(ctxGroupIndices, ctxTransGenomeAGroups, ctxTransGenomeBGroups)
+    ctxCluster = getTransCluster(ctxGroupIndices, {i:ctxTransGenomeAGroups[i].member for i in range(len(ctxTransGenomeAGroups))}, {i:ctxTransGenomeBGroups[i].member for i in range(len(ctxTransGenomeBGroups))})
 
     ctxClusterIndices = dict()
     for i in range(len(ctxCluster)):
@@ -1586,212 +1634,212 @@ def blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
     return (transBlocks, invTransBlocks, allTransBlocks, allTransIndexOrder)
 
 
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks, cpp_map[long, cpp_vec[long]] agroup, cpp_map[long, cpp_vec[long]] bgroup, int threshold):
-    np.random.seed(1)
-
-    cdef:
-        ssize_t                                         i, j, k
-        cpp_bool                                        fnd, outchanged, changed
-        long                                            n = len(transBlocksData)
-        long                                            ncls = len(cluster)
-        long                                            length=0, ntmp=0            # number of temp cluster still need to be classified
-        unsigned long                                   newblock
-        unsigned long[:]                                astart, aend, bstart, bend, aindex, bindex, clstrsize
-        unsigned short int[:]                           meclass
-        unsigned long[:]                                meto, mealist, meblist
-        unsigned short int                              auni, buni, status
-        unsigned short int[:]                           tempcluster, outblocks, skiplist
-        unsigned short int[:]                           intrlist
-
-    bestScore = 0
-    bestComb = []
-
-    astart = np.array([transBlocksData[i].aStart for i in range(n)], dtype=np.uint)
-    aend = np.array([transBlocksData[i].aEnd for i in range(n)], dtype=np.uint)
-    bstart = np.array([transBlocksData[i].bStart for i in range(n)], dtype=np.uint)
-    bend = np.array([transBlocksData[i].bEnd for i in range(n)], dtype=np.uint)
-    aindex = np.array([transBlocksData[i].transGroupIndices[0] for i in range(n)], dtype=np.uint)
-    bindex = np.array([transBlocksData[i].transGroupIndices[1] for i in range(n)], dtype=np.uint)
-
-    tempcluster = np.zeros(len(transBlocksData), dtype=np.uint16)
-    outblocks = np.zeros(len(transBlocksData), dtype=np.uint16)
-    skiplist = np.zeros(len(transBlocksData), dtype=np.uint16)
-    intrlist = np.zeros(len(transBlocksData), dtype=np.uint16)
-
-    for i in range(ncls):
-        tempcluster[cluster[i]] = 1
-        length+=1
-
-    ntmp = length
-
-    for i in range(len(seedBlocks)):
-        outblocks[seedBlocks[i]] = 1
-        tempcluster[seedBlocks[i]] = 0
-        ntmp-=1
-
-    transBlocksScore = {}
-    for i in range(n):
-        if tempcluster[i] == 1:
-            transBlocksScore[i] = aend[i] - astart[i] + bend[i] - bstart[i] + 2
-
-
-    garb = deque()
-    for i in range(n):
-        if not transBlocksData[i].aUni and not transBlocksData[i].bUni:
-            garb.append(0)
-        elif transBlocksData[i].status == 1:
-            garb.append(0)
-        elif not transBlocksData[i].aUni:
-            garb.append(1)
-        elif not transBlocksData[i].bUni:
-            garb.append(2)
-        else:
-            garb.append(3)
-    meclass = np.array(list(garb), np.uint16)
-
-    while ntmp > 0:
-        outchanged = True
-        changed = True
-        while ntmp != length:
-            length = ntmp
-
-            if changed or outchanged:
-                changed = False
-            ## Check whether any of the remaining elements are mutually exclusive to the already selected candidates.
-            ## Remove any such mutually exclusive element
-                for i in range(n):
-                    if tempcluster[i] == 0:
-                        continue
-                    ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
-                    if meclass[i] == 1 or meclass[i] == 2:
-                        meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
-                        for j in meto:
-                            if outblocks[j] == 1:
-                                tempcluster[i] = 0
-                                ntmp-=1
-                                skiplist[i]=1
-                                changed = True
-                                break
-                    ## when the tempcluster element does not overlap with inplace blocks
-                    elif meclass[i] == 3:
-                        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]],  bgroup[bindex[i]], i, threshold, meclass[i])
-                        ## remove candidate when at least ME candidate on both genomes has already been selected
-                        for j in mealist:
-                            if outblocks[j] == 1:
-                                for k in meblist:
-                                    if outblocks[k] == 1:
-                                        tempcluster[i] = 0
-                                        ntmp-=1
-                                        skiplist[i]=1
-                                        changed = True
-                                        break
-                                break
-
-            if changed or outchanged:
-                outchanged = False
-                changed = False
-            ## For a given candidate, if all of its ME candidates have already been added to the skiplist, then that candidate will be selected as part of output
-                for i in range(n):
-                    if tempcluster[i] ==0:
-                        continue
-                    ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
-                    if meclass[i] == 1 or meclass[i] == 2:
-                        meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
-                        fnd = True
-                        for j in meto:
-                            if skiplist[j] == 0:
-                                fnd = False
-                                break
-                        if fnd:
-                            tempcluster[i]=0
-                            ntmp-=1
-                            outblocks[i]=1
-                            changed = True
-                    ## when the tempcluster element does not overlap with inplace blocks
-                    elif meclass[i] == 3:
-                        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
-                        fnd = True
-                        for j in mealist:
-                            if skiplist[j]==0:
-                                fnd = False
-                                break
-                        if fnd:
-                            for j in meblist:
-                                if skiplist[j] ==0:
-                                    fnd = False
-                                    break
-                        if fnd:
-                            tempcluster[i] = 0
-                            ntmp-=1
-                            outblocks[i] = 1
-                            changed = True
-
-        if ntmp>0:
-            ## select one of the twenty highest scoring candidate randomly to break the deadlock
-            topblocks = deque()
-            for i in range(n):
-                if tempcluster[i] == 1:
-                    topblocks.append(i)
-            topblocks = sorted(list(topblocks), key = lambda x: transBlocksScore[x], reverse = True)[:20]
-            totalscore = sum(transBlocksScore[i] for i in topblocks)
-            prob = [transBlocksScore[i]/totalscore for i in topblocks]
-            i = int(np.random.choice(topblocks, size = 1, p = prob))
-
-            ## update lists to include the selected candidate
-            tempcluster[i] = 0
-            ntmp-=1
-            outblocks[i] = 1
-
-            ## Remove ME candidates
-            if meclass[i] == 1 or meclass[i] == 2:
-                meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
-                for j in meto:
-                    if tempcluster[j] == 1:
-                        tempcluster[j] = 0
-                        ntmp-=1
-                    skiplist[j] = 1
-
-            elif meclass[i] == 3:
-                mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
-                fnd = False
-                for j in mealist:
-                    if outblocks[j] == 1:
-                        fnd = True
-                        for k in meblist:
-                            if tempcluster[k] == 1:
-                                tempcluster[k] = 0
-                                ntmp -=1
-                            skiplist[k] = 1
-                        break
-                if not fnd:
-                    for j in meblist:
-                        if outblocks[j] == 1:
-                            for k in mealist:
-                                if tempcluster[k] == 1:
-                                    tempcluster[k] = 0
-                                    ntmp -=1
-                                skiplist[k] = 1
-                            break
-
-                ## Also remove candidates which are ME to the selected candidate on both genomes
-                for j in range(n):
-                    intrlist[j] = 0
-
-                for j in mealist:
-                    intrlist[j] = 1
-
-                for j in meblist:
-                    if intrlist[j] != 0:
-                        if tempcluster[j] == 1:
-                            tempcluster[j] = 0
-                            ntmp -= 1
-                        skiplist[j] = 1
-
-    bestScore, bestComb = updateBestComb(bestScore, bestComb, np.nonzero(outblocks)[0], transBlocksData)
-    return bestScore, bestComb
+#
+# @cython.boundscheck(False)
+# @cython.wraparound(False)
+# cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks, cpp_map[long, cpp_vec[long]] agroup, cpp_map[long, cpp_vec[long]] bgroup, int threshold):
+#     np.random.seed(1)
+#
+#     cdef:
+#         ssize_t                                         i, j, k
+#         cpp_bool                                        fnd, outchanged, changed
+#         long                                            n = len(transBlocksData)
+#         long                                            ncls = len(cluster)
+#         long                                            length=0, ntmp=0            # number of temp cluster still need to be classified
+#         unsigned long                                   newblock
+#         unsigned long[:]                                astart, aend, bstart, bend, aindex, bindex, clstrsize
+#         unsigned short int[:]                           meclass
+#         unsigned long[:]                                meto, mealist, meblist
+#         unsigned short int                              auni, buni, status
+#         unsigned short int[:]                           tempcluster, outblocks, skiplist
+#         unsigned short int[:]                           intrlist
+#
+#     bestScore = 0
+#     bestComb = []
+#
+#     astart = np.array([transBlocksData[i].aStart for i in range(n)], dtype=np.uint)
+#     aend = np.array([transBlocksData[i].aEnd for i in range(n)], dtype=np.uint)
+#     bstart = np.array([transBlocksData[i].bStart for i in range(n)], dtype=np.uint)
+#     bend = np.array([transBlocksData[i].bEnd for i in range(n)], dtype=np.uint)
+#     aindex = np.array([transBlocksData[i].transGroupIndices[0] for i in range(n)], dtype=np.uint)
+#     bindex = np.array([transBlocksData[i].transGroupIndices[1] for i in range(n)], dtype=np.uint)
+#
+#     tempcluster = np.zeros(len(transBlocksData), dtype=np.uint16)
+#     outblocks = np.zeros(len(transBlocksData), dtype=np.uint16)
+#     skiplist = np.zeros(len(transBlocksData), dtype=np.uint16)
+#     intrlist = np.zeros(len(transBlocksData), dtype=np.uint16)
+#
+#     for i in range(ncls):
+#         tempcluster[cluster[i]] = 1
+#         length+=1
+#
+#     ntmp = length
+#
+#     for i in range(len(seedBlocks)):
+#         outblocks[seedBlocks[i]] = 1
+#         tempcluster[seedBlocks[i]] = 0
+#         ntmp-=1
+#
+#     transBlocksScore = {}
+#     for i in range(n):
+#         if tempcluster[i] == 1:
+#             transBlocksScore[i] = aend[i] - astart[i] + bend[i] - bstart[i] + 2
+#
+#
+#     garb = deque()
+#     for i in range(n):
+#         if not transBlocksData[i].aUni and not transBlocksData[i].bUni:
+#             garb.append(0)
+#         elif transBlocksData[i].status == 1:
+#             garb.append(0)
+#         elif not transBlocksData[i].aUni:
+#             garb.append(1)
+#         elif not transBlocksData[i].bUni:
+#             garb.append(2)
+#         else:
+#             garb.append(3)
+#     meclass = np.array(list(garb), np.uint16)
+#
+#     while ntmp > 0:
+#         outchanged = True
+#         changed = True
+#         while ntmp != length:
+#             length = ntmp
+#
+#             if changed or outchanged:
+#                 changed = False
+#             ## Check whether any of the remaining elements are mutually exclusive to the already selected candidates.
+#             ## Remove any such mutually exclusive element
+#                 for i in range(n):
+#                     if tempcluster[i] == 0:
+#                         continue
+#                     ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
+#                     if meclass[i] == 1 or meclass[i] == 2:
+#                         meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+#                         for j in meto:
+#                             if outblocks[j] == 1:
+#                                 tempcluster[i] = 0
+#                                 ntmp-=1
+#                                 skiplist[i]=1
+#                                 changed = True
+#                                 break
+#                     ## when the tempcluster element does not overlap with inplace blocks
+#                     elif meclass[i] == 3:
+#                         mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]],  bgroup[bindex[i]], i, threshold, meclass[i])
+#                         ## remove candidate when at least ME candidate on both genomes has already been selected
+#                         for j in mealist:
+#                             if outblocks[j] == 1:
+#                                 for k in meblist:
+#                                     if outblocks[k] == 1:
+#                                         tempcluster[i] = 0
+#                                         ntmp-=1
+#                                         skiplist[i]=1
+#                                         changed = True
+#                                         break
+#                                 break
+#
+#             if changed or outchanged:
+#                 outchanged = False
+#                 changed = False
+#             ## For a given candidate, if all of its ME candidates have already been added to the skiplist, then that candidate will be selected as part of output
+#                 for i in range(n):
+#                     if tempcluster[i] ==0:
+#                         continue
+#                     ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
+#                     if meclass[i] == 1 or meclass[i] == 2:
+#                         meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+#                         fnd = True
+#                         for j in meto:
+#                             if skiplist[j] == 0:
+#                                 fnd = False
+#                                 break
+#                         if fnd:
+#                             tempcluster[i]=0
+#                             ntmp-=1
+#                             outblocks[i]=1
+#                             changed = True
+#                     ## when the tempcluster element does not overlap with inplace blocks
+#                     elif meclass[i] == 3:
+#                         mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+#                         fnd = True
+#                         for j in mealist:
+#                             if skiplist[j]==0:
+#                                 fnd = False
+#                                 break
+#                         if fnd:
+#                             for j in meblist:
+#                                 if skiplist[j] ==0:
+#                                     fnd = False
+#                                     break
+#                         if fnd:
+#                             tempcluster[i] = 0
+#                             ntmp-=1
+#                             outblocks[i] = 1
+#                             changed = True
+#
+#         if ntmp>0:
+#             ## select one of the twenty highest scoring candidate randomly to break the deadlock
+#             topblocks = deque()
+#             for i in range(n):
+#                 if tempcluster[i] == 1:
+#                     topblocks.append(i)
+#             topblocks = sorted(list(topblocks), key = lambda x: transBlocksScore[x], reverse = True)[:20]
+#             totalscore = sum(transBlocksScore[i] for i in topblocks)
+#             prob = [transBlocksScore[i]/totalscore for i in topblocks]
+#             i = int(np.random.choice(topblocks, size = 1, p = prob))
+#
+#             ## update lists to include the selected candidate
+#             tempcluster[i] = 0
+#             ntmp-=1
+#             outblocks[i] = 1
+#
+#             ## Remove ME candidates
+#             if meclass[i] == 1 or meclass[i] == 2:
+#                 meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+#                 for j in meto:
+#                     if tempcluster[j] == 1:
+#                         tempcluster[j] = 0
+#                         ntmp-=1
+#                     skiplist[j] = 1
+#
+#             elif meclass[i] == 3:
+#                 mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+#                 fnd = False
+#                 for j in mealist:
+#                     if outblocks[j] == 1:
+#                         fnd = True
+#                         for k in meblist:
+#                             if tempcluster[k] == 1:
+#                                 tempcluster[k] = 0
+#                                 ntmp -=1
+#                             skiplist[k] = 1
+#                         break
+#                 if not fnd:
+#                     for j in meblist:
+#                         if outblocks[j] == 1:
+#                             for k in mealist:
+#                                 if tempcluster[k] == 1:
+#                                     tempcluster[k] = 0
+#                                     ntmp -=1
+#                                 skiplist[k] = 1
+#                             break
+#
+#                 ## Also remove candidates which are ME to the selected candidate on both genomes
+#                 for j in range(n):
+#                     intrlist[j] = 0
+#
+#                 for j in mealist:
+#                     intrlist[j] = 1
+#
+#                 for j in meblist:
+#                     if intrlist[j] != 0:
+#                         if tempcluster[j] == 1:
+#                             tempcluster[j] = 0
+#                             ntmp -= 1
+#                         skiplist[j] = 1
+#
+#     bestScore, bestComb = updateBestComb(bestScore, bestComb, np.nonzero(outblocks)[0], transBlocksData)
+#     return bestScore, bestComb
 
 
 @cython.boundscheck(False)
@@ -2240,12 +2288,12 @@ def getBestClusterSubset(cluster, transBlocksData, bRT, chromo='', aGroups=None,
     if len(cluster) == 0:
         return
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
-    if len(cluster) > 100000:
-        logger.info('Massive (>100000 candidates) TD cluster (with '+ str(len(cluster)) +' candidate TDs) identified. Using low-memory high-runtime approach. Iterative sampling disabled. Using less stringent progressive elimination.')
+    if len(cluster) > 10000:
+        logger.info('Large (>10000 candidates) TD cluster (with '+ str(len(cluster)) +' candidate TDs) identified. Using low-memory high-runtime approach. Iterative sampling disabled. Using less stringent progressive elimination.')
         output = greedySubsetSelectorHeuristic(np.array(cluster, np.int), transBlocksData, np.array(seedBlocks, np.int), aGroups, bGroups, threshold)
-    elif len(cluster) > 10000:
-        logger.info('Large (>10000 candidates) TD cluster (with '+ str(len(cluster)) +' candidate TDs) identified. Using low-memory high-runtime approach. Iterative sampling disabled.')
-        output = greedySubsetSelector2(np.array(cluster, np.int), transBlocksData, np.array(seedBlocks, np.int), aGroups, bGroups, threshold)
+    # elif len(cluster) > 10000:
+    #     logger.info('Large (>10000 candidates) TD cluster (with '+ str(len(cluster)) +' candidate TDs) identified. Using low-memory high-runtime approach. Iterative sampling disabled.')
+    #     output = greedySubsetSelector2(np.array(cluster, np.int), transBlocksData, np.array(seedBlocks, np.int), aGroups, bGroups, threshold)
     elif len(cluster) < 50:
         output = bruteSubsetSelector(cluster, transBlocksData, seedBlocks, bRT)
         if output == "Failed":
