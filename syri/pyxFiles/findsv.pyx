@@ -1,3 +1,6 @@
+# cython: language_level = 3
+# distutils: language = c++
+
 import numpy as np
 from syri.bin.func.myUsefulFunctions import *
 import sys

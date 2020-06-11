@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # distutils: language = c++
+# cython: language_level = 3
 
 import numpy as np
 from syri.bin.func.myUsefulFunctions import *
