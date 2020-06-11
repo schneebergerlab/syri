@@ -16,7 +16,7 @@ cimport numpy as np
 cimport cython
 np.random.seed(1)
 
-cpdef getOverlapWithSynBlocks(np.ndarray[np.int_t, ndim=1] start, np.ndarray[np.int_t, ndim=1] end, np.ndarray chrom, np.ndarray[np.int_t, ndim=1] in_start, np.ndarray[np.int_t, ndim=1] in_end, np.ndarray in_chrom, np.int_t threshold, np.int_t count, np.int_t tUC, np.float_t tUP):
+cpdef inline getOverlapWithSynBlocks(np.ndarray[np.int_t, ndim=1] start, np.ndarray[np.int_t, ndim=1] end, np.ndarray chrom, np.ndarray[np.int_t, ndim=1] in_start, np.ndarray[np.int_t, ndim=1] in_end, np.ndarray in_chrom, np.int_t threshold, np.int_t count, np.int_t tUC, np.float_t tUP):
 
     assert(len(start) == len(end) == len(chrom) ==count)
     assert(len(in_start) == len(in_end) == len(in_chrom))
@@ -60,7 +60,7 @@ cpdef getOverlapWithSynBlocks(np.ndarray[np.int_t, ndim=1] start, np.ndarray[np.
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef getmeblocks(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold, long[:] aUni, long[:] bUni, long[:] status, long[:] aIndex, long[:] bIndex, aGroups, bGroups, long[:] clstrsize):
+cpdef inline getmeblocks(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold, long[:] aUni, long[:] bUni, long[:] status, long[:] aIndex, long[:] bIndex, aGroups, bGroups, long[:] clstrsize):
     # Function take the coordinates and cluster information of all translocated blocks and identifies mutually exclusive
     #  blocks (candidates with which a given candidate cannot co-exist) by comparing the coordinates of each block to the coordinates of the member blocks in its cluster
     logger = logging.getLogger("getmeblocks")
@@ -135,7 +135,7 @@ cpdef getmeblocks(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, in
     return rem, meblock, melist
 
 
-cpdef getConnectivityGraph(blocksList):
+cpdef inline getConnectivityGraph(blocksList):
     outOG = Graph().as_directed()
     outOG.add_vertices(len(blocksList))
     if len(blocksList) == 0:
