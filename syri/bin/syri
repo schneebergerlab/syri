@@ -274,7 +274,7 @@ if __name__ == "__main__":
     from syri.bin.func.myUsefulFunctions import fileRemove
     if not args.keep:
         for fin in ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", "sv.txt", "notAligned.txt", "snps.txt"]:
-            fileRemove(args.prefix + fin)
+            fileRemove(args.dir + args.prefix + fin)
     print("Finished syri")
 
 
