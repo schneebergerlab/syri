@@ -27,4 +27,10 @@ optional arguments:
   -d D              DPI for the final image
 ```
 
+Example of output plot:
+<p align='center'>
+<img src='syri.png' alt>
+<br />
+<em>Sample plot generated using plotsr.</em>
+</p>
 
