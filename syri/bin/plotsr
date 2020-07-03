@@ -149,8 +149,7 @@ if __name__ == '__main__':
     df.loc[invindex, 7] = df.loc[invindex, 6] - df.loc[invindex, 7]
     df.loc[invindex, 6] = df.loc[invindex, 6] - df.loc[invindex, 7]
 
-    import matplotlib
-    matplotlib.use('Qt5Agg')
+    
     from matplotlib import pyplot as plt
     from matplotlib.patches import Polygon
     plt.switch_backend('Qt5Agg')
