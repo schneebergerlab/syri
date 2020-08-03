@@ -14,16 +14,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     optional = parser._action_groups.pop()
     required = parser.add_argument_group("Input Files")
-    required.add_argument("-c", dest="infile", help="File containing alignment coordinates in a tsv format", type=argparse.FileType('r'), required=True)
+    required.add_argument("-c", dest="infile", help="File containing alignment coordinates", type=argparse.FileType('r'), required=True)
     required.add_argument("-r", dest="ref", help="Genome A (which is considered as reference for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
     required.add_argument("-q", dest="qry", help="Genome B (which is considered as query for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
     required.add_argument("-d", dest="delta", help=".delta file from mummer. Required for short variation (SNPs/indels) identification when CIGAR string is not available", type=argparse.FileType('r'))
 
-# parser.add_argument("-n", dest="threshold", help="Threshold to differentiate estimate whether the",\type=int,
-    # default=50)
     optional.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM", default="T", choices=['T', 'S', 'B'])
-#    optional.add_argument('-o', dest="fout", help="Output file name", default="syri", type=str)
-    optional.add_argument('-k', dest="keep", help="Keep internediate output files", default=False, action="store_true")
+    optional.add_argument('-k', dest="keep", help="Keep intermediate output files", default=False, action="store_true")
     optional.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
     optional.add_argument("--lf", dest="log_fin", help="Name of log file", type=argparse.FileType("w"), default="syri.log")
     optional.add_argument('--dir', dest='dir', help="path to working directory (if not current directory). All files must be in this directory.", action='store')
@@ -31,6 +28,7 @@ if __name__ == "__main__":
     optional.add_argument("--seed", dest="seed", help="seed for generating random numbers", type=int, default=1)
     optional.add_argument('--nc', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
     optional.add_argument('--novcf', dest="novcf", help="Do not combine all files into one output file", default=False, action="store_true")
+    optional.add_argument('-f', dest='f', help='Filter out low quality alignments', default=True, action='store_false')
 
     parser._action_groups.append(optional)
     # Parameters for identification of structural rearrangements

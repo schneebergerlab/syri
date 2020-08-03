@@ -29,6 +29,95 @@ np.random.seed(1)
 
 from syri.pyxFiles.function cimport getmeblocks, getOverlapWithSynBlocks
 
+def samtocoords(f):
+    from pandas import DataFrame
+    from collections import deque
+
+    logger = logging.getLogger('SAM reader')
+
+    rc = {}        # Referece chromosomes
+    rcs = {}        # Selected chromosomes
+    al = deque()    # Individual alignment
+    try:
+        with open(f, 'r') as fin:
+            for l in fin:
+                if l[:3] == '@SQ':
+                    c, s = 0, 0
+                    for h in l.strip().split()[1:]:
+                        h = h.split(':')
+                        if h[0] == 'SN': c = h[1]
+                        if h[0] == 'LN': s = int(h[1])
+                    rcs[c] = s
+                    continue
+                elif l[0] == '@': continue
+
+                l = l.split('\t')[:6]
+                # if l[1] == '2064': break
+                if l[2] == '*':
+                    logger.warning(l[0]+ ' do not align with any reference sequence and cannot be analysed. Remove all unplaced scaffolds and contigs from the assemblies.')  # Skip rows corresponding to non-mapping sequences (contigs/scaffolds)
+                    continue
+
+                if 'M' in l[5]:
+                    logger.error('Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: ' + l[5])
+                    sys.exit()
+                cgt = [[int(j[0]), j[1]] for j in [i.split(';') for i in l[5].replace('S', ';S,').replace('H', ';H,').replace('=', ';=,').replace('X', ';X,').replace('I', ';I,').replace('D', ';D,').split(',')[:-1]]]
+                if len(cgt) > 2:
+                    if True in [True if i[1] in ['S', 'H'] else False for i in cgt[1:-1]]:
+                        logger.error("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + aln.cigarstring)
+                        sys.exit()
+
+                bf = '{:012b}'.format(int(l[1]))
+
+                rs = int(l[3])
+                re = rs - 1 + sum([i[0] for i in cgt if i[1] in ['X', '=', 'D']])
+
+                if bf[7] == '0':    # forward alignment
+                    if cgt[0][1] == '=':
+                        qs = 1
+                    elif cgt[0][1] in ['S', 'H']:
+                        qs = cgt[0][0] + 1
+                    else:
+                        print('ERROR: CIGAR string starting with non-matching base')
+                    qe = qs - 1 + sum([i[0] for i in cgt if i[1] in ['X', '=', 'I']])
+                elif bf[7] == '1':  # inverted alignment
+                    if cgt[-1][1] == '=':
+                        qs = 1
+                    elif cgt[-1][1] in ['S', 'H']:
+                        qs = cgt[-1][0] + 1
+                    else:
+                        print('ERROR: CIGAR string starting with non-matching base')
+                    qe = qs - 1 + sum([i[0] for i in cgt if i[1] in ['X', '=', 'I']])
+                    qs, qe = qe, qs
+
+                al.append([
+                    rs,
+                    re,
+                    qs,
+                    qe,
+                    re-rs+1,
+                    abs(qs-qe+1),
+                    format((sum([i[0] for i in cgt if i[1] == '=']) / sum(
+                        [i[0] for i in cgt if i[1] in ['=', 'X', 'I', 'D']])) * 100, '.2f'),
+                    1,
+                    1 if bf[7] == '0' else -1,
+                    l[2],
+                    l[0],
+                    "".join([str(i[0])+i[1] for i in cgt if i[1] in ['=', 'X', 'I', 'D']])
+                ])
+                rcs[l[2]] = 1
+            rcs = list(rcs.keys())
+            for k in list(rc.keys()):
+                if k not in rcs: logger.warning(l[0]+ ' do not align with any query sequence and cannot be analysed. Remove all unplaced scaffolds and contigs from the assemblies.')
+    except Exception as e:
+        logger.error('Error in reading SAM file: ' + str(e))
+        sys.exit()
+    al = DataFrame(list(al))
+    al[6] = al[6].astype('float')
+    al.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
+    al.index = range(len(al.index))
+    return al
+
+
 def readSAMBAM(fin, type='B'):
     import pysam
     logger = logging.getLogger('Reading BAM/SAM file')
@@ -36,7 +125,7 @@ def readSAMBAM(fin, type='B'):
         if type == 'B':
             findata = pysam.AlignmentFile(fin,'rb')
         elif type == 'S':
-            findata = pysam.AlignmentFile(fin,'r')
+            return samtocoords(fin)
         else:
             raise ValueError("Wrong parameter")
     except ValueError as e:
@@ -48,7 +137,6 @@ def readSAMBAM(fin, type='B'):
     except Exception as e:
         logger.error("Unexpected error in opening BAM/SAM file. " + str(e))
         sys.exit()
-
 
     try:
         qry_prim = {}
@@ -123,10 +211,12 @@ def readSAMBAM(fin, type='B'):
         ## Return alignments
         coords = pd.DataFrame.from_dict(coords, orient= 'index')
         coords.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
+        coords.index = range(len(coords.index))
         return coords
     except Exception as e:
         logger.error("Error in reading BAM/SAM file. " + str(e))
         sys.exit()
+
 
 def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     logger = logging.getLogger('Reading Coords')
@@ -159,6 +249,9 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
         logger.error("Incorrect alignment file type specified.")
         sys.exit()
 
+    if args.f:
+        coords = coords.loc[coords[6] > 90]
+        coords = coords.loc[(coords[4]>100) & (coords[5]>100)]
 
     if not cigar:
         if coords.shape[1] >= 12:

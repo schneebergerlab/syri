@@ -11,7 +11,7 @@ except ImportError:
 
     
 setup(name="syri",
-        version='1.3',
+        version='1.4',
         ext_modules=cythonize([Extension('syri.pyxFiles.synsearchFunctions',['syri/pyxFiles/synsearchFunctions.pyx']),
         Extension('syri.inversions',['syri/pyxFiles/inversions.pyx']),
         Extension('syri.tdfunc',['syri/pyxFiles/tdfunc.pyx']),
