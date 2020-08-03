@@ -111,7 +111,7 @@ def samtocoords(f):
     except Exception as e:
         logger.error('Error in reading SAM file: ' + str(e))
         sys.exit()
-    al = DataFrame(al)
+    al = DataFrame(list(al))
     al[6] = al[6].astype('float')
     al.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
     al.index = range(len(al.index))
