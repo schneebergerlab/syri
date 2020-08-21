@@ -212,6 +212,7 @@ def readSAMBAM(fin, type='B'):
         coords = pd.DataFrame.from_dict(coords, orient= 'index')
         coords.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
         coords.index = range(len(coords.index))
+        coords[6] = coords[6].astype('float')
         return coords
     except Exception as e:
         logger.error("Error in reading BAM/SAM file. " + str(e))
@@ -248,10 +249,6 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     else:
         logger.error("Incorrect alignment file type specified.")
         sys.exit()
-
-    if args.f:
-        coords = coords.loc[coords[6] > 90]
-        coords = coords.loc[(coords[4]>100) & (coords[5]>100)]
 
     if not cigar:
         if coords.shape[1] >= 12:
@@ -337,6 +334,11 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     except:
         logger.error('bChr is not string')
         sys.exit()
+
+    # Filter small alignments
+    if args.f:
+        coords = coords.loc[coords.iden > 90]
+        coords = coords.loc[(coords.aLen>100) & (coords.bLen>100)]
 
     ## check for bstart > bend when bdir is -1
     check = np.unique(coords.loc[coords.bDir == -1, 'bStart'] > coords.loc[coords.bDir == -1, 'bEnd'])
@@ -431,6 +433,7 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
             logger.warning('Reference chromosome ' + achr + ' has high fraction of inverted alignments with its homologous chromosome in the query genome (' + hombchr + '). Ensure that same chromosome-strands are being compared in the two genomes, as different strand can result in unexpected errors.')
     return coords, chrlink
 
+
 def startSyri(args, coords):
     nCores = args.nCores
     bRT = args.bruteRunTime
@@ -462,6 +465,7 @@ def startSyri(args, coords):
     # Recalculate syntenic blocks by considering the blocks introduced by CX events
     outSyn(cwdPath, threshold, prefix)
     return 'Finished'
+
 
 def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
     logger = logging.getLogger("syri."+chromo)
@@ -507,8 +511,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
     chromBlocks = coords[(coords.aChr == chromo) & (coords.bChr == chromo)]
     inPlaceIndices = sorted(list(synData.index.values) + list(invData.index.values))
     inPlaceBlocks = chromBlocks[chromBlocks.index.isin(sorted(list(synData.index.values)))].copy()
-    
-    
+
+
     for i in bestInvPath:
         invPos = profitable[i].invPos
         invBlockData = invertedCoordsOri.iloc[invPos]
@@ -524,7 +528,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
             except:
                 pass
         inPlaceBlocks = inPlaceBlocks.append(pd.Series(invCoord, index = inPlaceBlocks.columns, name = invPos[0]))
-        
+
     inPlaceBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
     inPlaceBlocks.index = range(inPlaceBlocks.shape[0])
     outPlaceBlocks = chromBlocks[~chromBlocks.index.isin(inPlaceIndices)]
@@ -543,7 +547,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
 
     allTransGenomeAGroups = makeTransGroupList(allTransBlocks, "aStart", "aEnd", threshold)
     allTransGenomeBGroups = makeTransGroupList(allTransBlocks, "bStart", "bEnd", threshold)
-    
+
     allTransGroupIndices = {}
     for i in range(len(allTransGenomeAGroups)):
         for block in allTransGenomeAGroups[i].member:
@@ -551,7 +555,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
     for i in range(len(allTransGenomeBGroups)):
         for block in allTransGenomeBGroups[i].member:
             allTransGroupIndices[block].append(i)
-    
+
     logger.debug("Translocations : getting clusters " + chromo)
     allTransCluster = getTransCluster(allTransGroupIndices, {i:allTransGenomeAGroups[i].member for i in range(len(allTransGenomeAGroups))}, {i:allTransGenomeBGroups[i].member for i in range(len(allTransGenomeBGroups))})
 
@@ -656,7 +660,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
 
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
     #clusterBlocks = unlist(clusterSolutionBlocks)
-    
+
     logger.debug("Translocations : processing translocations " + chromo + str(datetime.now()))
 
     garb = deque()
@@ -693,8 +697,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
     dupData = allTransBlocks.iloc[transClasses["duplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
     invDupData = allTransBlocks.iloc[transClasses["invDuplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
     TLData = allTransBlocks.iloc[transClasses["translocation"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
-    invTLData = allTransBlocks.iloc[transClasses["invTranslocation"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])  
-    
+    invTLData = allTransBlocks.iloc[transClasses["invTranslocation"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
+
     dupData = getDupGenome(dupData,
                            allTransBlocksData,
                            transClasses,
@@ -721,8 +725,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
                               bGroups,
                               threshold,
                               meclass)
-    
-    
+
+
     fout = open(cwdPath+prefix+chromo+"_invOut.txt","w")
     tempInvBlocks = []
     for i in bestInvPath:
@@ -733,15 +737,15 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
             fout.write("\t".join(map(str,invertedCoordsOri.iloc[j][:4])))
             fout.write("\n")
     fout.close()
-    
-    
+
+
     ## Grouping Syn blocks : Final synblock identification is done after ctx identification.
     allBlocks, outClusters = groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn)
 
     orderedBlocks = outPlaceBlocks[outPlaceBlocks.bDir == 1]
     invertedBlocks = outPlaceBlocks[outPlaceBlocks.bDir == -1]
 
-    
+
 ########################################################################################################################
     fout = open(cwdPath+prefix+chromo+"_synOut.txt","w")
     for i in outClusters:
@@ -754,7 +758,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
                 fout.write("\n")
     fout.close()
 ########################################################################################################################
-    
+
     fout = open(cwdPath+prefix+chromo+"_dupOut.txt","w")
     for i in dupData.index.values:
         fout.write("\t".join(map(str,["#",dupData.at[i,"aStart"],dupData.at[i,"aEnd"],"-",dupData.at[i,"bStart"],dupData.at[i,"bEnd"],"-", dupData.at[i,"dupGenomes"],"\n"])))
@@ -763,8 +767,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
             fout.write("\n")
     fout.close()
 
-########################################################################################################################    
-    
+########################################################################################################################
+
     fout = open(cwdPath+prefix+chromo+"_invDupOut.txt","w")
     for i in invDupData.index.values:
         fout.write("\t".join(map(str,["#",invDupData.at[i,"aStart"],invDupData.at[i,"aEnd"],"-",invDupData.at[i,"bStart"],invDupData.at[i,"bEnd"],"-", invDupData.at[i,"dupGenomes"],"\n"])))
@@ -774,7 +778,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
     fout.close()
 
 ########################################################################################################################
-    
+
     fout = open(cwdPath+prefix+chromo+"_TLOut.txt","w")
     for i in TLData.index.values:
         fout.write("\t".join(map(str,["#",TLData.at[i,"aStart"],TLData.at[i,"aEnd"],"-",TLData.at[i,"bStart"],TLData.at[i,"bEnd"],"\n"])))
@@ -784,7 +788,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
     fout.close()
 
 ########################################################################################################################
-    
+
     fout = open(cwdPath+prefix+chromo+"_invTLOut.txt","w")
     for i in invTLData.index.values:
         fout.write("\t".join(map(str,["#",invTLData.at[i,"aStart"],invTLData.at[i,"aEnd"],"-",invTLData.at[i,"bStart"],invTLData.at[i,"bEnd"],"\n"])))
