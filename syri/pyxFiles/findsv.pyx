@@ -110,16 +110,18 @@ def getSV(cwdPath, allAlignments, prefix, offset):
     :param offset:
     :return:
     """
+    logger = logging.getLogger("getSV")
     offset = -abs(offset)
     fout = open(cwdPath + prefix + "sv.txt", "w")
     allAlignments["id"] = allAlignments.group.astype(
-        "str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
+        "str") + 'Chr' + allAlignments.aChr + 'Chr' + allAlignments.bChr + allAlignments.state
     allBlocks = pd.unique(allAlignments.id)
 
     for i in allBlocks:
         blocksAlign = allAlignments.loc[allAlignments.id == i].copy()
         if len(pd.unique(blocksAlign["aChr"])) > 1 or len(pd.unique(blocksAlign["aChr"])) > 1:
-            sys.exit("More than one chromosome found for a SR")
+            logger.error("More than one chromosome found for a SR\n"+blocksAlign.to_string())
+            sys.exit()
         fout.write("\t".join(["#",
                               str(blocksAlign[["aStart","aEnd"]].min().min()),
                               str(blocksAlign[["aStart", "aEnd"]].max().max()),
