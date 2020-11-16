@@ -7,79 +7,478 @@ This is a temporary script file.
 """
 
 import argparse
+from collections import defaultdict, namedtuple
+from itertools import product
+import sys
 
-def getdata(reflength, refid, refdir):
-    # Each node corresponds to a continuous genomic region aligning to a scaffold
-    class node:
-        def __init__(self, id, name, pos):
-            self.id = id
-            self.name = name
-            self.children = deque()
-            self.start = pos
-            self.end = pos
-            self.length = -1
+Run = namedtuple("Run", ["char", "length"])
+Solution = namedtuple("Solution", ["size", "subsequences"])
 
-    def getpath(nodes, added=[], i=0, last=-1):
-        if i in fnd.keys():
-            if ",".join(map(str, added)) in fnd[i]:
-                return fnd[i][",".join(map(str, added))]
 
-        if i == 0:
-            added = [nodes[i].name]
-            path = [i]
-            last = nodes[i].name
-            bp = []
-            bpscore = -1
-            for j in nodes[i].children:
-                tmppath = getpath(nodes, added, j, last)
-                tmpscore = sum([nodes[n].length for n in tmppath])
-                # if len(tmppath) > len(bp):
-                if tmpscore > bpscore:
-                    bp = tmppath
-                    bpscore = tmpscore
-            return path+bp
+def get_selected_runs(sub, ref):
+    '''
+    Returns the positions in ref, which are covered by the subsequence sub.
+    Returns None if sub is not a subsequence of ref
+    '''
+    indices = []
+    sub_pos = 0
+    for ref_pos in range(len(ref)):
+        if sub_pos >= len(sub):
+            break
+        if ref[ref_pos] == sub[sub_pos]:
+            indices.append(ref_pos)
+            sub_pos += 1
+    if sub_pos < len(sub):
+        return None
+    else:
+        return indices
 
-        if nodes[i].name != last and nodes[i].name in added:
-            return []
-        path = [i]
-        if len(nodes[i].children) == 0:
-            # fnd[i][",".join(map(str, added))] = path
-            return path
-        elif len(nodes[i].children) == 1:
-            if nodes[i].name == last:
-                path = path + getpath(nodes, added, nodes[i].children[0], last)
-                # fnd[i][",".join(map(str, added))] = path
-                return path
+
+def char_in_subalphabet(f, c_idx):
+    t = 2**c_idx
+    return (f % (2*t)) >= t
+
+
+def add_char_to_subalphabet(f, c_idx):
+    t = 2**c_idx
+    if (f % (2*t)) >= t:
+        return f
+    else:
+        return f + t
+
+
+def lrs_dp(s):
+    # create alphabet with reverse index
+    sigma = sorted(list(set([run.char for run in s])))
+    char_idx = dict()
+    for i, char in enumerate(sigma):
+        char_idx[char] = i
+
+    # compute predecessor for each char and for each run
+    pred = [[0 for _ in sigma] for i in range(len(s)+1)]
+    for pos in range(1, len(s)+1):
+        for prev in range(pos-1, 0, -1):
+            pred[pos][char_idx[s[prev-1].char]] = max(pred[pos][char_idx[s[prev-1].char]], prev)
+
+    # initialize dp table (and backtracking table)
+    D = [defaultdict(lambda : -float("inf")) for _ in range(len(s)+1)]
+    B = [defaultdict(lambda : -float("inf")) for _ in range(len(s)+1)]
+    D[0][0] = 0
+    B[0][0] = (-1, 0)
+
+    max_entry = (0, 0)
+    max_sol = 0
+
+    # iterate column-wise
+    for col in range(1, len(s)+1):
+
+        # iterate over all characters
+        for char in sigma:
+            c_idx = char_idx[char]
+            c_idx_s = char_idx[s[col-1].char]
+            pr = pred[col][c_idx]
+
+            # case 1: char is same character as is current column -> extend previous solutions
+            if c_idx == c_idx_s and pr > 0:
+                for subalphabet in D[pr]:
+                    if D[pr][subalphabet] + s[col-1].length > D[col][subalphabet]:
+                        D[col][subalphabet] = D[pr][subalphabet] + s[col-1].length
+                        B[col][subalphabet] = (pr, subalphabet)
+
+            # case 2: char is another character -> extend only solutions, which did not contain char yet
             else:
-                path = path + getpath(nodes, added + [nodes[i].name], nodes[i].children[0], nodes[i].name)
-                # fnd[i][",".join(map(str, added))] = path
-                return path
+                for subalphabet in D[pr]:
+                    if not char_in_subalphabet(subalphabet, c_idx_s):
+                        new_subalphabet = add_char_to_subalphabet(subalphabet, c_idx_s)
+                        if D[pr][subalphabet] + s[col-1].length > D[col][new_subalphabet]:
+                            D[col][new_subalphabet] = D[pr][subalphabet] + s[col-1].length
+                            B[col][new_subalphabet] = (pr, subalphabet)
+
+        # register new best solution
+        for subalphabet in sorted(D[col]):
+            if D[col][subalphabet] > max_sol:
+                max_sol = D[col][subalphabet]
+                max_entry = (col, subalphabet)
+
+    # backtracking
+    sol = []
+    while max_entry[0] > 0:
+        sol.append(s[max_entry[0]-1])
+        max_entry = B[max_entry[0]][max_entry[1]]
+
+    sol = sol[::-1]
+
+    return Solution(sum([run.length for run in sol]), [sol])
+
+
+def get_first_and_last_occurences(s):
+    '''
+    Returns two dictionaries, which for each character in s contain the first and last run index (respectively) of its occurences
+    '''
+    first_occ = dict()
+    last_occ = dict()
+    for i, run in enumerate(s):
+        if run.char not in first_occ:
+            first_occ[run.char] = i
+            last_occ[run.char] = i
+        last_occ[run.char] = i
+    return first_occ, last_occ
+
+
+def reduce_concat(s, solver, verbosity=0):
+    '''
+    Input: List of Runs
+    Output: Solution
+    '''
+    sigma = list(set([run.char for run in s]))
+    intervals = []
+    partial_solutions = []
+
+    # find first and last occurence for each character
+    first_occ, last_occ = get_first_and_last_occurences(s)
+
+    # take first run and extend it to the left, until a secluded prefix is found
+    pos = 0
+    current_end = 0
+    while pos < len(s):
+        # invariant: all positions before current_end (exclusive) have been processed
+        current_start = current_end
+        current_end = last_occ[s[current_start].char]+1
+        pos = current_start+1
+        while pos < current_end:
+            # invariant: all runs before pos (exclusive) have been used to extend the interval
+            current_end = max(current_end, last_occ[s[pos].char]+1)
+            pos += 1
+
+        # use nested reduction rule on complete interval
+        intervals.append((current_start, current_end))
+        partial_solutions.append(reduce_nested(s[current_start:current_end], solver, verbosity))
+
+    # concatenate solutions
+    size = sum([sol.size for sol in partial_solutions])
+    partial_subs = [sol.subsequences for sol in partial_solutions]
+    subsequences = []
+    for comb in product(*partial_subs):
+        subsequences.append([subseq for sublist in comb for subseq in sublist])
+
+    return Solution(size, subsequences)
+
+
+def reduce_nested(s, solver, verbosity=0):
+    '''
+    Input: List of Runs
+    Output: Solution
+    '''
+    sigma = list(set([run.char for run in s]))
+
+    # find first and last occurence for each character
+    first_occ, last_occ = get_first_and_last_occurences(s)
+
+    checked_chars = set()
+    independent = []
+
+    # idea: check for each character, whether it is part of a nested interval
+    # 1. start with the characters borders as candidate interval
+    # 2. for every other character inside the current interval, extend the borders
+    # 3. proceed, until interval contains all occurences of any character inside
+
+    # process wider spread chars first to avoid "nested" independent intervals
+    sigma.sort(key=lambda char: last_occ[char] - first_occ[char], reverse=True)
+
+    for char in sigma:
+        if char in checked_chars:
+            continue
+
+        # initialize the candidate interval with first and last occurence of examined char
+        left_bound = first_occ[char]
+        right_bound = last_occ[char]+1 # right_bound is exclusive
+        chars_in_interval = set([char])
+
+        # these pointers indicate up to which position (from left_bound) we already read
+        left = left_bound - 1
+        right = left_bound + 1
+
+        # if both pointers reached the bounds, the interval is closed
+        # the borders itself must be characters we have already seen, so no check
+        while left > left_bound or right < right_bound - 1:
+            if right < right_bound - 1:
+                c = s[right].char
+                chars_in_interval.add(c)
+                left_bound = min(left_bound, first_occ[c])
+                right_bound = max(right_bound, last_occ[c]+1)
+                right += 1
+            else:
+                c = s[left].char
+                chars_in_interval.add(c)
+                left_bound = min(left_bound, first_occ[c])
+                right_bound = max(right_bound, last_occ[c]+1)
+                left -= 1
+
+        # only create sub instance, if it is not the entire string
+        if left_bound > 0 or right_bound < len(s):
+            independent.append((left_bound, right_bound))
+            checked_chars.update(chars_in_interval)
+
+    # if no intervals found, solve entire string
+    if len(independent) == 0:
+        return solver(s)
+
+    # sort independent intervals by position (they cannot overlap, so left bound is sufficient)
+    independent.sort(key=lambda interval: interval[0])
+
+    # contract adjacent independent intervals and run concat-rule on them again, if longer than one block
+    # save the solution and the bounds for every sub-instance solved
+    partial_solutions = []
+    intervals = []
+    left = independent[0][0]
+    right = independent[0][0]
+    for interval in independent:
+        if interval[0] == right:
+            # interval extends current sub-instance
+            right = interval[1]
         else:
-            bp = []
-            bpscore = -1
-            for j in nodes[i].children:
-                if nodes[i].name == last:
-                    tmppath = getpath(nodes, added, j, last)
+            # interval does not extend current sub-instance. solve latter (if not singleton block) and open new sub-instance
+            if right - left >= 2:
+                intervals.append((left, right))
+                partial_solutions.append(reduce_concat(s[left:right], solver, verbosity))
+            left = interval[0]
+            right = interval[1]
+
+    # solve unclosed sub instance (if not singleton block)
+    if right - left >= 2:
+        intervals.append((left, right))
+        partial_solutions.append(reduce_concat(s[left:right], solver, verbosity))
+
+    # again, if no sub-instance was solved, we have to solve the entire string as one instance
+    if len(intervals) == 0:
+        return solver(s)
+
+    # replace all sub-instance intervals with a single run of a new character. length = solution size of sub-instance
+    s0 = []
+    pos = 0
+    for i in range(len(intervals)):
+        s0 += s[pos:intervals[i][0]]
+        s0.append(Run('$'+str(i), partial_solutions[i].size))
+        pos = intervals[i][1]
+    s0 += s[pos:]
+
+    # solve modified instance
+    sol = solver(s)
+
+    # for every solution in modified instance: replace any run of $-chars with all solutions of the respective sub-instance
+    final_subseqs = []
+    for seq in sol.subsequences:
+        # start with just the solution of the outer problem
+        expanded_solutions = [seq]
+        for i in range(len(intervals)):
+            # replace the placeholder block for every solution in expanded_solutions with every sub-instance solution
+            expanded_expanded_solutions = []
+            for expanded_solution in expanded_solutions:
+                # find index of placeholder block if existent
+                idx = -1
+                for j, run in enumerate(expanded_solution):
+                    if run.char == '$'+str(i):
+                        idx = j
+                        break
+                if idx >= 0:
+                    for subsol in partial_solutions[i].subsequences:
+                        expanded_expanded_solutions.append(expanded_solution[:idx]+subsol+expanded_solution[idx+1:])
                 else:
-                    tmppath = getpath(nodes, added + [nodes[i].name], j, nodes[i].name)
-                tmpscore = sum([nodes[n].length for n in tmppath])
-                # if len(tmppath) > len(bp):
-                if tmpscore > bpscore:
-                    bp = tmppath
-                    bpscore = tmpscore
-            # if nodes[i].name == last:
-            fnd[i][",".join(map(str, added))] = path + bp
-            return path+bp
+                    expanded_expanded_solutions.append(expanded_solution)
+
+            # continue next iteration with the now extended solutions
+            expanded_solutions = expanded_expanded_solutions
+        final_subseqs += expanded_solutions
+    return Solution(sol.size, final_subseqs)
 
 
+def subsequence_to_indices(sub, ref):
+    indices = get_selected_runs(sub, ref)
+    char_indices = []
+    char_pos = 0
+    if indices is None:
+        return None
+    for i in range(len(ref)):
+        if i in indices:
+            char_indices += list(range(char_pos, char_pos+ref[i].length))
+        char_pos += ref[i].length
+    return char_indices
+
+
+def lrs(r, verbosity=0):
+    '''
+    We use the algorithm and implementation developed by Gunnar Klau's lab and presented
+    in Sven et al https://drops.dagstuhl.de/opus/volltexte/2020/12795/
+    '''
+    # r = string_to_run(s)
+    # Create r manually so that alphabet is not restricted to english characters and can use numbers.
+    # Would need to create a
+    sol = reduce_concat(r, lrs_dp, verbosity)
+    result = subsequence_to_indices(sub=sol.subsequences[0], ref=r)
+    return result
+
+
+# def getdata(reflength, refid, refdir):
+#     # Each node corresponds to a continuous genomic region aligning to a scaffold
+#     class node:
+#         def __init__(self, id, name, pos):
+#             self.id = id
+#             self.name = name
+#             self.children = deque()
+#             self.start = pos
+#             self.end = pos
+#             self.length = -1
+#
+#     def getpath(nodes, added=[], i=0, last=-1):
+#         if i in fnd.keys():
+#             if ",".join(map(str, added)) in fnd[i]:
+#                 return fnd[i][",".join(map(str, added))]
+#
+#         if i == 0:
+#             added = [nodes[i].name]
+#             path = [i]
+#             last = nodes[i].name
+#             bp = []
+#             bpscore = -1
+#             for j in nodes[i].children:
+#                 tmppath = getpath(nodes, added, j, last)
+#                 tmpscore = sum([nodes[n].length for n in tmppath])
+#                 # if len(tmppath) > len(bp):
+#                 if tmpscore > bpscore:
+#                     bp = tmppath
+#                     bpscore = tmpscore
+#             return path+bp
+#
+#         if nodes[i].name != last and nodes[i].name in added:
+#             return []
+#         path = [i]
+#         if len(nodes[i].children) == 0:
+#             # fnd[i][",".join(map(str, added))] = path
+#             return path
+#         elif len(nodes[i].children) == 1:
+#             if nodes[i].name == last:
+#                 path = path + getpath(nodes, added, nodes[i].children[0], last)
+#                 # fnd[i][",".join(map(str, added))] = path
+#                 return path
+#             else:
+#                 path = path + getpath(nodes, added + [nodes[i].name], nodes[i].children[0], nodes[i].name)
+#                 # fnd[i][",".join(map(str, added))] = path
+#                 return path
+#         else:
+#             bp = []
+#             bpscore = -1
+#             for j in nodes[i].children:
+#                 if nodes[i].name == last:
+#                     tmppath = getpath(nodes, added, j, last)
+#                 else:
+#                     tmppath = getpath(nodes, added + [nodes[i].name], j, nodes[i].name)
+#                 tmpscore = sum([nodes[n].length for n in tmppath])
+#                 # if len(tmppath) > len(bp):
+#                 if tmpscore > bpscore:
+#                     bp = tmppath
+#                     bpscore = tmpscore
+#             # if nodes[i].name == last:
+#             fnd[i][",".join(map(str, added))] = path + bp
+#             return path+bp
+#
+#
+#     refdata = {}
+#     # For each scaffold in genome A find the list of aligning scaffolds in genome B
+#     for rid in refid:
+#         # print(rid)
+#         qiddata = {}
+#         fnd = defaultdict(dict)
+#
+#         # Use sliding window (size: 5) for ref scaffolds larger than 50 units, scaffolds which are not major alignment in any window are removed.
+#         # print("Sliding Window")
+#         if len(reflength[rid]) > 50:
+#             wsize = 5
+#             scaflist = []
+#             for i in range(0, len(reflength[rid]) - wsize + 1):
+#                 qids = deque()
+#                 for j in range(i, i+5):
+#                     try:
+#                         qids.append(reflength[rid][j*10000])
+#                     except KeyError:
+#                         pass
+#                 qids = Counter(qids)
+#                 for k, v in qids.items():
+#                     if v >= 3:
+#                         scaflist.append(k)
+#             scaflist = list(np.unique(scaflist))
+#             if len(scaflist) == 0:
+#                 print('Error: For contig ', rid, ' no matching contig was found. This could be a result of incorrect assembly or extensive repeats or ', rid, ' could be a novel region. Pseudo-genome cannot be generated. Try removing this contig.')
+#                 sys.exit()
+#         else:
+#             scaflist = list(np.unique(list(reflength[rid].values())))
+#
+#         # print("node generation")
+#         a2 = np.array([[k, scaflist.index(v)] for k, v in reflength[rid].items() if v in scaflist])
+#         a2 = a2[a2[:, 0].argsort()]
+#
+#         pos = a2[:, 0]
+#         ids = [-1] + list(a2[:, 1]) + [-2]
+#         unid = list(np.unique(ids))
+#
+#         # Create graph (nodes are regions and edges imply co-existence)
+#         nodes = [node(0, ids[0], -1)]
+#         for i in range(1, len(ids) - 1):
+#             if ids[i] == nodes[-1].name:
+#                 nodes[-1].end = pos[i-1]
+#             else:
+#                 nodes.append(node(i, ids[i], pos[i-1]))
+#         nodes.append(node(i+1, ids[-1], -2))
+#
+#         for n in nodes[1:-1]:
+#             n.length = n.end - n.start + 10000
+#
+#         for i in range(len(nodes)):
+#             tunid = unid.copy()
+#             for j in range(i+1, len(nodes)):
+#                 if len(tunid) == 0:
+#                     break
+#                 if nodes[j].name not in tunid:
+#                     continue
+#                 nodes[i].children.append(j)
+#
+#                 ## If a child node aligns to a large region (here > 100000bp), then that scaffold is considered to be fixed
+#                 if nodes[j].length >= 100000:                    ## Heuristic approach used to limit number of children a node can have
+#                     break                                       ## This is requried cause otherwise the number of possible combinations grows to large for low contiguity assemblies
+#
+#                 if nodes[i].name == nodes[j].name:
+#                     break
+#                 tunid.remove(nodes[j].name)
+#
+#         # Get list of nodes corresponding longest mapping
+#         # print("number of nodes", len(nodes))
+#         path = getpath(nodes)
+#         # print('finished getting path')
+#         for i in path[1:-1]:
+#             if scaflist[nodes[i].name] not in qiddata:
+#                 qiddata[scaflist[nodes[i].name]] = {'s': nodes[i].start,
+#                                                     'e': nodes[i].end,
+#                                                     'l': nodes[i].length}
+#             else:
+#                 qiddata[scaflist[nodes[i].name]]['e'] = nodes[i].end
+#                 qiddata[scaflist[nodes[i].name]]['l'] = nodes[i].length + qiddata[scaflist[nodes[i].name]]['l']
+#
+#         # get direction of the alingment of two scaffolds
+#         for qid in qiddata.keys():
+#             qiddata[qid]['d'] = refdir[rid][qid]
+#         refdata[rid] = qiddata
+#     return refdata
+
+
+def getdata_withLRS(reflength, refid, refdir):
     refdata = {}
     # For each scaffold in genome A find the list of aligning scaffolds in genome B
     for rid in refid:
-        # print(rid)
         qiddata = {}
-        fnd = defaultdict(dict)
-
-        # Use sliding window (size: 5) for ref scaffolds larger than 50 units, scaffolds which are not major alignment in any window are removed.
+        if len(reflength[rid]) == 0:
+            refdata[rid] = qiddata
+            continue
+        # Use sliding window (size: 5) for ref scaffolds larger than 50 units,
+        # scaffolds which are not major alignment in any window are removed.
         # print("Sliding Window")
         if len(reflength[rid]) > 50:
             wsize = 5
@@ -102,60 +501,52 @@ def getdata(reflength, refid, refdir):
         else:
             scaflist = list(np.unique(list(reflength[rid].values())))
 
-        # print("node generation")
-        a2 = np.array([[k, scaflist.index(v)] for k, v in reflength[rid].items() if v in scaflist])
-        a2 = a2[a2[:, 0].argsort()]
+        qids = np.unique(list(reflength[rid].values()))
+        qind = dict(zip(qids, list(range(len(qids)))))
+        ks = deque()
+        qlist = deque()
+        for k in sorted(list(reflength[rid].keys())):
+            if reflength[rid][k] in scaflist:
+                ks.append(k)
+                qlist.append(qind[reflength[rid][k]])
+        ks = list(ks)
+        qlist = list(qlist)
 
-        pos = a2[:, 0]
-        ids = [-1] + list(a2[:, 1]) + [-2]
-        unid = list(np.unique(ids))
-
-        # Create graph (nodes are regions and edges imply co-existence)
-        nodes = [node(0, ids[0], -1)]
-        for i in range(1, len(ids) - 1):
-            if ids[i] == nodes[-1].name:
-                nodes[-1].end = pos[i-1]
+        r = []
+        char = qlist[0]
+        length = 1
+        for i in qlist[1:]:
+            if i == char:
+                length += 1
             else:
-                nodes.append(node(i, ids[i], pos[i-1]))
-        nodes.append(node(i+1, ids[-1], -2))
+                r.append(Run(str(char), length))
+                char = i
+                length = 1
+        r.append(Run(char, length))
+        selected = lrs(r)
 
-        for n in nodes[1:-1]:
-            n.length = n.end - n.start + 10000
-
-        for i in range(len(nodes)):
-            tunid = unid.copy()
-            for j in range(i+1, len(nodes)):
-                if len(tunid) == 0:
-                    break
-                if nodes[j].name not in tunid:
-                    continue
-                nodes[i].children.append(j)
-
-                ## If a child node aligns to a large region (here > 100000bp), then that scaffold is considered to be fixed
-                if nodes[j].length >= 100000:                    ## Heuristic approach used to limit number of children a node can have
-                    break                                       ## This is requried cause otherwise the number of possible combinations grows to large for low contiguity assemblies
-
-                if nodes[i].name == nodes[j].name:
-                    break
-                tunid.remove(nodes[j].name)
-
-        # Get list of nodes corresponding longest mapping
-        # print("number of nodes", len(nodes))
-        path = getpath(nodes)
-        # print('finished getting path')
-        for i in path[1:-1]:
-            if scaflist[nodes[i].name] not in qiddata:
-                qiddata[scaflist[nodes[i].name]] = {'s': nodes[i].start,
-                                                    'e': nodes[i].end,
-                                                    'l': nodes[i].length}
+        q = reflength[rid][ks[selected[0]]]
+        start = ks[selected[0]]
+        end = ks[selected[0]]
+        for s in selected[1:]:
+            if reflength[rid][ks[s]] == q:
+                end = ks[s]
             else:
-                qiddata[scaflist[nodes[i].name]]['s'] = nodes[i].end
-                qiddata[scaflist[nodes[i].name]]['l'] = nodes[i].length + qiddata[scaflist[nodes[i].name]]['l']
+                qiddata[q] = {'s': start,
+                              'e': end,
+                              'l': end - start + 10000
+                              }
+                q = reflength[rid][ks[s]]
+                start = ks[s]
+                end = ks[s]
+        qiddata[q] = {'s': start,
+                      'e': end,
+                      'l': end - start + 10000
+                      }
 
-        # get direction of the alingment of two scaffolds
         for qid in qiddata.keys():
             qiddata[qid]['d'] = refdir[rid][qid]
-        refdata[rid] = qiddata
+            refdata[rid] = qiddata
     return refdata
 
 
@@ -337,8 +728,10 @@ def scaf(args):
     qryid = np.unique(coords.bChr)
 
     # Get mapping data between scaffolds
-    refdata = getdata(reflength, refid, refdir)
-    qrydata = getdata(qrylength, qryid, qrydir)
+    # refdata = getdata(reflength, refid, refdir)
+    # qrydata = getdata(qrylength, qryid, qrydir)
+    refdata = getdata_withLRS(reflength, refid, refdir)
+    qrydata = getdata_withLRS(qrylength, qryid, qrydir)
     print('got data')
 
     # remove scaffolds (Y) from the list of matched scaffolds for scaffold (X) if

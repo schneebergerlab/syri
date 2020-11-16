@@ -135,6 +135,7 @@ def getTSV(cwdpath, prefix, ref):
         svdata = pd.read_table(cwdpath + prefix + "sv.txt", header=None)
         logger.debug("Number of SV annotations read from file: " + str(svdata.shape[0]))
         svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr']
+        svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
 
         entries = deque()
         count = 1
@@ -194,6 +195,7 @@ def getTSV(cwdpath, prefix, ref):
         isempty = False
         try:
             notal = pd.read_table(cwdpath + prefix + "notAligned.txt", header=None)
+            notal[3] = notal[3].astype('str')
         except pd.errors.EmptyDataError as e:
             isempty = True
             logger.debug("NOTAL file is empty")
