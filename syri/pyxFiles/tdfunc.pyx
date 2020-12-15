@@ -662,12 +662,13 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
 
     with Pool(processes=nCores) as pool:
         clusterSolutions = pool.map(partial(getBestClusterSubset,
-                                             transBlocksData=ctxBlocksData,
-                                             chromo='CTX',
-                                             bRT=bRT,
-                                             aGroups=aGroups,
-                                             bGroups=bGroups,
-                                             threshold=threshold), ctxCluster)
+                                            transBlocksData=ctxBlocksData,
+                                            tdolp=tdolp,
+                                            chromo='CTX',
+                                            bRT=bRT,
+                                            aGroups=aGroups,
+                                            bGroups=bGroups,
+                                            threshold=threshold), ctxCluster)
 
     clusterSolutionBlocks = [i[1] for i in clusterSolutions if i != None]
 
