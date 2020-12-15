@@ -60,13 +60,13 @@ cpdef inline getOverlapWithSynBlocks(np.ndarray[np.int_t, ndim=1] start, np.ndar
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef inline getmeblocks(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold, long[:] aUni, long[:] bUni, long[:] status, long[:] aIndex, long[:] bIndex, aGroups, bGroups, long[:] clstrsize):
+cpdef inline getmeblocks(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold, long[:] aUni, long[:] bUni, long[:] status, long[:] aIndex, long[:] bIndex, aGroups, bGroups, long[:] clstrsize, float tdolp):
     # Function take the coordinates and cluster information of all translocated blocks and identifies mutually exclusive
     #  blocks (candidates with which a given candidate cannot co-exist) by comparing the coordinates of each block to the coordinates of the member blocks in its cluster
     logger = logging.getLogger("getmeblocks")
     cdef np.ndarray[np.int_t, ndim=1] members, temp
     cdef np.ndarray[np.npy_bool, ndim=1, cast=True] meb, meb_a, meb_b, rem = np.zeros(len(astart), dtype="bool")
-
+    cdef int overlap
     cdef np.int_t i, j, index
     meblock = {}            ## for blocks which are overlapping with inplace blocks
     melist = {}             ## for blocks which are not overlapping with inplace blocks
@@ -85,52 +85,60 @@ cpdef inline getmeblocks(long[:] astart, long[:] aend, long[:] bstart, long[:] b
             meb = np.zeros(len(members), dtype="bool")              ## vector of mutually exclusive block
             for index in range(len(members)):
                 j = members[index]
-                if bend[j] < bstart[i]:
-                    continue
-                if bstart[j] > bend[i]:
-                    break
+                if bend[j] < bstart[i]: continue
+                if bstart[j] > bend[i]: break
+                if j==i: continue
                 if bstart[j] - threshold < bstart[i] and bend[j] + threshold > bend[i]:
-                    if j!=i:
-                        meb[index]=True
+                    meb[index]=True
+                    continue
+                overlap = min(bend[i], bend[j]) - max(bstart[i], bstart[j])
+                if overlap/(bend[i] - bstart[i]) > tdolp:
+                    meb[index]=True
             meblock[i] = np.array(members[meb], dtype="uint32")
         elif not bUni[i]:
             members = aGroups[aIndex[i]]
             meb = np.zeros(len(members), dtype="bool")               ## vector of mutually exclusive block
             for index in range(len(members)):
                 j = members[index]
-                if aend[j] < astart[i]:
-                    continue
-                if astart[j] > aend[i]:
-                    break
+                if aend[j] < astart[i]: continue
+                if astart[j] > aend[i]: break
+                if j==i: continue
                 if astart[j] - threshold < astart[i] and aend[j]+threshold > aend[i]:
-                    if j!=i:
-                        meb[index] = True
+                    meb[index] = True
+                    continue
+                overlap = min(aend[i], aend[j]) - max(astart[i], astart[j])
+                if overlap/(aend[i] - astart[i]) > tdolp:
+                    meb[index] = True
             meblock[i] = np.array(members[meb], dtype="uint32")
         else:
             members = aGroups[aIndex[i]]
             meb_a = np.zeros(len(members), dtype="bool")             ## vector of mutually exclusive block on A genome
             for index in range(len(members)):
                 j = members[index]
-                if aend[j] < astart[i]:
-                    continue
-                if astart[j] > aend[i]:
-                    break
+                if aend[j] < astart[i]: continue
+                if astart[j] > aend[i]: break
+                if j==i: continue
                 if astart[j] - threshold < astart[i] and aend[j]+threshold > aend[i]:
-                    if j!=i:
-                        meb_a[index] = True
+                    meb_a[index] = True
+                    continue
+                overlap = min(aend[i], aend[j]) - max(astart[i], astart[j])
+                if overlap/(aend[i] - astart[i]) > tdolp:
+                    meb_a[index] = True
             temp = members[meb_a]
 
             members = bGroups[bIndex[i]]
             meb_b = np.zeros(len(members), dtype="bool")             ## vector of mutually exclusive block on B genome
             for index in range(len(members)):
                 j = members[index]
-                if bend[j] < bstart[i]:
-                    continue
-                if bstart[j] > bend[i]:
-                    break
+                if bend[j] < bstart[i]: continue
+                if bstart[j] > bend[i]: break
+                if j==i: continue
                 if bstart[j] - threshold < bstart[i] and bend[j] + threshold > bend[i]:
-                    if j!=i:
-                        meb_b[index] = True
+                    meb_b[index] = True
+                    continue
+                overlap = min(bend[i], bend[j]) - max(bstart[i], bstart[j])
+                if overlap/(bend[i] - bstart[i]) > tdolp:
+                    meb_b[index] = True
             melist[i] = (np.array(temp, dtype="uint32"), np.array(members[meb_b], dtype="uint32"))
     return rem, meblock, melist
 

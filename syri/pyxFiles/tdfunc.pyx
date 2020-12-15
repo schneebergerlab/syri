@@ -102,57 +102,66 @@ class transGroups:
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline getmeblocks2(unsigned long[:] ast, unsigned long[:] aen, unsigned long[:] bst, unsigned long[:] ben, cpp_vec[long] amem, cpp_vec[long] bmem, int i, int threshold, int meclass):
+cdef inline getmeblocks2(unsigned long[:] ast, unsigned long[:] aen, unsigned long[:] bst, unsigned long[:] ben, cpp_vec[long] amem, cpp_vec[long] bmem, int i, int threshold, int meclass, float tdolp):
     cdef:
         unsigned short int[:]                   meb, meb_a, meb_b
         Py_ssize_t                              index
         long                                    j
+        int                                     overlap
     if meclass == 1:
         meb = np.zeros(bmem.size(), dtype=np.uint16)              ## vector of mutually exclusive block
         for index in range(<Py_ssize_t>bmem.size()):
             j = bmem[index]
-            if ben[j] < bst[i]:
-                continue
-            if bst[j] > ben[i]:
-                break
+            if ben[j] < bst[i]: continue
+            if bst[j] > ben[i]: break
+            if j==i: continue
             if bst[j] - threshold < bst[i] and ben[j] + threshold > ben[i]:
-                if j!=i:
-                    meb[index]=1
+                meb[index]=1
+                continue
+            overlap = min(ben[i], ben[j]) - max(bst[i], bst[j])
+            if overlap/(ben[i] - bst[i]) > tdolp:
+                meb[index]=1
         return np.array([bmem[index] for index in range(<Py_ssize_t>bmem.size()) if meb[index] == 1], np.uint)
     elif meclass == 2:
         meb = np.zeros(amem.size(), dtype=np.uint16)               ## vector of mutually exclusive block
         for index in range(<Py_ssize_t>amem.size()):
             j = amem[index]
-            if aen[j] < ast[i]:
-                continue
-            if ast[j] > aen[i]:
-                break
+            if aen[j] < ast[i]: continue
+            if ast[j] > aen[i]: break
+            if j==i: continue
             if ast[j] - threshold < ast[i] and aen[j]+threshold > aen[i]:
-                if j!=i:
-                    meb[index] = 1
+                meb[index]=1
+                continue
+            overlap = min(aen[i], aen[j]) - max(ast[i], ast[j])
+            if overlap/(aen[i] - ast[i]) > tdolp:
+                meb[index]=1
         return np.array([amem[index] for index in range(<Py_ssize_t>amem.size()) if meb[index] ==1], np.uint)
     elif meclass == 3:
         meb_a = np.zeros(amem.size(), dtype=np.uint16)             ## vector of mutually exclusive block on A genome
         for index in range(<Py_ssize_t>amem.size()):
             j = amem[index]
-            if aen[j] < ast[i]:
-                continue
-            if ast[j] > aen[i]:
-                break
+            if aen[j] < ast[i]: continue
+            if ast[j] > aen[i]: break
+            if j==i: continue
             if ast[j] - threshold < ast[i] and aen[j]+threshold > aen[i]:
-                if j!=i:
-                    meb_a[index] = 1
+                meb_a[index]=1
+                continue
+            overlap = min(aen[i], aen[j]) - max(ast[i], ast[j])
+            if overlap/(aen[i] - ast[i]) > tdolp:
+                meb_a[index]=1
 
         meb_b = np.zeros(bmem.size(), dtype=np.uint16)             ## vector of mutually exclusive block on B genome
         for index in range(<Py_ssize_t> bmem.size()):
             j = bmem[index]
-            if ben[j] < bst[i]:
-                continue
-            if bst[j] > ben[i]:
-                break
+            if ben[j] < bst[i]: continue
+            if bst[j] > ben[i]: break
+            if j==i: continue
             if bst[j] - threshold < bst[i] and ben[j] + threshold > ben[i]:
-                if j!=i:
-                    meb_b[index] = 1
+                meb_b[index]=1
+                continue
+            overlap = min(ben[i], ben[j]) - max(bst[i], bst[j])
+            if overlap/(ben[i] - bst[i]) > tdolp:
+                meb_b[index]=1
         return np.array([amem[index] for index in range(<Py_ssize_t>amem.size()) if meb_a[index]==1], np.uint), np.array([bmem[index] for index in range(<Py_ssize_t>bmem.size()) if meb_b[index] == 1], np.uint)
 
 
@@ -469,11 +478,11 @@ def readAnnoCoords(cwdPath, uniChromo, prefix):
     return(annoCoords)
 
 
-def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores, tdgl):
+def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores, tdgl, tdolp):
     logger = logging.getLogger("getCTX")
     logger.info("Identifying cross-chromosomal translocation and duplication for chromosome" + str(datetime.now()))
 
-    def getDupCTX(indices, allTransBlocksData, transClasses, astart, aend, bstart, bend, aindex, bindex, agroup, bgroup, threshold, meclass):
+    def getDupCTX(indices, allTransBlocksData, transClasses, astart, aend, bstart, bend, aindex, bindex, agroup, bgroup, threshold, meclass, tdolp):
         dupGenomes = {}
         for index in indices:
             if index in transClasses["translocation"] or index in transClasses["invTranslocation"]:
@@ -496,7 +505,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
             if meclass[index] != 3:
                 print('Error in dup class identification ', index)
                 continue
-            mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[index]],  bgroup[bindex[index]], index, threshold, meclass=3)
+            mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[index]],  bgroup[bindex[index]], index, threshold, meclass=3, tdolp=tdolp)
             for i in mealist:
                 if i in transClasses["translocation"] or i in transClasses["invTranslocation"]:
                     found = True
@@ -635,7 +644,8 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
                           bIndex,
                           aGroups,
                           bGroups,
-                          clstrsize)
+                          clstrsize,
+                          tdolp)
 
         for i in range(len(out[0])):
             if out[0][i]:
@@ -688,7 +698,8 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
                                    aGroups,
                                    bGroups,
                                    threshold,
-                                   meclass)
+                                   meclass,
+                                   tdolp)
 
     indices = sorted(unlist(list(transClasses.values())))
     keys = [key for index in indices for key in list(transClasses.keys()) if index in transClasses[key]]
@@ -705,7 +716,8 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
                            aGroups,
                            bGroups,
                            threshold,
-                           meclass)
+                           meclass,
+                           tdolp)
 
     fout = open(cwdPath+prefix+"ctxOut.txt","w")
     for index in indices:
@@ -1189,7 +1201,7 @@ def blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks, cpp_map[long, cpp_vec[long]] agroup, cpp_map[long, cpp_vec[long]] bgroup, int threshold):
+cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks, cpp_map[long, cpp_vec[long]] agroup, cpp_map[long, cpp_vec[long]] bgroup, int threshold, float tdolp):
     np.random.seed(1)
 
     cdef:
@@ -1263,11 +1275,10 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
             ## Check whether any of the remaining elements are mutually exclusive to the already selected candidates.
             ## Remove any such mutually exclusive element
                 for i in range(n):
-                    if tempcluster[i] == 0:
-                        continue
+                    if tempcluster[i] == 0: continue
                     ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
                     if meclass[i] == 1 or meclass[i] == 2:
-                        meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+                        meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i], tdolp)
                         for j in meto:
                             if outblocks[j] == 1:
                                 tempcluster[i] = 0
@@ -1277,7 +1288,7 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
                                 break
                     ## when the tempcluster element does not overlap with inplace blocks
                     elif meclass[i] == 3:
-                        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]],  bgroup[bindex[i]], i, threshold, meclass[i])
+                        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]],  bgroup[bindex[i]], i, threshold, meclass[i], tdolp)
                         ## remove candidate when at least ME candidate on both genomes has already been selected
                         for j in mealist:
                             if outblocks[j] == 1:
@@ -1295,11 +1306,10 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
                 changed = False
             ## For a given candidate, if all of its ME candidates have already been added to the skiplist, then that candidate will be selected as part of output
                 for i in range(n):
-                    if tempcluster[i] ==0:
-                        continue
+                    if tempcluster[i] ==0: continue
                     ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
                     if meclass[i] == 1 or meclass[i] == 2:
-                        meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+                        meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i], tdolp)
                         fnd = True
                         for j in meto:
                             if skiplist[j] == 0:
@@ -1312,7 +1322,7 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
                             changed = True
                     ## when the tempcluster element does not overlap with inplace blocks
                     elif meclass[i] == 3:
-                        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+                        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i], tdolp)
                         fnd = True
                         for j in mealist:
                             if skiplist[j]==0:
@@ -1335,7 +1345,9 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
             for i in range(n):
                 if tempcluster[i] == 1:
                     topblocks.append(i)
-            topblocks = sorted(list(topblocks), key = lambda x: transBlocksScore[x], reverse = True)[:20]
+
+            # As iterative sampling is not used, use a purely greedy-algorithm by selecting the top scoring transblock
+            topblocks = sorted(list(topblocks), key = lambda x: transBlocksScore[x], reverse = True)[:1]
             totalscore = sum(transBlocksScore[i] for i in topblocks)
             prob = [transBlocksScore[i]/totalscore for i in topblocks]
             i = int(np.random.choice(topblocks, size = 1, p = prob))
@@ -1347,7 +1359,7 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
 
             ## Remove ME candidates
             if meclass[i] == 1 or meclass[i] == 2:
-                meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+                meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i], tdolp)
                 for j in meto:
                     if tempcluster[j] == 1:
                         tempcluster[j] = 0
@@ -1355,7 +1367,7 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
                     skiplist[j] = 1
 
             elif meclass[i] == 3:
-                mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+                mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i], tdolp)
                 fnd = False
                 for j in mealist:
                     if outblocks[j] == 1:
@@ -1396,7 +1408,7 @@ cdef greedySubsetSelector2(long[:] cluster, transBlocksData, long[:] seedBlocks,
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] seedBlocks, cpp_map[long, cpp_vec[long]] agroup, cpp_map[long, cpp_vec[long]] bgroup, int threshold):
+cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] seedBlocks, cpp_map[long, cpp_vec[long]] agroup, cpp_map[long, cpp_vec[long]] bgroup, int threshold, float tdolp):
     np.random.seed(1)
     cdef:
         Py_ssize_t                                      i, j, k, l
@@ -1423,16 +1435,12 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
 
     garb = deque()
     for i in range(n):
-        if not transBlocksData[i].aUni and not transBlocksData[i].bUni:
-            garb.append(0)
-        elif transBlocksData[i].status == 1:
-            garb.append(0)
-        elif not transBlocksData[i].aUni:
-            garb.append(1)
-        elif not transBlocksData[i].bUni:
-            garb.append(2)
-        else:
-            garb.append(3)
+        if not transBlocksData[i].aUni and not transBlocksData[i].bUni: garb.append(0)
+        elif transBlocksData[i].status == 1:                            garb.append(0)
+        elif not transBlocksData[i].aUni:                               garb.append(1)
+        elif not transBlocksData[i].bUni:                               garb.append(2)
+        else:                                                           garb.append(3)
+
     meclass = np.array(list(garb), np.uint16)
     ntmp = 0
     tempcluster = np.zeros(n, dtype=np.uint16)
@@ -1453,8 +1461,7 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
 
     outblockindex = np.where(np.array(outblocks) == 1)[0]
     for i in range(n):
-        if tempcluster[i] == 0:
-            continue
+        if tempcluster[i] == 0: continue
         ## when the tempcluster element is overlapping with inplace blocks at one of the genomes
         if meclass[i] == 1:
             for j in outblockindex:
@@ -1533,12 +1540,13 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
             skipindexmap[i] = n
 
     while ntmp>0:
-        ## select one of the twenty highest scoring candidate randomly to break the deadlock
+        # select one of the twenty highest scoring candidate randomly to break the deadlock
         topblocks = deque()
         for i in range(n):
             if tempcluster[i] == 1:
                 topblocks.append(i)
-        topblocks = sorted(list(topblocks), key = lambda x: transBlocksScore[x], reverse = True)[:20]
+        # As iterative sampling is not used, use a purely greedy-algorithm by selecting the top scoring transblock
+        topblocks = sorted(list(topblocks), key = lambda x: transBlocksScore[x], reverse = True)[:1]
         totalscore = sum(transBlocksScore[i] for i in topblocks)
         prob = [transBlocksScore[i]/totalscore for i in topblocks]
         i = int(np.random.choice(topblocks, size = 1, p = prob))
@@ -1550,14 +1558,14 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
 
         ## Remove ME candidates
         if meclass[i] == 1 or meclass[i] == 2:
-            meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+            meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i], tdolp)
             for j in meto:
                 if tempcluster[j] == 1:
                     tempcluster[j] = 0
                     ntmp-=1
                 skiplist[j] = 1
         elif meclass[i] == 3:
-            mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i])
+            mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[i]], bgroup[bindex[i]], i, threshold, meclass[i], tdolp)
             fnd = False
             for j in mealist:
                 if outblocks[j] == 1:
@@ -1835,17 +1843,17 @@ cdef greedySubsetSelector(cluster, transBlocksData, seedblocks, iterCount = 100)
     return(bestScore, bestComb)
 
 
-def getBestClusterSubset(cluster, transBlocksData, bRT, chromo='', aGroups=None, bGroups=None, threshold=None):
+def getBestClusterSubset(cluster, transBlocksData, bRT, tdolp, chromo='', aGroups=None, bGroups=None, threshold=None):
     logger = logging.getLogger('tdcluster'+chromo)
     if len(cluster) == 0:
         return
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
     if len(cluster) > 100000:
         logger.info('Large (>100000 candidates) TD cluster (with '+ str(len(cluster)) +' candidate TDs) identified. Using low-memory high-runtime approach. Iterative sampling disabled. Using less stringent progressive elimination.')
-        output = greedySubsetSelectorHeuristic(np.array(cluster, np.int), transBlocksData, np.array(seedBlocks, np.int), aGroups, bGroups, threshold)
+        output = greedySubsetSelectorHeuristic(np.array(cluster, np.int), transBlocksData, np.array(seedBlocks, np.int), aGroups, bGroups, threshold, tdolp)
     elif len(cluster) > 10000:
         logger.info('Large (>10000 candidates) TD cluster (with '+ str(len(cluster)) +' candidate TDs) identified. Using low-memory high-runtime approach. Iterative sampling disabled.')
-        output = greedySubsetSelector2(np.array(cluster, np.int), transBlocksData, np.array(seedBlocks, np.int), aGroups, bGroups, threshold)
+        output = greedySubsetSelector2(np.array(cluster, np.int), transBlocksData, np.array(seedBlocks, np.int), aGroups, bGroups, threshold, tdolp)
     elif len(cluster) < 50:
         output = bruteSubsetSelector(cluster, transBlocksData, seedBlocks, bRT)
         if output == "Failed":
@@ -1855,7 +1863,7 @@ def getBestClusterSubset(cluster, transBlocksData, bRT, chromo='', aGroups=None,
     return output
 
 
-def getTransClasses(clusterSolutionBlocks, transData, transagroups, transbgroups, astart, aend, bstart, bend, aindex, bindex, agroup, bgroup, threshold, meclass):
+def getTransClasses(clusterSolutionBlocks, transData, transagroups, transbgroups, astart, aend, bstart, bend, aindex, bindex, agroup, bgroup, threshold, meclass, float tdolp):
     logger = logging.getLogger('gettransclasses')
     def settl(j):
         if transData[j].dir == 1:
@@ -1925,13 +1933,13 @@ def getTransClasses(clusterSolutionBlocks, transData, transagroups, transbgroups
                         settl(j)
                 else:
                     if meclass[j] == 1 or meclass[j] == 2:
-                        meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[j]], bgroup[bindex[j]], j, threshold, meclass[j])
+                        meto = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[j]], bgroup[bindex[j]], j, threshold, meclass[j], tdolp)
                         if len(np.intersect1d(meto, i)) > 0:
                             setdup(j)
                         else:
                             settl(j)
                     elif meclass[j] == 3:
-                        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[j]],  bgroup[bindex[j]], j, threshold, meclass[j])
+                        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[j]],  bgroup[bindex[j]], j, threshold, meclass[j], tdolp)
                         if len(np.intersect1d(mealist, i)) > 0 or len(np.intersect1d(meblist, i)) > 0:
                             setdup(j)
                         else:
@@ -1942,7 +1950,7 @@ def getTransClasses(clusterSolutionBlocks, transData, transagroups, transbgroups
 
 
 
-def getDupGenome(dupData, allTransBlocksData, transClasses, astart, aend, bstart, bend, aindex, bindex, agroup, bgroup, threshold, meclass):
+def getDupGenome(dupData, allTransBlocksData, transClasses, astart, aend, bstart, bend, aindex, bindex, agroup, bgroup, threshold, meclass, tdolp):
     dupGenomes = []
     for row in dupData.itertuples(index = True):
         found = False
@@ -1962,7 +1970,7 @@ def getDupGenome(dupData, allTransBlocksData, transClasses, astart, aend, bstart
         if meclass[row.Index] != 3:
             print('Error in dup class identification ', row.Index)
             continue
-        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[row.Index]],  bgroup[bindex[row.Index]], row.Index, threshold, meclass=3)
+        mealist, meblist = getmeblocks2(astart, aend, bstart, bend, agroup[aindex[row.Index]],  bgroup[bindex[row.Index]], row.Index, threshold, meclass=3, tdolp=tdolp)
         for i in mealist:
             if i in transClasses["translocation"] or i in transClasses["invTranslocation"]:
                 found = True

@@ -35,9 +35,10 @@ if __name__ == "__main__":
     srargs = parser.add_argument_group("SR identification")
     srargs.add_argument("--nosr", dest="nosr", help="Set to skip structural rearrangement identification", action="store_true", default=False)
     srargs.add_argument("--tdgaplen", dest="tdgl", help="Maximum allowed gap-length between two alignments of a multi-alignment translocation or duplication (TD). Larger values increases TD identification sensitivity but also runtime.", type=int, default=500000)
+    srargs.add_argument("--tdmaxolp", dest="tdolp", help="Maximum allowed overlap between two translocations. Value should be in range (0,1].", type=float, default=0.8)
     srargs.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
     srargs.add_argument("--unic", dest="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type=int, default=1000)
-    srargs.add_argument("--unip", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would selection of translocation which are more overlapped with \
+    srargs.add_argument("--unip", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would allow selection of TDs which are more overlapped with \
      other regions.", type=float, default=0.5)
     srargs.add_argument("--inc", dest="increaseBy", help="Minimum score increase required to add another alignment to translocation cluster solution", type=int, default=1000)
     srargs.add_argument("--no-chrmatch", dest='chrmatch', help="Do not allow SyRI to automatically match chromosome ids between the two genomes if they are not equal", default=False, action='store_true')
@@ -114,6 +115,12 @@ if __name__ == "__main__":
         logger.warning('A low value for --tdgaplen is provided (' + str(args.tdgl) + '). TDs might be missed.')
     elif args.tdgl > 10000000:
         logger.warning('A high value for --tdgaplen is provided (' + str(args.tdgl) + '). TDs identification may take a lot of time.')
+
+    # Check TDOLP flag
+
+    if args.tdolp <= 0 or args.tdolp > 1:
+        logger.error('--tdmaxolp Value should be in range (0,1].')
+        sys.exit()
 
     ###################################################################
     # Check python and pandas version. Add other checks later if required!!

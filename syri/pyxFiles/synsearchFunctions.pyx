@@ -443,6 +443,7 @@ def startSyri(args, coords):
     tUC = args.TransUniCount
     tUP = args.TransUniPercent
     tdgl = args.tdgl
+    tdolp = args.tdolp
 
     logger = logging.getLogger("syri")
     logger.info("starting")
@@ -453,21 +454,21 @@ def startSyri(args, coords):
     # Identify intra-chromosomal events (synteny, inversions, intra-trans, intra-dup) for each chromosome as a separate
     # process in parallel
     with Pool(processes = nCores) as pool:
-        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, tdgl=tdgl), uniChromo)
+        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, tdgl=tdgl, tdolp=tdolp), uniChromo)
 
     # Merge output of all chromosomes
     mergeOutputFiles(uniChromo,cwdPath, prefix)
 
     #Identify cross-chromosomal events in all chromosomes simultaneously
     from syri.tdfunc import getCTX
-    getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores, tdgl)
+    getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores, tdgl, tdolp)
 
     # Recalculate syntenic blocks by considering the blocks introduced by CX events
     outSyn(cwdPath, threshold, prefix)
     return 'Finished'
 
 
-def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
+def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl, tdolp):
     logger = logging.getLogger("syri."+chromo)
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
     logger.info(chromo+" " + str(coordsData.shape))
@@ -633,7 +634,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
                           bIndex,
                           aGroups,
                           bGroups,
-                          clstrsize)
+                          clstrsize,
+                          tdolp)
 
         for i in range(len(out[0])):
             if out[0][i]:
@@ -654,9 +656,9 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
     for i in range(len(allTransCluster)):
         if len(allTransCluster[i]) > 0:
             if len(allTransCluster[i]) > 10000:
-                clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT, chromo, aGroups, bGroups, threshold))
+                clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT, tdolp, chromo, aGroups, bGroups, threshold))
             else:
-                clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT, chromo))
+                clusterSolutions.append(getBestClusterSubset(allTransCluster[i], allTransBlocksData, bRT, tdolp, chromo))
 
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
     #clusterBlocks = unlist(clusterSolutionBlocks)
@@ -677,9 +679,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
             garb.append(3)
     meclass = np.array(list(garb), np.uint16)
 
-
-    # transClasses = getTransClasses(clusterSolutionBlocks, allTransBlocksData, allTransGenomeAGroups, allTransGenomeBGroups)
-
     transClasses = getTransClasses(clusterSolutionBlocks,
                                    allTransBlocksData,
                                    allTransGenomeAGroups,
@@ -693,7 +692,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
                                    aGroups,
                                    bGroups,
                                    threshold,
-                                   meclass)
+                                   meclass,
+                                   tdolp)
     dupData = allTransBlocks.iloc[transClasses["duplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
     invDupData = allTransBlocks.iloc[transClasses["invDuplication"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
     TLData = allTransBlocks.iloc[transClasses["translocation"]].sort_values(by = ["aStart","aEnd","bStart","bEnd"])
@@ -711,7 +711,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
                            aGroups,
                            bGroups,
                            threshold,
-                           meclass)
+                           meclass,
+                           tdolp)
     invDupData = getDupGenome(invDupData,
                               allTransBlocksData,
                               transClasses,
@@ -724,7 +725,8 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl):
                               aGroups,
                               bGroups,
                               threshold,
-                              meclass)
+                              meclass,
+                              tdolp)
 
 
     fout = open(cwdPath+prefix+chromo+"_invOut.txt","w")
