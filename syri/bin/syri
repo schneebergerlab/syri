@@ -169,6 +169,15 @@ if __name__ == "__main__":
     
     coords, chrlink = readCoords(args.infile.name, args.chrmatch, args.dir, args.prefix, args, args.cigar)
     achrs = np.unique(coords.aChr).tolist()
+    bchrs = np.unique(coords.bChr).tolist()
+    for chrid in achrs + bchrs:
+        try:
+            i = int(chrid)
+            logger.error('Numerical chromosome id: {} found in alignments. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(chrid))
+            sys.exit()
+        except ValueError as e:
+            pass
+
     achr_size = {}
     bchr_size = {}
     for achr in achrs:
@@ -180,13 +189,19 @@ if __name__ == "__main__":
     if args.ref is not None:
         for fasta in parse(args.ref.name, 'fasta', generic_dna):
             if fasta.id in achrs:
+                try:
+                    i = int(fasta.id)
+                    logger.error('Numerical chromosome id found: {} in reference genome. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(chrid))
+                    sys.exit()
+                except ValueError as e:
+                    pass
                 key_found = key_found + [fasta.id]
                 if len(fasta.seq) < achr_size[fasta.id]:
                     logger.error('Length of reference sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                     sys.exit()
         for achr in achrs:
             if achr not in key_found:
-                logger.error('Chromosome ID ' + achr + ' is available in alignments but not in reference genome fasta. Exiting.')
+                logger.error('Chromosome ID ' + achr + ' is present in alignments but not in reference genome fasta. Exiting.')
                 sys.exit()
     
     key_found = []
@@ -194,17 +209,29 @@ if __name__ == "__main__":
         if len(chrlink) > 0:
             for fasta in parse(args.qry.name, 'fasta', generic_dna):
                 if fasta.id in list(chrlink.keys()):
+                    try:
+                        i = int(fasta.id)
+                        logger.error('Numerical chromosome id found: {} in query genome. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(chrid))
+                        sys.exit()
+                    except ValueError as e:
+                        pass
                     key_found = key_found + [fasta.id]
                     if len(fasta.seq) < bchr_size[chrlink[fasta.id]]:
                         logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                         sys.exit()
             for bchr in list(chrlink.keys()):
                 if bchr not in key_found:
-                    logger.error('Chromosome ID ' + bchr + ' is available in alignments but not in query genome fasta. Exiting.')
+                    logger.error('Chromosome ID ' + bchr + ' is present in alignments but not in query genome fasta. Exiting.')
                     sys.exit()
         else:
             for fasta in parse(args.qry.name, 'fasta', generic_dna):
                 if fasta.id in list(bchr_size.keys()):
+                    try:
+                        i = int(fasta.id)
+                        logger.error('Numerical chromosome id found: {} in query genome. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(chrid))
+                        sys.exit()
+                    except ValueError as e:
+                        pass
                     key_found = key_found + [fasta.id]
                     if len(fasta.seq) < bchr_size[fasta.id]:
                         logger.error('Length of query sequence of ' + fasta.id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
