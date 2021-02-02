@@ -179,7 +179,8 @@ def getshv(args, coords, chrlink):
             fname = "snps.txt"
         with open(cwdpath + prefix + fname, "w") as fout:
             p = Popen([sspath + " -HrTS " + delta], stdin=PIPE, stdout=fout, stderr=PIPE, shell=True)
-            out = p.communicate(input=allAlignments.iloc[:][["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].to_string(index=False, header=False).encode())
+            out = p.communicate(input=b'\n'.join([' '.join(allAlignments.iloc[i][["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].astype('str').tolist()).encode() for i in range(allAlignments.shape[0])]))
+            # out = p.communicate(input=allAlignments.iloc[:][["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr"]].to_string(index=False, header=False).encode())
 
         if out[1] != b'':
             logger.error('Error in finding SNPs using show-snps: ' + out[1].decode())
