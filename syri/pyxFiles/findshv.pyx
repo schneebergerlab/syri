@@ -151,7 +151,7 @@ def getshv(args, coords, chrlink):
         global chrsnps                          # Use global variable to save SNPs divided based on chromosomes. Using global variable, saves memory when classifying snps/indels using parallel processing
 
         allAlignments = readSRData(cwdpath, prefix, args.all)
-        mapit = 0
+        mapit = 0conda i
         if os.path.isfile(cwdpath+prefix+"mapids.txt"):
             mapit = 1
             chroms = {}

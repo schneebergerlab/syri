@@ -304,6 +304,21 @@ def subsequence_to_indices(sub, ref):
         char_pos += ref[i].length
     return char_indices
 
+# try:
+  # from longestrunsubsequence import lrs
+# except ImportError:
+  # print("longestrunsubsequence package is not installed. Using local copy for lrs function. If the program takes too much memory or run-time, then install longestrunsubsequence package and try again.")
+  # def lrs(r, verbosity=0):
+      # '''
+      # We use the algorithm and implementation developed by Gunnar Klau's lab and presented
+      # in Sven et al https://drops.dagstuhl.de/opus/volltexte/2020/12795/
+      # '''
+      # # r = string_to_run(s)
+      # # Create r manually so that alphabet is not restricted to english characters and can use numbers.
+      # # Would need to create a
+      # sol = reduce_concat(r, lrs_dp, verbosity)
+      # result = subsequence_to_indices(sub=sol.subsequences[0], ref=r)
+      # return result
 
 def lrs(r, verbosity=0):
     '''
@@ -316,157 +331,6 @@ def lrs(r, verbosity=0):
     sol = reduce_concat(r, lrs_dp, verbosity)
     result = subsequence_to_indices(sub=sol.subsequences[0], ref=r)
     return result
-
-
-# def getdata(reflength, refid, refdir):
-#     # Each node corresponds to a continuous genomic region aligning to a scaffold
-#     class node:
-#         def __init__(self, id, name, pos):
-#             self.id = id
-#             self.name = name
-#             self.children = deque()
-#             self.start = pos
-#             self.end = pos
-#             self.length = -1
-#
-#     def getpath(nodes, added=[], i=0, last=-1):
-#         if i in fnd.keys():
-#             if ",".join(map(str, added)) in fnd[i]:
-#                 return fnd[i][",".join(map(str, added))]
-#
-#         if i == 0:
-#             added = [nodes[i].name]
-#             path = [i]
-#             last = nodes[i].name
-#             bp = []
-#             bpscore = -1
-#             for j in nodes[i].children:
-#                 tmppath = getpath(nodes, added, j, last)
-#                 tmpscore = sum([nodes[n].length for n in tmppath])
-#                 # if len(tmppath) > len(bp):
-#                 if tmpscore > bpscore:
-#                     bp = tmppath
-#                     bpscore = tmpscore
-#             return path+bp
-#
-#         if nodes[i].name != last and nodes[i].name in added:
-#             return []
-#         path = [i]
-#         if len(nodes[i].children) == 0:
-#             # fnd[i][",".join(map(str, added))] = path
-#             return path
-#         elif len(nodes[i].children) == 1:
-#             if nodes[i].name == last:
-#                 path = path + getpath(nodes, added, nodes[i].children[0], last)
-#                 # fnd[i][",".join(map(str, added))] = path
-#                 return path
-#             else:
-#                 path = path + getpath(nodes, added + [nodes[i].name], nodes[i].children[0], nodes[i].name)
-#                 # fnd[i][",".join(map(str, added))] = path
-#                 return path
-#         else:
-#             bp = []
-#             bpscore = -1
-#             for j in nodes[i].children:
-#                 if nodes[i].name == last:
-#                     tmppath = getpath(nodes, added, j, last)
-#                 else:
-#                     tmppath = getpath(nodes, added + [nodes[i].name], j, nodes[i].name)
-#                 tmpscore = sum([nodes[n].length for n in tmppath])
-#                 # if len(tmppath) > len(bp):
-#                 if tmpscore > bpscore:
-#                     bp = tmppath
-#                     bpscore = tmpscore
-#             # if nodes[i].name == last:
-#             fnd[i][",".join(map(str, added))] = path + bp
-#             return path+bp
-#
-#
-#     refdata = {}
-#     # For each scaffold in genome A find the list of aligning scaffolds in genome B
-#     for rid in refid:
-#         # print(rid)
-#         qiddata = {}
-#         fnd = defaultdict(dict)
-#
-#         # Use sliding window (size: 5) for ref scaffolds larger than 50 units, scaffolds which are not major alignment in any window are removed.
-#         # print("Sliding Window")
-#         if len(reflength[rid]) > 50:
-#             wsize = 5
-#             scaflist = []
-#             for i in range(0, len(reflength[rid]) - wsize + 1):
-#                 qids = deque()
-#                 for j in range(i, i+5):
-#                     try:
-#                         qids.append(reflength[rid][j*10000])
-#                     except KeyError:
-#                         pass
-#                 qids = Counter(qids)
-#                 for k, v in qids.items():
-#                     if v >= 3:
-#                         scaflist.append(k)
-#             scaflist = list(np.unique(scaflist))
-#             if len(scaflist) == 0:
-#                 print('Error: For contig ', rid, ' no matching contig was found. This could be a result of incorrect assembly or extensive repeats or ', rid, ' could be a novel region. Pseudo-genome cannot be generated. Try removing this contig.')
-#                 sys.exit()
-#         else:
-#             scaflist = list(np.unique(list(reflength[rid].values())))
-#
-#         # print("node generation")
-#         a2 = np.array([[k, scaflist.index(v)] for k, v in reflength[rid].items() if v in scaflist])
-#         a2 = a2[a2[:, 0].argsort()]
-#
-#         pos = a2[:, 0]
-#         ids = [-1] + list(a2[:, 1]) + [-2]
-#         unid = list(np.unique(ids))
-#
-#         # Create graph (nodes are regions and edges imply co-existence)
-#         nodes = [node(0, ids[0], -1)]
-#         for i in range(1, len(ids) - 1):
-#             if ids[i] == nodes[-1].name:
-#                 nodes[-1].end = pos[i-1]
-#             else:
-#                 nodes.append(node(i, ids[i], pos[i-1]))
-#         nodes.append(node(i+1, ids[-1], -2))
-#
-#         for n in nodes[1:-1]:
-#             n.length = n.end - n.start + 10000
-#
-#         for i in range(len(nodes)):
-#             tunid = unid.copy()
-#             for j in range(i+1, len(nodes)):
-#                 if len(tunid) == 0:
-#                     break
-#                 if nodes[j].name not in tunid:
-#                     continue
-#                 nodes[i].children.append(j)
-#
-#                 ## If a child node aligns to a large region (here > 100000bp), then that scaffold is considered to be fixed
-#                 if nodes[j].length >= 100000:                    ## Heuristic approach used to limit number of children a node can have
-#                     break                                       ## This is requried cause otherwise the number of possible combinations grows to large for low contiguity assemblies
-#
-#                 if nodes[i].name == nodes[j].name:
-#                     break
-#                 tunid.remove(nodes[j].name)
-#
-#         # Get list of nodes corresponding longest mapping
-#         # print("number of nodes", len(nodes))
-#         path = getpath(nodes)
-#         # print('finished getting path')
-#         for i in path[1:-1]:
-#             if scaflist[nodes[i].name] not in qiddata:
-#                 qiddata[scaflist[nodes[i].name]] = {'s': nodes[i].start,
-#                                                     'e': nodes[i].end,
-#                                                     'l': nodes[i].length}
-#             else:
-#                 qiddata[scaflist[nodes[i].name]]['e'] = nodes[i].end
-#                 qiddata[scaflist[nodes[i].name]]['l'] = nodes[i].length + qiddata[scaflist[nodes[i].name]]['l']
-#
-#         # get direction of the alingment of two scaffolds
-#         for qid in qiddata.keys():
-#             qiddata[qid]['d'] = refdir[rid][qid]
-#         refdata[rid] = qiddata
-#     return refdata
 
 
 def getdata_withLRS(reflength, refid, refdir):
