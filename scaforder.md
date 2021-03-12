@@ -12,7 +12,7 @@ When both assemblies are at scaffold-level, `chroder` groups scaffolds (from one
 </p>
 
 ```
-usage: chroder [-h] [-n NCOUNT] [-o OUT] [-noref] coords ref qry
+usage: chroder [-h] [-n NCOUNT] [-o OUT] [-noref] [-F {T,S,B}] coords ref qry
 
 positional arguments:
   coords      Alignment coordinates in a tsv format
@@ -21,9 +21,11 @@ positional arguments:
 
 optional arguments:
   -h, --help  show this help message and exit
-  -n NCOUNT   number of N's to be inserted
-  -o OUT      output file prefix
+  -n NCOUNT   number of N's to be inserted (default: 500)
+  -o OUT      output file prefix (default: out)
   -noref      Use this parameter when no assembly is at chromosome level
+              (default: False)
+  -F {T,S,B}  Input coords type. T: Table, S: SAM, B: BAM (default: T)
 ```
 
 This method is highly heuristic and should not be considered as an alternative to a dedicated scaffolding program. Further, generating homology based pseudo-chromosome will result in higher false negatives as some of the structural rearrangements between assemblies will be removed during pseudo-chromosome generation.
