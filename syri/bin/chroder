@@ -304,21 +304,6 @@ def subsequence_to_indices(sub, ref):
         char_pos += ref[i].length
     return char_indices
 
-# try:
-  # from longestrunsubsequence import lrs
-# except ImportError:
-  # print("longestrunsubsequence package is not installed. Using local copy for lrs function. If the program takes too much memory or run-time, then install longestrunsubsequence package and try again.")
-  # def lrs(r, verbosity=0):
-      # '''
-      # We use the algorithm and implementation developed by Gunnar Klau's lab and presented
-      # in Sven et al https://drops.dagstuhl.de/opus/volltexte/2020/12795/
-      # '''
-      # # r = string_to_run(s)
-      # # Create r manually so that alphabet is not restricted to english characters and can use numbers.
-      # # Would need to create a
-      # sol = reduce_concat(r, lrs_dp, verbosity)
-      # result = subsequence_to_indices(sub=sol.subsequences[0], ref=r)
-      # return result
 
 def lrs(r, verbosity=0):
     '''
