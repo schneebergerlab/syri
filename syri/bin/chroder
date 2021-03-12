@@ -10,315 +10,339 @@ import argparse
 from collections import defaultdict, namedtuple
 from itertools import product
 import sys
-
-Run = namedtuple("Run", ["char", "length"])
-Solution = namedtuple("Solution", ["size", "subsequences"])
+from warnings import warn
 
 
-def get_selected_runs(sub, ref):
-    '''
-    Returns the positions in ref, which are covered by the subsequence sub.
-    Returns None if sub is not a subsequence of ref
-    '''
-    indices = []
-    sub_pos = 0
-    for ref_pos in range(len(ref)):
-        if sub_pos >= len(sub):
-            break
-        if ref[ref_pos] == sub[sub_pos]:
-            indices.append(ref_pos)
-            sub_pos += 1
-    if sub_pos < len(sub):
-        return None
-    else:
-        return indices
+try:
+    from longestrunsubsequence import lrs
+except ImportError:
+    warn('longestrunsubsequence package was not found.\n'
+         'Using local copy of lrs function.\n'
+         'For improved performance of chroder, download the latest longestrunsubsequence package using:\n'
+         'conda install -c bioconda longestrunsubsequence')
 
+    Run = namedtuple("Run", ["char", "length"])
+    Solution = namedtuple("Solution", ["size", "subsequences"])
 
-def char_in_subalphabet(f, c_idx):
-    t = 2**c_idx
-    return (f % (2*t)) >= t
-
-
-def add_char_to_subalphabet(f, c_idx):
-    t = 2**c_idx
-    if (f % (2*t)) >= t:
-        return f
-    else:
-        return f + t
-
-
-def lrs_dp(s):
-    # create alphabet with reverse index
-    sigma = sorted(list(set([run.char for run in s])))
-    char_idx = dict()
-    for i, char in enumerate(sigma):
-        char_idx[char] = i
-
-    # compute predecessor for each char and for each run
-    pred = [[0 for _ in sigma] for i in range(len(s)+1)]
-    for pos in range(1, len(s)+1):
-        for prev in range(pos-1, 0, -1):
-            pred[pos][char_idx[s[prev-1].char]] = max(pred[pos][char_idx[s[prev-1].char]], prev)
-
-    # initialize dp table (and backtracking table)
-    D = [defaultdict(lambda : -float("inf")) for _ in range(len(s)+1)]
-    B = [defaultdict(lambda : -float("inf")) for _ in range(len(s)+1)]
-    D[0][0] = 0
-    B[0][0] = (-1, 0)
-
-    max_entry = (0, 0)
-    max_sol = 0
-
-    # iterate column-wise
-    for col in range(1, len(s)+1):
-
-        # iterate over all characters
-        for char in sigma:
-            c_idx = char_idx[char]
-            c_idx_s = char_idx[s[col-1].char]
-            pr = pred[col][c_idx]
-
-            # case 1: char is same character as is current column -> extend previous solutions
-            if c_idx == c_idx_s and pr > 0:
-                for subalphabet in D[pr]:
-                    if D[pr][subalphabet] + s[col-1].length > D[col][subalphabet]:
-                        D[col][subalphabet] = D[pr][subalphabet] + s[col-1].length
-                        B[col][subalphabet] = (pr, subalphabet)
-
-            # case 2: char is another character -> extend only solutions, which did not contain char yet
-            else:
-                for subalphabet in D[pr]:
-                    if not char_in_subalphabet(subalphabet, c_idx_s):
-                        new_subalphabet = add_char_to_subalphabet(subalphabet, c_idx_s)
-                        if D[pr][subalphabet] + s[col-1].length > D[col][new_subalphabet]:
-                            D[col][new_subalphabet] = D[pr][subalphabet] + s[col-1].length
-                            B[col][new_subalphabet] = (pr, subalphabet)
-
-        # register new best solution
-        for subalphabet in sorted(D[col]):
-            if D[col][subalphabet] > max_sol:
-                max_sol = D[col][subalphabet]
-                max_entry = (col, subalphabet)
-
-    # backtracking
-    sol = []
-    while max_entry[0] > 0:
-        sol.append(s[max_entry[0]-1])
-        max_entry = B[max_entry[0]][max_entry[1]]
-
-    sol = sol[::-1]
-
-    return Solution(sum([run.length for run in sol]), [sol])
-
-
-def get_first_and_last_occurences(s):
-    '''
-    Returns two dictionaries, which for each character in s contain the first and last run index (respectively) of its occurences
-    '''
-    first_occ = dict()
-    last_occ = dict()
-    for i, run in enumerate(s):
-        if run.char not in first_occ:
-            first_occ[run.char] = i
-            last_occ[run.char] = i
-        last_occ[run.char] = i
-    return first_occ, last_occ
-
-
-def reduce_concat(s, solver, verbosity=0):
-    '''
-    Input: List of Runs
-    Output: Solution
-    '''
-    sigma = list(set([run.char for run in s]))
-    intervals = []
-    partial_solutions = []
-
-    # find first and last occurence for each character
-    first_occ, last_occ = get_first_and_last_occurences(s)
-
-    # take first run and extend it to the left, until a secluded prefix is found
-    pos = 0
-    current_end = 0
-    while pos < len(s):
-        # invariant: all positions before current_end (exclusive) have been processed
-        current_start = current_end
-        current_end = last_occ[s[current_start].char]+1
-        pos = current_start+1
-        while pos < current_end:
-            # invariant: all runs before pos (exclusive) have been used to extend the interval
-            current_end = max(current_end, last_occ[s[pos].char]+1)
-            pos += 1
-
-        # use nested reduction rule on complete interval
-        intervals.append((current_start, current_end))
-        partial_solutions.append(reduce_nested(s[current_start:current_end], solver, verbosity))
-
-    # concatenate solutions
-    size = sum([sol.size for sol in partial_solutions])
-    partial_subs = [sol.subsequences for sol in partial_solutions]
-    subsequences = []
-    for comb in product(*partial_subs):
-        subsequences.append([subseq for sublist in comb for subseq in sublist])
-
-    return Solution(size, subsequences)
-
-
-def reduce_nested(s, solver, verbosity=0):
-    '''
-    Input: List of Runs
-    Output: Solution
-    '''
-    sigma = list(set([run.char for run in s]))
-
-    # find first and last occurence for each character
-    first_occ, last_occ = get_first_and_last_occurences(s)
-
-    checked_chars = set()
-    independent = []
-
-    # idea: check for each character, whether it is part of a nested interval
-    # 1. start with the characters borders as candidate interval
-    # 2. for every other character inside the current interval, extend the borders
-    # 3. proceed, until interval contains all occurences of any character inside
-
-    # process wider spread chars first to avoid "nested" independent intervals
-    sigma.sort(key=lambda char: last_occ[char] - first_occ[char], reverse=True)
-
-    for char in sigma:
-        if char in checked_chars:
-            continue
-
-        # initialize the candidate interval with first and last occurence of examined char
-        left_bound = first_occ[char]
-        right_bound = last_occ[char]+1 # right_bound is exclusive
-        chars_in_interval = set([char])
-
-        # these pointers indicate up to which position (from left_bound) we already read
-        left = left_bound - 1
-        right = left_bound + 1
-
-        # if both pointers reached the bounds, the interval is closed
-        # the borders itself must be characters we have already seen, so no check
-        while left > left_bound or right < right_bound - 1:
-            if right < right_bound - 1:
-                c = s[right].char
-                chars_in_interval.add(c)
-                left_bound = min(left_bound, first_occ[c])
-                right_bound = max(right_bound, last_occ[c]+1)
-                right += 1
-            else:
-                c = s[left].char
-                chars_in_interval.add(c)
-                left_bound = min(left_bound, first_occ[c])
-                right_bound = max(right_bound, last_occ[c]+1)
-                left -= 1
-
-        # only create sub instance, if it is not the entire string
-        if left_bound > 0 or right_bound < len(s):
-            independent.append((left_bound, right_bound))
-            checked_chars.update(chars_in_interval)
-
-    # if no intervals found, solve entire string
-    if len(independent) == 0:
-        return solver(s)
-
-    # sort independent intervals by position (they cannot overlap, so left bound is sufficient)
-    independent.sort(key=lambda interval: interval[0])
-
-    # contract adjacent independent intervals and run concat-rule on them again, if longer than one block
-    # save the solution and the bounds for every sub-instance solved
-    partial_solutions = []
-    intervals = []
-    left = independent[0][0]
-    right = independent[0][0]
-    for interval in independent:
-        if interval[0] == right:
-            # interval extends current sub-instance
-            right = interval[1]
+    def get_selected_runs(sub, ref):
+        '''
+        Returns the positions in ref, which are covered by the subsequence sub.
+        Returns None if sub is not a subsequence of ref
+        '''
+        indices = []
+        sub_pos = 0
+        for ref_pos in range(len(ref)):
+            if sub_pos >= len(sub):
+                break
+            if ref[ref_pos] == sub[sub_pos]:
+                indices.append(ref_pos)
+                sub_pos += 1
+        if sub_pos < len(sub):
+            return None
         else:
-            # interval does not extend current sub-instance. solve latter (if not singleton block) and open new sub-instance
-            if right - left >= 2:
-                intervals.append((left, right))
-                partial_solutions.append(reduce_concat(s[left:right], solver, verbosity))
-            left = interval[0]
-            right = interval[1]
+            return indices
 
-    # solve unclosed sub instance (if not singleton block)
-    if right - left >= 2:
-        intervals.append((left, right))
-        partial_solutions.append(reduce_concat(s[left:right], solver, verbosity))
 
-    # again, if no sub-instance was solved, we have to solve the entire string as one instance
-    if len(intervals) == 0:
-        return solver(s)
+    def char_in_subalphabet(f, c_idx):
+        t = 2**c_idx
+        return (f % (2*t)) >= t
 
-    # replace all sub-instance intervals with a single run of a new character. length = solution size of sub-instance
-    s0 = []
-    pos = 0
-    for i in range(len(intervals)):
-        s0 += s[pos:intervals[i][0]]
-        s0.append(Run('$'+str(i), partial_solutions[i].size))
-        pos = intervals[i][1]
-    s0 += s[pos:]
 
-    # solve modified instance
-    sol = solver(s)
+    def add_char_to_subalphabet(f, c_idx):
+        t = 2**c_idx
+        if (f % (2*t)) >= t:
+            return f
+        else:
+            return f + t
 
-    # for every solution in modified instance: replace any run of $-chars with all solutions of the respective sub-instance
-    final_subseqs = []
-    for seq in sol.subsequences:
-        # start with just the solution of the outer problem
-        expanded_solutions = [seq]
-        for i in range(len(intervals)):
-            # replace the placeholder block for every solution in expanded_solutions with every sub-instance solution
-            expanded_expanded_solutions = []
-            for expanded_solution in expanded_solutions:
-                # find index of placeholder block if existent
-                idx = -1
-                for j, run in enumerate(expanded_solution):
-                    if run.char == '$'+str(i):
-                        idx = j
-                        break
-                if idx >= 0:
-                    for subsol in partial_solutions[i].subsequences:
-                        expanded_expanded_solutions.append(expanded_solution[:idx]+subsol+expanded_solution[idx+1:])
+
+    def lrs_dp(s):
+        # create alphabet with reverse index
+        sigma = sorted(list(set([run.char for run in s])))
+        char_idx = dict()
+        for i, char in enumerate(sigma):
+            char_idx[char] = i
+
+        # compute predecessor for each char and for each run
+        pred = [[0 for _ in sigma] for i in range(len(s)+1)]
+        for pos in range(1, len(s)+1):
+            for prev in range(pos-1, 0, -1):
+                pred[pos][char_idx[s[prev-1].char]] = max(pred[pos][char_idx[s[prev-1].char]], prev)
+
+        # initialize dp table (and backtracking table)
+        D = [defaultdict(lambda : -float("inf")) for _ in range(len(s)+1)]
+        B = [defaultdict(lambda : -float("inf")) for _ in range(len(s)+1)]
+        D[0][0] = 0
+        B[0][0] = (-1, 0)
+
+        max_entry = (0, 0)
+        max_sol = 0
+
+        # iterate column-wise
+        for col in range(1, len(s)+1):
+
+            # iterate over all characters
+            for char in sigma:
+                c_idx = char_idx[char]
+                c_idx_s = char_idx[s[col-1].char]
+                pr = pred[col][c_idx]
+
+                # case 1: char is same character as is current column -> extend previous solutions
+                if c_idx == c_idx_s and pr > 0:
+                    for subalphabet in D[pr]:
+                        if D[pr][subalphabet] + s[col-1].length > D[col][subalphabet]:
+                            D[col][subalphabet] = D[pr][subalphabet] + s[col-1].length
+                            B[col][subalphabet] = (pr, subalphabet)
+
+                # case 2: char is another character -> extend only solutions, which did not contain char yet
                 else:
-                    expanded_expanded_solutions.append(expanded_solution)
+                    for subalphabet in D[pr]:
+                        if not char_in_subalphabet(subalphabet, c_idx_s):
+                            new_subalphabet = add_char_to_subalphabet(subalphabet, c_idx_s)
+                            if D[pr][subalphabet] + s[col-1].length > D[col][new_subalphabet]:
+                                D[col][new_subalphabet] = D[pr][subalphabet] + s[col-1].length
+                                B[col][new_subalphabet] = (pr, subalphabet)
 
-            # continue next iteration with the now extended solutions
-            expanded_solutions = expanded_expanded_solutions
-        final_subseqs += expanded_solutions
-    return Solution(sol.size, final_subseqs)
+            # register new best solution
+            for subalphabet in sorted(D[col]):
+                if D[col][subalphabet] > max_sol:
+                    max_sol = D[col][subalphabet]
+                    max_entry = (col, subalphabet)
 
+        # backtracking
+        sol = []
+        while max_entry[0] > 0:
+            sol.append(s[max_entry[0]-1])
+            max_entry = B[max_entry[0]][max_entry[1]]
 
-def subsequence_to_indices(sub, ref):
-    indices = get_selected_runs(sub, ref)
-    char_indices = []
-    char_pos = 0
-    if indices is None:
-        return None
-    for i in range(len(ref)):
-        if i in indices:
-            char_indices += list(range(char_pos, char_pos+ref[i].length))
-        char_pos += ref[i].length
-    return char_indices
+        sol = sol[::-1]
 
-
-def lrs(r, verbosity=0):
-    '''
-    We use the algorithm and implementation developed by Gunnar Klau's lab and presented
-    in Sven et al https://drops.dagstuhl.de/opus/volltexte/2020/12795/
-    '''
-    # r = string_to_run(s)
-    # Create r manually so that alphabet is not restricted to english characters and can use numbers.
-    # Would need to create a
-    sol = reduce_concat(r, lrs_dp, verbosity)
-    result = subsequence_to_indices(sub=sol.subsequences[0], ref=r)
-    return result
+        return Solution(sum([run.length for run in sol]), [sol])
 
 
-def getdata_withLRS(reflength, refid, refdir):
+    def get_first_and_last_occurences(s):
+        '''
+        Returns two dictionaries, which for each character in s contain the first and last run index (respectively) of its occurences
+        '''
+        first_occ = dict()
+        last_occ = dict()
+        for i, run in enumerate(s):
+            if run.char not in first_occ:
+                first_occ[run.char] = i
+                last_occ[run.char] = i
+            last_occ[run.char] = i
+        return first_occ, last_occ
+
+
+    def reduce_concat(s, solver, verbosity=0):
+        '''
+        Input: List of Runs
+        Output: Solution
+        '''
+        sigma = list(set([run.char for run in s]))
+        intervals = []
+        partial_solutions = []
+
+        # find first and last occurence for each character
+        first_occ, last_occ = get_first_and_last_occurences(s)
+
+        # take first run and extend it to the left, until a secluded prefix is found
+        pos = 0
+        current_end = 0
+        while pos < len(s):
+            # invariant: all positions before current_end (exclusive) have been processed
+            current_start = current_end
+            current_end = last_occ[s[current_start].char]+1
+            pos = current_start+1
+            while pos < current_end:
+                # invariant: all runs before pos (exclusive) have been used to extend the interval
+                current_end = max(current_end, last_occ[s[pos].char]+1)
+                pos += 1
+
+            # use nested reduction rule on complete interval
+            intervals.append((current_start, current_end))
+            partial_solutions.append(reduce_nested(s[current_start:current_end], solver, verbosity))
+
+        # concatenate solutions
+        size = sum([sol.size for sol in partial_solutions])
+        partial_subs = [sol.subsequences for sol in partial_solutions]
+        subsequences = []
+        for comb in product(*partial_subs):
+            subsequences.append([subseq for sublist in comb for subseq in sublist])
+
+        return Solution(size, subsequences)
+
+
+    def reduce_nested(s, solver, verbosity=0):
+        '''
+        Input: List of Runs
+        Output: Solution
+        '''
+        sigma = list(set([run.char for run in s]))
+
+        # find first and last occurence for each character
+        first_occ, last_occ = get_first_and_last_occurences(s)
+
+        checked_chars = set()
+        independent = []
+
+        # idea: check for each character, whether it is part of a nested interval
+        # 1. start with the characters borders as candidate interval
+        # 2. for every other character inside the current interval, extend the borders
+        # 3. proceed, until interval contains all occurences of any character inside
+
+        # process wider spread chars first to avoid "nested" independent intervals
+        sigma.sort(key=lambda char: last_occ[char] - first_occ[char], reverse=True)
+
+        for char in sigma:
+            if char in checked_chars:
+                continue
+
+            # initialize the candidate interval with first and last occurence of examined char
+            left_bound = first_occ[char]
+            right_bound = last_occ[char]+1 # right_bound is exclusive
+            chars_in_interval = set([char])
+
+            # these pointers indicate up to which position (from left_bound) we already read
+            left = left_bound - 1
+            right = left_bound + 1
+
+            # if both pointers reached the bounds, the interval is closed
+            # the borders itself must be characters we have already seen, so no check
+            while left > left_bound or right < right_bound - 1:
+                if right < right_bound - 1:
+                    c = s[right].char
+                    chars_in_interval.add(c)
+                    left_bound = min(left_bound, first_occ[c])
+                    right_bound = max(right_bound, last_occ[c]+1)
+                    right += 1
+                else:
+                    c = s[left].char
+                    chars_in_interval.add(c)
+                    left_bound = min(left_bound, first_occ[c])
+                    right_bound = max(right_bound, last_occ[c]+1)
+                    left -= 1
+
+            # only create sub instance, if it is not the entire string
+            if left_bound > 0 or right_bound < len(s):
+                independent.append((left_bound, right_bound))
+                checked_chars.update(chars_in_interval)
+
+        # if no intervals found, solve entire string
+        if len(independent) == 0:
+            return solver(s)
+
+        # sort independent intervals by position (they cannot overlap, so left bound is sufficient)
+        independent.sort(key=lambda interval: interval[0])
+
+        # contract adjacent independent intervals and run concat-rule on them again, if longer than one block
+        # save the solution and the bounds for every sub-instance solved
+        partial_solutions = []
+        intervals = []
+        left = independent[0][0]
+        right = independent[0][0]
+        for interval in independent:
+            if interval[0] == right:
+                # interval extends current sub-instance
+                right = interval[1]
+            else:
+                # interval does not extend current sub-instance. solve latter (if not singleton block) and open new sub-instance
+                if right - left >= 2:
+                    intervals.append((left, right))
+                    partial_solutions.append(reduce_concat(s[left:right], solver, verbosity))
+                left = interval[0]
+                right = interval[1]
+
+        # solve unclosed sub instance (if not singleton block)
+        if right - left >= 2:
+            intervals.append((left, right))
+            partial_solutions.append(reduce_concat(s[left:right], solver, verbosity))
+
+        # again, if no sub-instance was solved, we have to solve the entire string as one instance
+        if len(intervals) == 0:
+            return solver(s)
+
+        # replace all sub-instance intervals with a single run of a new character. length = solution size of sub-instance
+        s0 = []
+        pos = 0
+        for i in range(len(intervals)):
+            s0 += s[pos:intervals[i][0]]
+            s0.append(Run('$'+str(i), partial_solutions[i].size))
+            pos = intervals[i][1]
+        s0 += s[pos:]
+
+        # solve modified instance
+        sol = solver(s)
+
+        # for every solution in modified instance: replace any run of $-chars with all solutions of the respective sub-instance
+        final_subseqs = []
+        for seq in sol.subsequences:
+            # start with just the solution of the outer problem
+            expanded_solutions = [seq]
+            for i in range(len(intervals)):
+                # replace the placeholder block for every solution in expanded_solutions with every sub-instance solution
+                expanded_expanded_solutions = []
+                for expanded_solution in expanded_solutions:
+                    # find index of placeholder block if existent
+                    idx = -1
+                    for j, run in enumerate(expanded_solution):
+                        if run.char == '$'+str(i):
+                            idx = j
+                            break
+                    if idx >= 0:
+                        for subsol in partial_solutions[i].subsequences:
+                            expanded_expanded_solutions.append(expanded_solution[:idx]+subsol+expanded_solution[idx+1:])
+                    else:
+                        expanded_expanded_solutions.append(expanded_solution)
+
+                # continue next iteration with the now extended solutions
+                expanded_solutions = expanded_expanded_solutions
+            final_subseqs += expanded_solutions
+        return Solution(sol.size, final_subseqs)
+
+
+    def subsequence_to_indices(sub, ref):
+        indices = get_selected_runs(sub, ref)
+        char_indices = []
+        char_pos = 0
+        if indices is None:
+            return None
+        for i in range(len(ref)):
+            if i in indices:
+                char_indices += list(range(char_pos, char_pos+ref[i].length))
+            char_pos += ref[i].length
+        return char_indices
+
+
+    def string_to_run(s):
+        if len(s) == 0:
+            return []
+        runs = []
+        char = s[0]
+        length = 1
+        for i in range(1, len(s)):
+            if s[i] == char:
+                length += 1
+            else:
+                runs.append(Run(char, length))
+                char = s[i]
+                length = 1
+        runs.append(Run(char, length))
+        return runs
+
+
+    def lrs(s, verbosity=0):
+        '''
+        We use the algorithm and implementation developed by Gunnar Klau's lab and presented
+        in Sven et al https://drops.dagstuhl.de/opus/volltexte/2020/12795/
+        '''
+        r = string_to_run(s)
+        sol = reduce_concat(r, lrs_dp, verbosity)
+        result = subsequence_to_indices(sub=sol.subsequences[0], ref=r)
+        return result
+
+
+def getdata(reflength, refid, refdir):
     refdata = {}
     # For each scaffold in genome A find the list of aligning scaffolds in genome B
     for rid in refid:
@@ -360,19 +384,11 @@ def getdata_withLRS(reflength, refid, refdir):
                 qlist.append(qind[reflength[rid][k]])
         ks = list(ks)
         qlist = list(qlist)
-
-        r = []
-        char = qlist[0]
-        length = 1
-        for i in qlist[1:]:
-            if i == char:
-                length += 1
-            else:
-                r.append(Run(str(char), length))
-                char = i
-                length = 1
-        r.append(Run(char, length))
-        selected = lrs(r)
+        try:
+            selected = lrs(qlist)
+        except Exception as e:
+            raise Exception('Error in running lrs: {}'.format(e))
+            sys.exit()
 
         q = reflength[rid][ks[selected[0]]]
         start = ks[selected[0]]
@@ -476,11 +492,11 @@ def remove_multialign(refdata, qrydata, noref):
                     try:
                         refdata[rid].pop(qid)
                     except KeyError:
-                            pass
+                        pass
                     try:
                         qrydata[qid].pop(rid)
                     except KeyError:
-                            pass
+                        pass
 
     empty = [i for i in refdata.keys() if len(refdata[i]) == 0]
     for i in empty:
@@ -581,11 +597,8 @@ def scaf(args):
     qryid = np.unique(coords.bChr)
 
     # Get mapping data between scaffolds
-    # refdata = getdata(reflength, refid, refdir)
-    # qrydata = getdata(qrylength, qryid, qrydir)
-    refdata = getdata_withLRS(reflength, refid, refdir)
-    qrydata = getdata_withLRS(qrylength, qryid, qrydir)
-    print('got data')
+    refdata = getdata(reflength, refid, refdir)
+    qrydata = getdata(qrylength, qryid, qrydir)
 
     # remove scaffolds (Y) from the list of matched scaffolds for scaffold (X) if
     # X is not in the list of matched scaffolds for Y.
@@ -643,8 +656,6 @@ def scaf(args):
     fout = open(out + ".anno", 'w')
     size = 60
     for chr in chrs:
-        print(chr)
-        # print(chr)
         loci = {}
         count = 0
         rqids = {}
@@ -843,8 +854,8 @@ def scaf(args):
                     continue
 
         if any([len(Counter(Counter(i[0]).values())) > 1 or len(Counter(Counter(i[0]).values())) > 1 for i in paths]):
-            print(paths)
-            print(chr)
+            # print(paths)
+            # print(chr)
             continue
 
         if len(paths) == 0:
