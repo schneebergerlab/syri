@@ -11,6 +11,9 @@ All these packages are available through anaconda and can be installed using:
 conda install cython numpy scipy pandas=0.23.4 biopython psutil matplotlib=3.0.0
 conda install -c conda-forge python-igraph
 conda install -c bioconda pysam
+
+# Additionally, if using chroder
+conda install -c bioconda longestrunsubsequence 
 ```
 
 ### Whole genome aligner 

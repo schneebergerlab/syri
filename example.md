@@ -31,16 +31,16 @@ SyRI takes genome alignments coordinates as input. Additionally, fasta files for
 The usage and parameters are:
 
 ```
-usage: syri [-h] -c INFILE [-r REF] [-q QRY] [-d DELTA] [-F {T,S,B}] [-o FOUT]
-            [-k] [--log {DEBUG,INFO,WARN}] [--lf LOG_FIN] [--dir DIR]
-            [--prefix PREFIX] [--seed SEED] [--nc NCORES] [--novcf] [--nosr]
-            [-b BRUTERUNTIME] [--unic TRANSUNICOUNT] [--unip TRANSUNIPERCENT]
-            [--inc INCREASEBY] [--no-chrmatch] [--nosv] [--nosnp] [--all]
-            [--allow-offset OFFSET] [--cigar] [-s SSPATH]
+usage: syri [-h] -c INFILE [-r REF] [-q QRY] [-d DELTA] [-F {T,S,B}] [-k]
+            [--log {DEBUG,INFO,WARN}] [--lf LOG_FIN] [--dir DIR]
+            [--prefix PREFIX] [--seed SEED] [--nc NCORES] [--novcf] [-f]
+            [--nosr] [--tdgaplen TDGL] [--tdmaxolp TDOLP] [-b BRUTERUNTIME]
+            [--unic TRANSUNICOUNT] [--unip TRANSUNIPERCENT] [--inc INCREASEBY]
+            [--no-chrmatch] [--nosv] [--nosnp] [--all] [--allow-offset OFFSET]
+            [--cigar] [-s SSPATH]
 
 Input Files:
-  -c INFILE             File containing alignment coordinates in a tsv format
-                        (default: None)
+  -c INFILE             File containing alignment coordinates (default: None)
   -r REF                Genome A (which is considered as reference for the
                         alignments). Required for local variation (large
                         indels, CNVs) identification. (default: None)
@@ -54,8 +54,7 @@ Input Files:
 optional arguments:
   -h, --help            show this help message and exit
   -F {T,S,B}            Input file type. T: Table, S: SAM, B: BAM (default: T)
-  -o FOUT               Output file name (default: syri)
-  -k                    Keep internediate output files (default: False)
+  -k                    Keep intermediate output files (default: False)
   --log {DEBUG,INFO,WARN}
                         log level (default: INFO)
   --lf LOG_FIN          Name of log file (default: syri.log)
@@ -67,10 +66,17 @@ optional arguments:
                         chromosomes) (default: 1)
   --novcf               Do not combine all files into one output file
                         (default: False)
+  -f                    Filter out low quality alignments (default: True)
 
 SR identification:
   --nosr                Set to skip structural rearrangement identification
                         (default: False)
+  --tdgaplen TDGL       Maximum allowed gap-length between two alignments of a
+                        multi-alignment translocation or duplication (TD).
+                        Larger values increases TD identification sensitivity
+                        but also runtime. (default: 500000)
+  --tdmaxolp TDOLP      Maximum allowed overlap between two translocations.
+                        Value should be in range (0,1]. (default: 0.8)
   -b BRUTERUNTIME       Cutoff to restrict brute force methods to take too
                         much time (in seconds). Smaller values would make
                         algorithm faster, but could have marginal effects on
@@ -83,7 +89,7 @@ SR identification:
   --unip TRANSUNIPERCENT
                         Percent of unique region requried to select
                         translocation. Value should be in range (0,1]. Smaller
-                        values would selection of translocation which are more
+                        values would allow selection of TDs which are more
                         overlapped with other regions. (default: 0.5)
   --inc INCREASEBY      Minimum score increase required to add another
                         alignment to translocation cluster solution (default:
