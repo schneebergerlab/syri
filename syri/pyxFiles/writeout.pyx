@@ -597,7 +597,7 @@ def getVCF(finname, foutname, cwdpath, prefix):
         for line in data.itertuples(index=False):
             pos = [line[0], line[1], line[8], 'N', '<' + line[10] + '>', '.', 'PASS']
 
-            if line[10] in ["SYN", "INV", "TRANS", "INVTR", "DUP", "INVDUP"]:
+            if line[10] in ["SYN", "INV", "TRANS", "INVTR", "DUP", "INVDP"]:
                 _info = ';'.join(['END='+line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=.', 'VarType='+'SR', 'DupType='+line[11]])
                 pos.append(_info)
                 fout.write('\t'.join(pos) + '\n')
@@ -609,7 +609,7 @@ def getVCF(finname, foutname, cwdpath, prefix):
                     pos.append(_info)
                     fout.write('\t'.join(pos) + '\n')
 
-            elif line[10] in ["SYNAL", "INVAL", "TRANSAL", "INVTRAL", "DUPAL", "INVDUPAL"]:
+            elif line[10] in ["SYNAL", "INVAL", "TRANSAL", "INVTRAL", "DUPAL", "INVDPAL"]:
                 _info = ';'.join(
                     ['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=.', 'DupType=.'])
                 pos.append(_info)
