@@ -96,7 +96,8 @@ if __name__ == '__main__':
         chrchange = np.where((np.array(df[0][1:]) == np.array(df[0][0:-1])) == False)[0] + 1
         for i in range(df.shape[0]):
             if i in chrchange:
-                groups.append(list(cg))
+                if len(cg) > 0:
+                    groups.append(list(cg))
                 cg = deque()
                 if issyn[i]:
                     cg.append(i)
@@ -105,7 +106,7 @@ if __name__ == '__main__':
             elif not issyn[i]:
                 if len(cg) > 0:
                     groups.append(list(cg))
-                    cg = deque()
+                cg = deque()
             else:
                 if len(cg) == 0:
                     cg.append(i)
@@ -116,12 +117,14 @@ if __name__ == '__main__':
                         ca = i
                         cb = i
                 else:
-                    groups.append(cg)
+                    if len(cg)>0:
+                        groups.append(list(cg))
                     cg = deque()
                     cg.append(i)
                     ca = i
                     cb = i
-        groups.append(cg)
+        if len(cg)>0:
+            groups.append(list(cg))
 
         newsyn = deque()
         for i in groups:
