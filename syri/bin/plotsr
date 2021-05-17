@@ -265,13 +265,13 @@ def readbed(path, V):
 
 def bezierpath(rs, re, qs, qe, ry, qy, V, col, alpha, label='', lw=0 ):
     # 4395  Chr4   1612606   2782625  Chr4   2891784   1739752  INV  1505  1505
-    # #
+    # 1612606, 2782625, 2891784, 1739752, rindent-offset, qindent-offset, V, col="black", alpha=alpha, lw=0.1
     # rs = 1612606
     # re = 2782625
     # qs = 2891784
     # qe = 1739752
-    # ry = 2
-    # qy = 1
+    # ry = 1
+    # qy = 2
 
 
     smid = (qs-rs)/2    # Start increment
@@ -292,12 +292,12 @@ def bezierpath(rs, re, qs, qe, ry, qy, V, col, alpha, label='', lw=0 ):
     else:
         verts = [(ry, rs),
                  (ry+hmid, rs),
-                 (ry+hmid, rs+2*hmid),
-                 (ry+2*hmid, rs+2*hmid),
+                 (ry+hmid, rs+2*smid),
+                 (ry+2*hmid, rs+2*smid),
                  (qy, qe),
                  (qy-hmid, qe),
-                 (qy-hmid, qe-2*hmid),
-                 (qy-2*hmid, qe-2*hmid),
+                 (qy-hmid, qe-2*emid),
+                 (qy-2*hmid, qe-2*emid),
                  (ry, rs),
                  ]
 
@@ -364,7 +364,7 @@ if __name__ == '__main__':
     R = args.R              # Create ribbons
     V = args.v              # Vertical chromosomes
     S = args.S              # Space between homologous chromosomes
-    B = args.B.name              # Annotation bed file
+    B = None if args.B is None else args.B.name              # Annotation bed file
 
     if S<0.1 or S>0.9:
         sys.exit('Out of range value for S. Please provide a value in the range 0.1-0.9')
@@ -430,8 +430,8 @@ if __name__ == '__main__':
 
     import matplotlib
     try:
-        # matplotlib.use(args.b)
-        matplotlib.use('Qt5Agg')
+        matplotlib.use(args.b)
+        # matplotlib.use('Qt5Agg')
     except:
         sys.exit('Matplotlib backend cannot be selected')
     from matplotlib import pyplot as plt
