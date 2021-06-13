@@ -3,6 +3,13 @@
 2. C/C++ compiler: g++
 
 ## Recent major updates:
+(13-06-2020)
+* SyRI V1.5 is now available. With this update, SyRI is now compatible with python3.8. You can download it using:
+` git clone --single-branch --branch V5  https://github.com/schneebergerlab/syri.git `
+* SyRI v1.4 (current major version for python3.5) will not be developed anymore (except for bug fixes) and all new features will be added in SyRI V1.5 onwards.
+* Currently, master branch still corresponds to SyRI V1.4, however, this will change after SyRI V1.5 is released.
+
+(14-05-2020)
 * Added a new method `plotsr` in `./syri/bin/` for plotting genomic structures (syntenic and structurally rearranged regions)
 * Optimised inversion identification improving worst-case performance by many folds.
  
