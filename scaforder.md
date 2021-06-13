@@ -16,8 +16,8 @@ usage: chroder [-h] [-n NCOUNT] [-o OUT] [-noref] [-F {T,S,B}] coords ref qry
 
 positional arguments:
   coords      Alignment coordinates in a tsv format
-  ref         Assembly of genome A in multi-fasta format
-  qry         Assembly of genome B in multi-fasta format
+  ref         Assembly of reference genome in multi-fasta format
+  qry         Assembly of query genome in multi-fasta format
 
 optional arguments:
   -h, --help  show this help message and exit

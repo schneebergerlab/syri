@@ -1,20 +1,20 @@
 ## File formats
 ### Input file format
-SyRI takes whole genome alignment coordinates in a TSV format with the following columns:
+Input whole genome alignment can be provided in SAM/BAM or in a TSV format. The columns of the TSV file are:
 
 |Column Number | Value   | Type |
 | ------------ | ---------- | ----------- |
-|1       | genome A start position (1-based, includes start position) | int        |
-|2       | genome A end position (1-based, includes end position) | int |
-|3       | genome B start position (1-based. Includes the start position.) | int |
-|4       | genome B end position (1-based. Includes the end position.)   |  int |
-|5       | alignment length on genome A  | int |
-|6       | alignment length on genome B    |    int |
+|1       | reference start position (1-based, includes start position) | int        |
+|2       | reference end position (1-based, includes end position) | int |
+|3       | query start position (1-based. Includes the start position.) | int |
+|4       | query end position (1-based. Includes the end position.)   |  int |
+|5       | alignment length in reference  | int |
+|6       | alignment length in query    |    int |
 |7       | alingment identity (in percent, 0-100)  | float |
-|8       | alignment direction in genome A  (always 1)  | int |
-|9       | alignment direction in genome B (1 for directed alignments, -1 for inverted alignments)       | int |
-|10      | chromosome ID in genome A     |         string |
-|11      | chromosome ID in genome B         |         string |
+|8       | alignment direction in reference  (always 1)  | int |
+|9       | alignment direction in query (1 for directed alignments, -1 for inverted alignments)       | int |
+|10      | chromosome ID in reference     |         string |
+|11      | chromosome ID in query         |         string |
 |12      | CIGAR string corresponding to the alignment (Optional; '=' for match, 'X' for mismatch, 'D' for deletion, 'I' for insertion)    |         string |
 
 
@@ -27,16 +27,16 @@ SyRI outputs results in TSV format and VCF file format.
 
 |Column Number | Value   | Type |
 | ------------ | ---------- | ----------- |
-|1       | chromosome ID in genome A     | string |
-|2       | genome A start position (1-based, includes start position) | int |
-|3       | genome A end position (1-based, includes end position) | int |
-|4       | Sequence in genome A (Only for SNPs and indels) | string |
-|5       | Sequence in genome B (Only for SNPs and indels) | string |
-|6       | chromosome ID in genome B     |         string |
-|7       | genome B start position (1-based, includes start position) | int |
-|8       | genome B end position (1-based, includes end position) | int |
-|9       | Unique ID  (annotation type + number)  | string |
-|10      | Parent ID  (annotation type + number)  | string |
+|1       | chromosome ID in reference     | string |
+|2       | reference start position (1-based, includes start position) | int |
+|3       | reference end position (1-based, includes end position) | int |
+|4       | sequence in reference (Only for SNPs and indels) | string |
+|5       | sequence in query (Only for SNPs and indels) | string |
+|6       | chromosome ID in query     |         string |
+|7       | query start position (1-based, includes start position) | int |
+|8       | query end position (1-based, includes end position) | int |
+|9       | unique ID  (annotation type + number)  | string |
+|10      | parent ID  (annotation type + number)  | string |
 |11      | Annotation type  | string |
 |12      | Copy status (for duplications)| string |
 
@@ -51,20 +51,20 @@ Here, annotation type can have the following meaning:
 | DUP | Duplicated region || DUPAL | Alignment in duplicated region |
 | INVDP | Inverted duplicated region || INVDPAL | Alignment in inverted duplicated region |
 | NOTAL | Un-aligned region || SNP | Single nucleotide polymorphism |
-| CPG | Copy gain in genome B || CPL | Copy loss in genome B |
+| CPG | Copy gain in query || CPL | Copy loss in query |
 | HDR | Highly diverged regions || TDM | Tandem repeat |
-| INS | Insertion in genome B || DEL | Deletion in genome B |
+| INS | Insertion in query || DEL | Deletion in query |
 
-Copy status describes whether the duplicated region in genome B (copygain, i.e. genome B has the extra copy) or in genome A (copyloss, i.e. genome A has the extra copy).
+Copy status describes whether the duplicated region is in query (copygain, i.e. query has the extra copy) or in reference (copyloss, i.e. reference has the extra copy).
 
-Parent ID corresponds to the unique ID of the annotated block (syntenic region or structural rearrangement) in which the alignment or the local variation exists. So, if there is a A->T SNP (with unique ID SNP1) in a translocated region (unique ID TRANS1) at position Chr1:10 on genome A and Chr2:542 on genome B then the corresponding entry would be:
+Parent ID corresponds to the unique ID of the annotated block (syntenic region or structural rearrangement) in which the alignment or the local variation exists. So, if there is a A->T SNP (with unique ID SNP1) in a translocated region (unique ID TRANS1) at position Chr1:10 on reference and Chr2:542 on query then the corresponding entry would be:
 
 ```
 Chr1  10  10  A T Chr2 542  542 SNP1  TRANS1  SNP -
 ```
 
 #### VCF format
-Above information is translated to VCF (v4.3) file format where genome A is considered as the reference genome. However, since VCF is based on reference genome position, we do not output un-aligned regions in genome B in VCF file, as it was not possible to write them in context of position in reference genome.
+Above information is translated to VCF (v4.3) file format. However, since VCF is based on reference genome position, we do not output un-aligned regions in query genome in VCF file, as it was not possible to write them in context of position in reference genome.
 
 
 <!--
