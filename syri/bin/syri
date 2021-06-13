@@ -128,19 +128,19 @@ if __name__ == "__main__":
 
     try:
         assert sys.version_info.major == 3
-        assert sys.version_info.minor == 5
+        assert sys.version_info.minor == 8
     except AssertionError:
-        logger.error('\nSyRI uses Python3.5. Currently using Python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'. Exiting')
+        logger.error('\nSyRI uses Python3.8. Currently using Python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'. Exiting')
         sys.exit()
     except KeyboardInterrupt:
         raise()
     except Exception as E:
         sys.exit(E)
 
-    from pandas import __version__ as pdversion
-    if pdversion != '0.23.4':
-        logger.warning('Using pandas version: ' + pdversion + '. Expected vesion: 0.23.4. This might result in unexpected errors.')
-    logger.debug('Python and Pandas version are ok')
+    # from pandas import __version__ as pdversion
+    # if pdversion != '0.23.4':
+    #     logger.warning('Using pandas version: ' + pdversion + '. Expected vesion: 0.23.4. This might result in unexpected errors.')
+    # logger.debug('Python and Pandas version are ok')
 
     ###################################################################
     # Check if input files are present
