@@ -11,7 +11,7 @@ from scipy.stats import *
 from datetime import datetime, date
 import pandas as pd
 import os
-from Bio.SeqIO import parse
+# from Bio.SeqIO import parse
 import logging
 
 np.random.seed(1)
@@ -104,9 +104,9 @@ def getsrtable(cwdpath, prefix):
 
 def extractseq(_gen, _pos):
     chrs = defaultdict(dict)
-    for fasta in parse(_gen, 'fasta'):
-        if fasta.id in _pos.keys():
-            chrs[fasta.id] = {_i:fasta.seq[_i-1] for _i in _pos[fasta.id]}
+    for id, seq in readfasta(_gen).items():
+        if id in _pos.keys():
+            chrs[id] = {_i:seq[_i-1] for _i in _pos[id]}
     return chrs
 
 

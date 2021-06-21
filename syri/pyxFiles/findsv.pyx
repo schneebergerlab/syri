@@ -14,7 +14,7 @@ from multiprocessing import Pool
 from functools import partial
 import os
 from gc import collect
-from Bio.SeqIO import parse
+# from Bio.SeqIO import parse
 import logging
 import psutil
 
@@ -447,8 +447,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
 def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
     logger = logging.getLogger("getNA")
 
-    refSize = {fasta.id: len(fasta.seq) for fasta in parse(ref,'fasta')}
-    qrySize = {fasta.id: len(fasta.seq) for fasta in parse(qry,'fasta')}
+    refSize = {id: len(seq) for id, seq in readfasta(ref).items()}
+    qrySize = {id: len(seq) for id, seq in readfasta(qry).items()}
+    # qrySize = {fasta.id: len(fasta.seq) for fasta in parse(qry,'fasta')}
 
     annoCoords = pd.DataFrame()
     for fileType in ["syn","inv", "TL", "invTL","dup", "invDup"]:

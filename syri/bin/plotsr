@@ -369,9 +369,11 @@ if __name__ == '__main__':
     if S<0.1 or S>0.9:
         sys.exit('Out of range value for S. Please provide a value in the range 0.1-0.9')
 
-    from Bio.SeqIO import parse
-    reflenghts = {i.id: len(i.seq) for i in parse(args.r.name, 'fasta')}
-    qrylenghts = {i.id: len(i.seq) for i in parse(args.q.name, 'fasta')}
+    # from Bio.SeqIO import parse
+    from syri.bin.func.myUsefulFunctions import readfasta
+    reflenghts = {id: len(seq) for id, seq in readfasta(args.r.name).items()}
+    qrylenghts = {id: len(seq) for id, seq in readfasta(args.q.name).items()}
+    # qrylenghts = {i.id: len(i.seq) for i in parse(args.q.name, 'fasta')}
 
     from collections import deque, OrderedDict
     syri_regs = deque()

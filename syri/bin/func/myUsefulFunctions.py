@@ -83,3 +83,67 @@ def mergeRanges(ranges):
             max_value = i[1]
     out_range.append([min_value, max_value])
     return np.array(out_range)
+
+
+def revcomp(seq):
+    assert type(seq) == str
+    old = 'ACGTRYKMBDHVacgtrykmbdhv'
+    rev = 'TGCAYRMKVHDBtgcayrmkvhdb'
+    tab = str.maketrans(old, rev)
+    return seq.translate(tab)[::-1]
+
+
+def readfasta(f):
+    from gzip import open as gzopen
+    from gzip import BadGzipFile
+    from collections import deque
+    import sys
+    out = {}
+    chrid = ''
+    chrseq = deque()
+
+    # Test if the file is Gzipped or not
+    with gzopen(f, 'rb') as fin:
+        try:
+            fin.read(1)
+            isgzip = True
+        except BadGzipFile:
+            isgzip = False
+
+    try:
+        if isgzip:
+            with gzopen(f, 'rb') as fin:
+                for line in fin:
+                    if b'>' in line:
+                        if chrid != '':
+                            out[chrid] = ''.join(chrseq)
+                            chrid = line.strip().split(b'>')[1].split(b' ')[0].decode()
+                            chrseq = deque()
+                        else:
+                            chrid = line.strip().split(b'>')[1].split(b' ')[0].decode()
+                        if chrid in out.keys():
+                            sys.exit(" Duplicate chromosome IDs are not accepted. Chromosome ID {} is duplicated. Provided chromosome with unique IDs".format(chrid))
+                    else:
+                        chrseq.append(line.strip().decode())
+        else:
+            with open(f, 'r') as fin:
+                for line in fin:
+                    if '>' in line:
+                        if chrid != '':
+                            out[chrid] = ''.join(chrseq)
+                            chrid = line.strip().split('>')[1].split(' ')[0]
+                            chrseq = deque()
+                        else:
+                            chrid = line.strip().split('>')[1].split(' ')[0]
+                        if chrid in out.keys():
+                            sys.exit(" Duplicate chromosome IDs are not accepted. Chromosome ID {} is duplicated. Provided chromosome with unique IDs".format(chrid))
+                    else:
+                        chrseq.append(line.strip())
+    except Exception as e:
+        raise Exception(e)
+
+    if chrid != '':
+        out[chrid] = ''.join(chrseq)
+    # TODO: add check for the validation of input fasta files
+    return out
+
