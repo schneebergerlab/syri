@@ -162,7 +162,8 @@ if __name__ == "__main__":
     ###################################################################
     # Read alignments and compare lengths with genome fasta
     ###################################################################
-    from syri.pyxFiles.synsearchFunctions import readCoords, readfasta
+    from syri.pyxFiles.synsearchFunctions import readCoords
+    from syri.bin.func.myUsefulFunctions import readfasta
     # from Bio.SeqIO import parse
     # from Bio.Alphabet import generic_dna
     import numpy as np

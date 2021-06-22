@@ -952,9 +952,9 @@ def scaf(args):
             fqry.write(spacer)
             spacer = nn
             if qdirs[qid] == 1:
-                fqry.write([seq for id, seq in readfasta(qryin) if ("qry"+id) == qid][0])
+                fqry.write([seq for id, seq in readfasta(qryin).items() if ("qry"+id) == qid][0])
             elif qdirs[qid] == -1:
-                fqry.write([revcomp(seq) for id, seq in readfasta(qryin) if ("qry"+id) == qid][0])
+                fqry.write([revcomp(seq) for id, seq in readfasta(qryin).items() if ("qry"+id) == qid][0])
         fqry.write("\n")
         if noref:
             fout.write(">Pseudochrom{}\n".format(chrid))

@@ -42,7 +42,7 @@ def readSRData(cwdPath, prefix, dup = False):
             fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object)
         except pd.errors.ParserError as _e:
             fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object, engine ="python")
-        except pd.io.common.EmptyDataError:
+        except pd.errors.EmptyDataError:
             print(fileType, " is empty. Skipping analysing it.")
             continue
         except Exception as _e:
@@ -73,7 +73,7 @@ def readSRData(cwdPath, prefix, dup = False):
         fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header = None, dtype = object)
     except pd.errors.ParserError as e:
         fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header=None, dtype = object, engine ="python")
-    except pd.io.common.EmptyDataError:
+    except pd.errors.EmptyDataError:
         print("ctxOut.txt is empty. Skipping analysing it.")
     except Exception as e:
         print("ERROR: while trying to read ", fileType, "Out.txt", e)
@@ -323,7 +323,7 @@ def getshv(args, coords, chrlink):
                                 sys.exit()
 
                         refseq = refg[row.aChr][(row.aStart-1):row.aEnd]
-                        qryseq = qryg[row.bChr][(row.bEnd-1):row.bStart].reverse_complement()
+                        qryseq = revcomp(qryg[row.bChr][(row.bEnd-1):row.bStart])
                     # with open('snps.txt', 'w') as fout:
                         posa = 0                    # number of bases covered in genome a
                         posb = 0                    # number of bases covered in genome b
