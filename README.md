@@ -1,5 +1,5 @@
 ## Pre-requisite:
-1. Python3.5 and the following packages: Cython, numpy, scipy, pandas (version: 0.23.4), python-igraph, biopython, psutil, pysam, and matplotlib
+1. Python3.5 and the following packages: Cython-0.29.23, numpy-1.20.2, scipy-1.6.2, pandas-1.2.4, python-igraph-0.9.1, psutil-5.8.0, pysam-0.16.0.1, and matplotlib-3.3.4
 2. C/C++ compiler: g++
 
 ## Recent major updates:
