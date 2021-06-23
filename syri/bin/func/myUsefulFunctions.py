@@ -5,7 +5,7 @@ Created on Mon Jun 19 15:36:01 2017
 """
 import operator as op
 from functools import reduce
-from Bio import SeqIO
+# from Bio import SeqIO
 from os import remove
 
 
@@ -39,12 +39,12 @@ def intersect(*lists):
     import numpy as np
     return reduce(np.intersect1d, list(lists))
 
-
-def extractSeq(filePath, seqID, start=0, end=-1):
-    querySeq = [fasta for fasta in SeqIO.parse(filePath, 'fasta') if fasta.id == seqID][0]
-    querySeq.seq = querySeq.seq[start:end+1]
-    SeqIO.write(querySeq, seqID+"_"+str(start)+"_"+str(end)+".fasta", "fasta")
-
+#
+# def extractSeq(filePath, seqID, start=0, end=-1):
+#     querySeq = [seq for id, seq in readfasta(filePath) if id == seqID][0]
+#     querySeq.seq = querySeq[start:end+1]
+#     writefasta(querySeq, seqID+"_"+str(start)+"_"+str(end)+".fasta")
+#
 
 def fileRemove(fName):
     try:
