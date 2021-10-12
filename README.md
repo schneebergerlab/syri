@@ -3,6 +3,9 @@
 2. C/C++ compiler: g++
 
 ## Recent major updates:
+(12-10-2021)
+* Issues in inversion detection: The recent releases of minimap2 (2.18-2.22) have some bug which results in inverted regions not getting aligned correctly. This issue is mostly fixed in the current master branch (HEAD node) of minimap2 repository. So, for accurate structural rearrangement identification with SyRI please use the latest version of minimap2.
+
 (13-06-2021)
 * SyRI V1.5 is now available. With this update, SyRI is now compatible with python3.8. You can download it using:
 ` git clone --single-branch --branch V5  https://github.com/schneebergerlab/syri.git `
