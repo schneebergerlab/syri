@@ -138,23 +138,26 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                 n = blocksAlign.iat[j, 3] - blocksAlign.iat[j + 1, 2] - 1
 
             if offset <= m <= 0:  ## No significant overlap of reference genome
-
                 if offset <= n <= 0:  ## No significant overlap in query genome
                     continue
-
                 elif n > 0:
+                    s = str(min(blocksAlign.iat[j, 1], blocksAlign.iat[j + 1, 0]))
                     if ordered:
                         fout.write("\t".join(["INS",
-                                              str(blocksAlign.iat[j, 1]),
-                                              str(blocksAlign.iat[j + 1, 0]),
+                                              # str(blocksAlign.iat[j, 1]),
+                                              # str(blocksAlign.iat[j + 1, 0]),
+                                              s,
+                                              s,
                                               str(blocksAlign.iat[j, 3] + 1),
                                               str(blocksAlign.iat[j + 1, 2] - 1),
                                               blocksAlign.iat[0, 5],
                                               blocksAlign.iat[0, 6]]) + "\n")
                     else:
                         fout.write("\t".join(["INS",
-                                              str(blocksAlign.iat[j, 1]),
-                                              str(blocksAlign.iat[j + 1, 0]),
+                                              # str(blocksAlign.iat[j, 1]),
+                                              # str(blocksAlign.iat[j + 1, 0]),
+                                              s,
+                                              s,
                                               str(blocksAlign.iat[j, 3] - 1),
                                               str(blocksAlign.iat[j + 1, 2] + 1),
                                               blocksAlign.iat[0, 5],
@@ -191,22 +194,27 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                                               blocksAlign.iat[0, 6]]) + "\n")
 
             elif m == 1:
-
                 if offset <= n <= 0:
                     if ordered:
+                        e = str(min(blocksAlign.iat[j, 3], blocksAlign.iat[j + 1, 2]))
                         fout.write("\t".join(["DEL",
                                               str(blocksAlign.iat[j, 1] + 1),
                                               str(blocksAlign.iat[j + 1, 0] - 1),
-                                              str(blocksAlign.iat[j, 3]),
-                                              str(blocksAlign.iat[j + 1, 2]),
+                                              # str(blocksAlign.iat[j, 3]),
+                                              # str(blocksAlign.iat[j + 1, 2]),
+                                              e,
+                                              e,
                                               blocksAlign.iat[0, 5],
                                               blocksAlign.iat[0, 6]]) + "\n")
                     else:
+                        e = str(max(blocksAlign.iat[j, 3], blocksAlign.iat[j + 1, 2]))
                         fout.write("\t".join(["DEL",
                                               str(blocksAlign.iat[j, 1] + 1),
                                               str(blocksAlign.iat[j + 1, 0] - 1),
-                                              str(blocksAlign.iat[j, 3]),
-                                              str(blocksAlign.iat[j + 1, 2]),
+                                              # str(blocksAlign.iat[j, 3]),
+                                              # str(blocksAlign.iat[j + 1, 2]),
+                                              e,
+                                              e,
                                               blocksAlign.iat[0, 5],
                                               blocksAlign.iat[0, 6]]) + "\n")
 
@@ -278,19 +286,25 @@ def getSV(cwdPath, allAlignments, prefix, offset):
             elif m > 1:
                 if offset <= n <= 0:
                     if ordered:
+                        e = str(min(blocksAlign.iat[j, 3], blocksAlign.iat[j + 1, 2]))
                         fout.write("\t".join(["DEL",
                                               str(blocksAlign.iat[j, 1] + 1),
                                               str(blocksAlign.iat[j + 1, 0] - 1),
-                                              str(blocksAlign.iat[j, 3]),
-                                              str(blocksAlign.iat[j + 1, 2]),
+                                              # str(blocksAlign.iat[j, 3]),
+                                              # str(blocksAlign.iat[j + 1, 2]),
+                                              e,
+                                              e,
                                               blocksAlign.iat[0, 5],
                                               blocksAlign.iat[0, 6]]) + "\n")
                     else:
+                        e = str(max(blocksAlign.iat[j, 3], blocksAlign.iat[j + 1, 2]))
                         fout.write("\t".join(["DEL",
                                               str(blocksAlign.iat[j, 1] + 1),
                                               str(blocksAlign.iat[j + 1, 0] - 1),
-                                              str(blocksAlign.iat[j, 3]),
-                                              str(blocksAlign.iat[j + 1, 2]),
+                                              # str(blocksAlign.iat[j, 3]),
+                                              # str(blocksAlign.iat[j + 1, 2]),
+                                              e,
+                                              e,
                                               blocksAlign.iat[0, 5],
                                               blocksAlign.iat[0, 6]]) + "\n")
                 elif n > 0:

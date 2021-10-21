@@ -243,7 +243,7 @@ if __name__ == "__main__":
                     logger.error('Chromosome ID ' + bchr + ' is available in alignments but not in query genome fasta. Exiting.')
                     sys.exit()
 
-    
+
     ###################################################################
     # Identify structural rearrangements
     ###################################################################
