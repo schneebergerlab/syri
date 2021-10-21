@@ -124,7 +124,7 @@ def getTSV(cwdpath, prefix, ref):
     logger.debug('Get SR anno')
     anno = getsrtable(cwdpath, prefix)
     logger.debug("Number of SR annotations: " + str(anno.shape[0]))
-
+    count = 1
     logger.debug('Get SV data')
     hasSV = True
     if not os.path.isfile(cwdpath + prefix + "sv.txt"):
@@ -138,7 +138,7 @@ def getTSV(cwdpath, prefix, ref):
         svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
 
         entries = deque()
-        count = 1
+
         for row in svdata.itertuples(index=False):
             if row.vartype == "#":
                 _parent = anno.loc[(anno.achr == row.achr) &
@@ -342,7 +342,8 @@ def getTSV(cwdpath, prefix, ref):
                         indel = 1 if line[1] == "." else -1
                         _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
                     elif indel == 1:
-                        if int(line[0]) != _as or line[1] != "." or line[10] != _ac or int(line[3])!=(_be+1):
+                        n = _be-1 if 'INV' in _parent else _be+1
+                        if int(line[0]) != _as or line[1] != "." or line[10] != _ac or int(line[3])!=n:
                             p_indel()
                             _seq = ""
                             count += 1
