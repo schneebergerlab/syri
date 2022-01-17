@@ -9,8 +9,6 @@ Created on Wed May 10 13:05:51 2017
 import argparse
 
 if __name__ == "__main__":
-
-    # print(sys.executable)
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     optional = parser._action_groups.pop()
     required = parser.add_argument_group("Input Files")
@@ -128,9 +126,9 @@ if __name__ == "__main__":
 
     try:
         assert sys.version_info.major == 3
-        assert sys.version_info.minor == 8
+        assert sys.version_info.minor >= 8
     except AssertionError:
-        logger.error('\nSyRI uses Python3.8. Currently using Python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'. Exiting')
+        logger.error('\nSyRI uses Python >=3.8. Currently using Python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'. Exiting')
         sys.exit()
     except KeyboardInterrupt:
         raise()
@@ -189,16 +187,16 @@ if __name__ == "__main__":
     key_found = []
     if args.ref is not None:
         # for fasta in parse(args.ref.name, 'fasta', generic_dna):
-        for id, seq in readfasta(args.ref.name).items():
-            if id in achrs:
+        for chrid, seq in readfasta(args.ref.name).items():
+            if chrid in achrs:
                 try:
-                    i = int(id)
-                    logger.error('Numerical chromosome id found: {} in reference genome. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(id))
+                    i = int(chrid)
+                    logger.error('Numerical chromosome id found: {} in reference genome. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(chrid))
                     sys.exit()
                 except ValueError as e:
                     pass
-                key_found = key_found + [id]
-                if len(seq) < achr_size[id]:
+                key_found = key_found + [chrid]
+                if len(seq) < achr_size[chrid]:
                     logger.error('Length of reference sequence of ' + id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                     sys.exit()
         for achr in achrs:
@@ -209,16 +207,16 @@ if __name__ == "__main__":
     key_found = []
     if args.qry is not None:
         if len(chrlink) > 0:
-            for id, seq in readfasta(args.qry.name).items():
-                if id in list(chrlink.keys()):
+            for chrid, seq in readfasta(args.qry.name).items():
+                if chrid in list(chrlink.keys()):
                     try:
-                        i = int(id)
-                        logger.error('Numerical chromosome id found: {} in query genome. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(id))
+                        i = int(chrid)
+                        logger.error('Numerical chromosome id found: {} in query genome. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(chrid))
                         sys.exit()
                     except ValueError as e:
                         pass
-                    key_found = key_found + [id]
-                    if len(seq) < bchr_size[chrlink[id]]:
+                    key_found = key_found + [chrid]
+                    if len(seq) < bchr_size[chrlink[chrid]]:
                         logger.error('Length of query sequence of ' + id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                         sys.exit()
             for bchr in list(chrlink.keys()):
@@ -226,16 +224,16 @@ if __name__ == "__main__":
                     logger.error('Chromosome ID ' + bchr + ' is present in alignments but not in query genome fasta. Exiting.')
                     sys.exit()
         else:
-            for id, seq in readfasta(args.qry.name).items():
-                if id in list(bchr_size.keys()):
+            for chrid, seq in readfasta(args.qry.name).items():
+                if chrid in list(bchr_size.keys()):
                     try:
-                        i = int(id)
-                        logger.error('Numerical chromosome id found: {} in query genome. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(id))
+                        i = int(chrid)
+                        logger.error('Numerical chromosome id found: {} in query genome. Please change it to string. Example: for chromosome 1, ">Chr1" is valid but ">1" is invalid. Exiting.'.format(chrid))
                         sys.exit()
                     except ValueError as e:
                         pass
-                    key_found = key_found + [id]
-                    if len(seq) < bchr_size[id]:
+                    key_found = key_found + [chrid]
+                    if len(seq) < bchr_size[chrid]:
                         logger.error('Length of query sequence of ' + id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                         sys.exit()
             for bchr in list(bchr_size.keys()):

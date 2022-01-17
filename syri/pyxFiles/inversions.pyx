@@ -66,7 +66,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
         float                           maxscore, synscore
         float                           w, revenue, cost
         Py_ssize_t                      index
-        long[:]                         n = np.array(range(len(invblocks)), dtype=int)
+        long[:]                         n = np.array(range(len(invblocks)), dtype=np.int)
         long[:]                         topo
         long[:]                         source, target
         long[:]                         pred
@@ -127,7 +127,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
         print('Cycle found')
         sys.exit()
 
-    topo = np.array(toporder, dtype = int)
+    topo = np.array(toporder, dtype = np.int)
     n_topo = len(topo)
     # Get order in which the edges need to be transversed
     source = np.zeros_like(invG.es['source'], dtype=int)
@@ -193,7 +193,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
         if i in uniend:
             continue
         nodepath.clear()
-        pred = np.array([-1]* <Py_ssize_t> len(n), dtype = int)
+        pred = np.array([-1]* <Py_ssize_t> len(n), dtype = np.int)
         dist = np.array([np.float32('inf')]*  <Py_ssize_t> len(n), dtype = np.float32)
         dist[i] = 0
         # Process vertices in topological order
@@ -321,10 +321,10 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
     path.clear()
     lp = st.size()
     totscore = np.array([profit[i] for i in range(<Py_ssize_t> profit.size())], dtype=np.float32)
-    st_list  = np.array([st[i] for i in range(<Py_ssize_t> st.size())], dtype=int)
-    end_list  = np.array([end[i] for i in range(<Py_ssize_t> end.size())], dtype=int)
-    stb_list  = np.array([stb[i] for i in range(<Py_ssize_t> stb.size())], dtype=int)
-    endb_list  = np.array([endb[i] for i in range(<Py_ssize_t> endb.size())], dtype=int)
+    st_list  = np.array([st[i] for i in range(<Py_ssize_t> st.size())], dtype=np.int)
+    end_list  = np.array([end[i] for i in range(<Py_ssize_t> end.size())], dtype=np.int)
+    stb_list  = np.array([stb[i] for i in range(<Py_ssize_t> stb.size())], dtype=np.int)
+    endb_list  = np.array([endb[i] for i in range(<Py_ssize_t> endb.size())], dtype=np.int)
     profit_list = np.array([profit[i] for i in range(<Py_ssize_t> profit.size())], dtype=np.float32)
 
     parents = np.array([-1]*lp, dtype = 'int')
@@ -435,7 +435,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
         if i in uniend:
             continue
         nodepath.clear()
-        pred = np.array([-1]* <Py_ssize_t> len(n), dtype = int)
+        pred = np.array([-1]* <Py_ssize_t> len(n), dtype = np.int)
         dist = np.array([np.float32('inf')]*  <Py_ssize_t> len(n), dtype = np.float32)
         dist[i] = 0
 

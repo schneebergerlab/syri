@@ -13,10 +13,8 @@ import pandas as pd
 from functools import partial
 import os
 from gc import collect
-# from Bio.SeqIO import parse
 import logging
 import psutil
-# from Bio.Alphabet import generic_dna
 from re import findall
 
 cimport numpy as np
@@ -241,10 +239,8 @@ def getshv(args, coords, chrlink):
         allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
         allBlocks = pd.unique(allAlignments.id)
 
-        # refg = {fasta.id:fasta.seq for fasta in parse(args.ref.name, 'fasta', generic_dna)}
         refg = readfasta(args.ref.name)
         qryg = readfasta(args.qry.name)
-        # qryg = {fasta.id:fasta.seq for fasta in parse(args.qry.name, 'fasta', generic_dna)}
 
         if len(chrlink) > 0 :
             try:

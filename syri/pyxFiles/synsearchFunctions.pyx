@@ -15,7 +15,6 @@ from multiprocessing import Pool
 from functools import partial
 import os
 from gc import collect
-# from Bio.SeqIO import parse
 import logging
 import psutil
 
