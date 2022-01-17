@@ -524,8 +524,8 @@ def scaf(args):
     coords.columns = ["aStart", "aEnd", "bStart", "bEnd", "aLen", "bLen", "iden", "aDir", "bDir", "aChr", "bChr"]
     coords.aChr = "ref"+coords.aChr
     coords.bChr = "qry"+coords.bChr
-    refsize = {("ref"+fasta.id): len(fasta.seq) for fasta in parse(refin, "fasta")}
-    qrysize = {("qry"+fasta.id): len(fasta.seq) for fasta in parse(qryin, "fasta")}
+    refsize = {("ref"+id): len(seq) for id, seq in readfasta(refin).items()}
+    qrysize = {("qry"+id): len(seq) for id, seq in readfasta(qryin).items()}
 
     reflength = defaultdict(dict)
     for i in np.unique(coords.aChr):
@@ -938,9 +938,9 @@ def scaf(args):
                 fref.write(spacer)
                 spacer = nn
                 if rdirs[rid] == 1:
-                    fref.write([str(fasta.seq) for fasta in parse(refin, "fasta") if "ref"+fasta.id == rid][0])
+                    fref.write([str(seq) for id, seq in readfasta(refin).items() if ("ref"+id) == rid][0])
                 elif rdirs[rid] == -1:
-                    fref.write([str(fasta.seq.reverse_complement()) for fasta in parse(refin, "fasta") if "ref"+fasta.id == rid][0])
+                    fref.write([revcomp(seq) for id, seq in readfasta(refin).items() if ("ref"+id) == rid][0])
             fref.write("\n")
 
         if noref:
@@ -952,9 +952,9 @@ def scaf(args):
             fqry.write(spacer)
             spacer = nn
             if qdirs[qid] == 1:
-                fqry.write([str(fasta.seq) for fasta in parse(qryin, "fasta") if "qry"+fasta.id == qid][0])
+                fqry.write([seq for id, seq in readfasta(qryin).items() if ("qry"+id) == qid][0])
             elif qdirs[qid] == -1:
-                fqry.write([str(fasta.seq.reverse_complement()) for fasta in parse(qryin, "fasta") if "qry"+fasta.id == qid][0])
+                fqry.write([revcomp(seq) for id, seq in readfasta(qryin).items() if ("qry"+id) == qid][0])
         fqry.write("\n")
         if noref:
             fout.write(">Pseudochrom{}\n".format(chrid))
@@ -968,6 +968,7 @@ def scaf(args):
     fref.close()
     fqry.close()
     fout.close()
+
 
 
 if __name__ == "__main__":
@@ -984,9 +985,9 @@ if __name__ == "__main__":
     import pandas as pd
     import numpy as np
     from collections import defaultdict, deque, Counter
-    from syri.bin.func.myUsefulFunctions import mergeRanges
+    from syri.bin.func.myUsefulFunctions import mergeRanges, readfasta, revcomp
     from syri.pyxFiles.synsearchFunctions import readSAMBAM
-    from Bio.SeqIO import parse
+    # from Bio.SeqIO import parse
     import logging
     import operator
     scaf(args)

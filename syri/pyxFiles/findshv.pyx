@@ -13,10 +13,8 @@ import pandas as pd
 from functools import partial
 import os
 from gc import collect
-from Bio.SeqIO import parse
 import logging
 import psutil
-from Bio.Alphabet import generic_dna
 from re import findall
 
 cimport numpy as np
@@ -42,7 +40,7 @@ def readSRData(cwdPath, prefix, dup = False):
             fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object)
         except pd.errors.ParserError as _e:
             fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object, engine ="python")
-        except pd.io.common.EmptyDataError:
+        except pd.errors.EmptyDataError:
             print(fileType, " is empty. Skipping analysing it.")
             continue
         except Exception as _e:
@@ -73,7 +71,7 @@ def readSRData(cwdPath, prefix, dup = False):
         fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header = None, dtype = object)
     except pd.errors.ParserError as e:
         fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header=None, dtype = object, engine ="python")
-    except pd.io.common.EmptyDataError:
+    except pd.errors.EmptyDataError:
         print("ctxOut.txt is empty. Skipping analysing it.")
     except Exception as e:
         print("ERROR: while trying to read ", fileType, "Out.txt", e)
@@ -241,8 +239,8 @@ def getshv(args, coords, chrlink):
         allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
         allBlocks = pd.unique(allAlignments.id)
 
-        refg = {fasta.id:fasta.seq for fasta in parse(args.ref.name, 'fasta', generic_dna)}
-        qryg = {fasta.id:fasta.seq for fasta in parse(args.qry.name, 'fasta', generic_dna)}
+        refg = readfasta(args.ref.name)
+        qryg = readfasta(args.qry.name)
 
         if len(chrlink) > 0 :
             try:
@@ -321,7 +319,7 @@ def getshv(args, coords, chrlink):
                                 sys.exit()
 
                         refseq = refg[row.aChr][(row.aStart-1):row.aEnd]
-                        qryseq = qryg[row.bChr][(row.bEnd-1):row.bStart].reverse_complement()
+                        qryseq = revcomp(qryg[row.bChr][(row.bEnd-1):row.bStart])
                     # with open('snps.txt', 'w') as fout:
                         posa = 0                    # number of bases covered in genome a
                         posb = 0                    # number of bases covered in genome b

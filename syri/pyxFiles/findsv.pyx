@@ -14,7 +14,6 @@ from multiprocessing import Pool
 from functools import partial
 import os
 from gc import collect
-from Bio.SeqIO import parse
 import logging
 import psutil
 
@@ -37,7 +36,7 @@ def readSRData(cwdPath, prefix, dup = False):
             fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object)
         except pd.errors.ParserError as _e:
             fileData = pd.read_table(cwdPath+prefix+fileType, header=None, dtype = object, engine ="python")
-        except pd.io.common.EmptyDataError:
+        except pd.errors.EmptyDataError:
             print(fileType, " is empty. Skipping analysing it.")
             continue
         except Exception as _e:
@@ -69,7 +68,7 @@ def readSRData(cwdPath, prefix, dup = False):
         fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header = None, dtype = object)
     except pd.errors.ParserError as e:
         fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header=None, dtype = object, engine ="python")
-    except pd.io.common.EmptyDataError:
+    except pd.errors.EmptyDataError:
         print("ctxOut.txt is empty. Skipping analysing it.")
     except Exception as e:
         print("ERROR: while trying to read ", fileType, "Out.txt", e)
@@ -168,8 +167,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
-                            int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
                                     blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
                         fout.write("\t".join(["CPL",
@@ -183,8 +181,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
-                            int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
                                     blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
                         fout.write("\t".join(["CPL",
@@ -260,8 +257,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
-                            int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
                                     blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
                         fout.write("\t".join(["CPL",
@@ -275,8 +271,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
-                            int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
                                     blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
                         fout.write("\t".join(["CPL",
@@ -333,8 +328,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
-                            int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
                                     blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
                         fout.write("\t".join(["CPL",
@@ -347,9 +341,13 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                     else:
                         j_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
+                        # sCoord = round(
+                        #     blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
+                        #     int)
+                        # eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
+                        #             blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
-                            int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
                                     blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
                         fout.write("\t".join(["CPL",
@@ -368,8 +366,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                 if n >= offset:
                     if ordered:
                         sCoord = round(
-                            blocksAlign.iat[j, 3] - j_prop * (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])).astype(
-                            int)
+                            blocksAlign.iat[j, 3] - j_prop * (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])).astype(int)
                         eCoord = round(blocksAlign.iat[j + 1, 2] + j1_prop * (
                                     blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])).astype(int)
                         fout.write("\t".join(["CPG",
@@ -381,8 +378,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                                               blocksAlign.iat[0, 6]]) + "\n")
                     else:
                         sCoord = round(
-                            blocksAlign.iat[j, 3] + j_prop * (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])).astype(
-                            int)
+                            blocksAlign.iat[j, 3] + j_prop * (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])).astype(int)
                         eCoord = round(blocksAlign.iat[j + 1, 2] - j1_prop * (
                                     blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])).astype(int)
                         fout.write("\t".join(["CPG",
@@ -461,8 +457,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
 def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
     logger = logging.getLogger("getNA")
 
-    refSize = {fasta.id: len(fasta.seq) for fasta in parse(ref,'fasta')}
-    qrySize = {fasta.id: len(fasta.seq) for fasta in parse(qry,'fasta')}
+    refSize = {chrid: len(seq) for chrid, seq in readfasta(ref).items()}
+    qrySize = {chrid: len(seq) for chrid, seq in readfasta(qry).items()}
+    # qrySize = {fasta.id: len(fasta.seq) for fasta in parse(qry,'fasta')}
 
     annoCoords = pd.DataFrame()
     for fileType in ["syn","inv", "TL", "invTL","dup", "invDup"]:
@@ -470,7 +467,7 @@ def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
             fileData = pd.read_table(cwdPath+prefix+fileType+"Out.txt", header=None, dtype = object)
         except pd.errors.ParserError as e:
             fileData = pd.read_table(cwdPath+prefix+fileType+"Out.txt", header=None, dtype = object, engine ="python")
-        except pd.io.common.EmptyDataError:
+        except pd.errors.EmptyDataError:
             print(fileType, "Out.txt is empty. Skipping analysing it.")
             continue
         except Exception as e:
@@ -485,7 +482,7 @@ def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
         fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header = None, dtype = object)
     except pd.errors.ParserError as e:
         fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header=None, dtype = object, engine ="python")
-    except pd.io.common.EmptyDataError:
+    except pd.errors.EmptyDataError:
         print("ctxOut.txt is empty. Skipping analysing it.")
     except Exception as e:
         print("ERROR: while trying to read ", fileType, "Out.txt", e)
