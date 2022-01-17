@@ -8,7 +8,7 @@
 ```
 git clone --single-branch --branch V1.4.1 https://github.com/schneebergerlab/syri.git
 ```
-* (Plotsr)[https://github.com/schneebergerlab/plotsr] is now a separate package. It can be installed using anaconda:
+* [Plotsr](https://github.com/schneebergerlab/plotsr) is now a separate package. It can be installed using anaconda:
 ```
 conda install -c bioconda plotsr
 ```
