@@ -3,7 +3,7 @@
 2. C/C++ compiler: g++
 
 ## Recent major updates:
-(17-01-2021)
+(17-01-2022)
 * Making the python >3.8 version as the default (master) branch. For using older version, use the following command:
 ```
 git clone --single-branch --branch V1.4.1 https://github.com/schneebergerlab/syri.git
