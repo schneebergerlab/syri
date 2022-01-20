@@ -167,9 +167,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0]))
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
-                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0]))
                         fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
@@ -181,9 +181,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0]))
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
-                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0]))
                         fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
@@ -257,9 +257,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0]))
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
-                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0]))
                         fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
@@ -271,9 +271,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0]))
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
-                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0]))
                         fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
@@ -328,9 +328,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         j_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0]))
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
-                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0]))
                         fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
@@ -341,15 +341,10 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                     else:
                         j_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
                         j1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
-                        # sCoord = round(
-                        #     blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(
-                        #     int)
-                        # eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
-                        #             blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
                         sCoord = round(
-                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                            blocksAlign.iat[j, 1] - j_prop * (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0]))
                         eCoord = round(blocksAlign.iat[j + 1, 0] + j1_prop * (
-                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                                    blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0]))
                         fout.write("\t".join(["CPL",
                                               str(sCoord),
                                               str(eCoord),
@@ -366,9 +361,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                 if n >= offset:
                     if ordered:
                         sCoord = round(
-                            blocksAlign.iat[j, 3] - j_prop * (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])).astype(int)
+                            blocksAlign.iat[j, 3] - j_prop * (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2]))
                         eCoord = round(blocksAlign.iat[j + 1, 2] + j1_prop * (
-                                    blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])).astype(int)
+                                    blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2]))
                         fout.write("\t".join(["CPG",
                                               str(blocksAlign.iat[j + 1, 0]),
                                               str(blocksAlign.iat[j, 1]),
@@ -377,10 +372,8 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                                               blocksAlign.iat[0, 5],
                                               blocksAlign.iat[0, 6]]) + "\n")
                     else:
-                        sCoord = round(
-                            blocksAlign.iat[j, 3] + j_prop * (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])).astype(int)
-                        eCoord = round(blocksAlign.iat[j + 1, 2] - j1_prop * (
-                                    blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])).astype(int)
+                        sCoord = round(blocksAlign.iat[j, 3] + j_prop * (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3]))
+                        eCoord = round(blocksAlign.iat[j + 1, 2] - j1_prop * (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3]))
                         fout.write("\t".join(["CPG",
                                               str(blocksAlign.iat[j + 1, 0]),
                                               str(blocksAlign.iat[j, 1]),
@@ -397,9 +390,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                     if abs(m) > abs(n):
                         if ordered:
                             sCoord = round(blocksAlign.iat[j, 3] - j_prop * (
-                                        blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])).astype(int)
+                                        blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2]))
                             eCoord = round(blocksAlign.iat[j + 1, 2] + j1_prop * (
-                                        blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])).astype(int)
+                                        blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2]))
                             fout.write("\t".join(["TDM",
                                                   str(blocksAlign.iat[j + 1, 0]),
                                                   str(blocksAlign.iat[j, 1]),
@@ -410,9 +403,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
 
                         else:
                             sCoord = round(blocksAlign.iat[j, 3] + j_prop * (
-                                        blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])).astype(int)
+                                        blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3]))
                             eCoord = round(blocksAlign.iat[j + 1, 2] - j1_prop * (
-                                        blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])).astype(int)
+                                        blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3]))
                             fout.write("\t".join(["TDM",
                                                   str(blocksAlign.iat[j + 1, 0]),
                                                   str(blocksAlign.iat[j, 1]),
@@ -425,9 +418,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                             k_prop = abs(n) / (blocksAlign.iat[j, 3] - blocksAlign.iat[j, 2])
                             k1_prop = abs(n) / (blocksAlign.iat[j + 1, 3] - blocksAlign.iat[j + 1, 2])
                             sCoord = round(blocksAlign.iat[j, 1] - k_prop * (
-                                        blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                                        blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0]))
                             eCoord = round(blocksAlign.iat[j + 1, 0] + k1_prop * (
-                                        blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                                        blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0]))
                             fout.write("\t".join(["TDM",
                                                   str(sCoord),
                                                   str(eCoord),
@@ -439,9 +432,9 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                             k_prop = abs(n) / (blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3])
                             k1_prop = abs(n) / (blocksAlign.iat[j + 1, 2] - blocksAlign.iat[j + 1, 3])
                             sCoord = round(blocksAlign.iat[j, 1] - k_prop * (
-                                        blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])).astype(int)
+                                        blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0]))
                             eCoord = round(blocksAlign.iat[j + 1, 0] + k1_prop * (
-                                        blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])).astype(int)
+                                        blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0]))
                             fout.write("\t".join(["TDM",
                                                   str(sCoord),
                                                   str(eCoord),

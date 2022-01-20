@@ -66,7 +66,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
         float                           maxscore, synscore
         float                           w, revenue, cost
         Py_ssize_t                      index
-        long[:]                         n = np.array(range(len(invblocks)), dtype=np.int)
+        long[:]                         n = np.array(range(len(invblocks)), dtype=int)
         long[:]                         topo
         long[:]                         source, target
         long[:]                         pred
@@ -127,7 +127,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
         print('Cycle found')
         sys.exit()
 
-    topo = np.array(toporder, dtype = np.int)
+    topo = np.array(toporder, dtype = int)
     n_topo = len(topo)
     # Get order in which the edges need to be transversed
     source = np.zeros_like(invG.es['source'], dtype=int)
@@ -193,7 +193,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
         if i in uniend:
             continue
         nodepath.clear()
-        pred = np.array([-1]* <Py_ssize_t> len(n), dtype = np.int)
+        pred = np.array([-1]* <Py_ssize_t> len(n), dtype = int)
         dist = np.array([np.float32('inf')]*  <Py_ssize_t> len(n), dtype = np.float32)
         dist[i] = 0
         # Process vertices in topological order
@@ -321,10 +321,10 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
     path.clear()
     lp = st.size()
     totscore = np.array([profit[i] for i in range(<Py_ssize_t> profit.size())], dtype=np.float32)
-    st_list  = np.array([st[i] for i in range(<Py_ssize_t> st.size())], dtype=np.int)
-    end_list  = np.array([end[i] for i in range(<Py_ssize_t> end.size())], dtype=np.int)
-    stb_list  = np.array([stb[i] for i in range(<Py_ssize_t> stb.size())], dtype=np.int)
-    endb_list  = np.array([endb[i] for i in range(<Py_ssize_t> endb.size())], dtype=np.int)
+    st_list  = np.array([st[i] for i in range(<Py_ssize_t> st.size())], dtype=int)
+    end_list  = np.array([end[i] for i in range(<Py_ssize_t> end.size())], dtype=int)
+    stb_list  = np.array([stb[i] for i in range(<Py_ssize_t> stb.size())], dtype=int)
+    endb_list  = np.array([endb[i] for i in range(<Py_ssize_t> endb.size())], dtype=int)
     profit_list = np.array([profit[i] for i in range(<Py_ssize_t> profit.size())], dtype=np.float32)
 
     parents = np.array([-1]*lp, dtype = 'int')
@@ -338,84 +338,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
                         parents[j] = i
             else:
                 break
-    
-    """
-    Attempt to speed up goodinv identification, but not working as of now
-    
-    print('starting')
-    parentscore = np.zeros(lp, np.float32)
-    for i in range(lp):
-        canmap[st_list[i]][stb_list[i]].push_back(i)
-        staenda[st_list[i]][end_list[i]].push_back(i)
-    print('graph generated')
-    i = 0
-    sorted_sa = np.zeros(<Py_ssize_t> canmap.size(), np.int64)
-    canmap_rit=canmap.rbegin()
-    while canmap_rit != canmap.rend():
-        sorted_sa[i] = deref(canmap_rit).first
-        i+=1
-        inc(canmap_rit)
-    sorted_sa = np.array(sorted(sorted_sa))
-    print('Pruning graph')
-    for i in sorted_sa:
-        canmap_rit2 = canmap[i].rbegin()
-        while canmap_rit2 != canmap[i].rend():
-            minparentscore[i][deref(canmap_rit2).first] = 0
-            inc(canmap_rit2)
 
-    print(np.array(sorted_sa))
-    count = 0
-    changed=False
-    for i in sorted_sa:
-        if i==12592489:
-            print(i, str(datetime.now()))
-        count+=1
-        staenda_it2 = staenda[i].rbegin()
-        while staenda_it2 != staenda[i].rend():
-            if i==12592489:
-                print(i, deref(staenda_it2).first, deref(staenda_it2).second.size())
-            for j in range(<Py_ssize_t> deref(staenda_it2).second.size()):
-                current = deref(staenda_it2).second[j]
-                canmap_rit = canmap.rbegin()
-                while canmap_rit != canmap.rend():
-                    if deref(canmap_rit).first > end_list[current]-threshold:
-                        if i==12592489:
-                            print(i, deref(staenda_it2).first, deref(staenda_it2).second.size(), deref(canmap_rit).first)
-                        canmap_rit2 = deref(canmap_rit).second.rbegin()
-                        while canmap_rit2 != deref(canmap_rit).second.rend():
-                            if i==12592489 and deref(staenda_it2).first == 12989685 and deref(canmap_rit).first == 13050974 and deref(canmap_rit2).first == 12368020:
-                                print('gg parent set1')
-                                print(i, deref(staenda_it2).first, deref(staenda_it2).second.size(), deref(canmap_rit).first)
-                            if totscore[current] > minparentscore[deref(canmap_rit).first][deref(canmap_rit2).first]:
-                                changed = False
-                                if deref(canmap_rit2).first > endb_list[current]-threshold:
-                                    if i==12592489 and deref(staenda_it2).first == 12989685 and deref(canmap_rit).first == 13050974 and deref(canmap_rit2).first == 12368020:
-                                        print('gg parent set2')
-                                        print(i, deref(staenda_it2).first, deref(staenda_it2).second.size(), deref(canmap_rit).first)
-                                    for k in range(<Py_ssize_t> deref(canmap_rit2).second.size()):
-                                        if parentscore[deref(canmap_rit2).second[k]] < totscore[current]:
-                                            if i==12592489 and deref(staenda_it2).first == 12989685 and deref(canmap_rit).first == 13050974 and deref(canmap_rit2).first == 12368020:
-                                                print('gg parent set3')
-                                                print(i, deref(staenda_it2).first, deref(staenda_it2).second.size(), deref(canmap_rit).first)
-                                            changed = True
-                                            totscore[deref(canmap_rit2).second[k]] = totscore[current] + profit_list[deref(canmap_rit2).second[k]]
-                                            parentscore[deref(canmap_rit2).second[k]] = totscore[current]
-                                            parents[deref(canmap_rit2).second[k]] = current
-                                    if changed:
-                                        minvalue = np.inf
-                                        for k in range(<Py_ssize_t> deref(canmap_rit2).second.size()):
-                                            if parentscore[deref(canmap_rit2).second[k]] < minvalue:
-                                                minvalue = parentscore[deref(canmap_rit2).second[k]]
-                                        minparentscore[deref(canmap_rit).first][deref(canmap_rit2).first] = minvalue
-                                else:
-                                    break
-                            inc(canmap_rit2)
-                    else:
-                        break
-                    inc(canmap_rit)
-            inc(staenda_it2)
-    """
-              
     maxid = -1
     maxscore = -1
     for i in range(lp):
@@ -435,7 +358,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
         if i in uniend:
             continue
         nodepath.clear()
-        pred = np.array([-1]* <Py_ssize_t> len(n), dtype = np.int)
+        pred = np.array([-1]* <Py_ssize_t> len(n), dtype = int)
         dist = np.array([np.float32('inf')]*  <Py_ssize_t> len(n), dtype = np.float32)
         dist[i] = 0
 

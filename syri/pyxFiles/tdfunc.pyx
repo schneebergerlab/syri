@@ -629,7 +629,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
     bGroups = {}
     for i in range(len(ctxTransGenomeBGroups)):
         bGroups[i] = ctxTransBlocks.iloc[ctxTransGenomeBGroups[i].member].sort_values(['bStart', 'bEnd']).index.values
-    clstrsize = np.array([len(ctxCluster[i.transClusterIndex]) for i in ctxBlocksData], np.int)
+    clstrsize = np.array([len(ctxCluster[i.transClusterIndex]) for i in ctxBlocksData], int)
 
     if len(ctxTransBlocks) > 0:
         out = getmeblocks(np.array(ctxTransBlocks.aStart),
@@ -980,10 +980,10 @@ cpdef getProfitableTrans(cpp_map[long, cpp_set[long]] graph, long[:] astart, lon
     else:
         unchrs = np.unique(list(np.unique(achr)) + list(np.unique(bchr)) + list(np.unique(inachr)) + list(np.unique(inbchr)))
         unchrdict = {unchrs[i]:i for i in range(len(unchrs))}
-        achrint     = np.array([unchrdict[c] for c in achr], np.int)
-        bchrint     = np.array([unchrdict[c] for c in bchr], np.int)
-        inachrint   = np.array([unchrdict[c] for c in inachr], np.int)
-        inbchrint   = np.array([unchrdict[c] for c in inbchr], np.int)
+        achrint     = np.array([unchrdict[c] for c in achr], int)
+        bchrint     = np.array([unchrdict[c] for c in bchr], int)
+        inachrint   = np.array([unchrdict[c] for c in inachr], int)
+        inbchrint   = np.array([unchrdict[c] for c in inbchr], int)
 
 
     ## For each alignment/node calculate the number of bases which are not overlapping with the in-place blocks
@@ -1036,12 +1036,12 @@ cpdef getProfitableTrans(cpp_map[long, cpp_set[long]] graph, long[:] astart, lon
                         bst = ben+1
                         break
         bscore += ben - bst + 1
-        almntdata[i] = np.array([aend[i]-astart[i]+1, bend[i]-bstart[i]+1, ascore, bscore], dtype=np.int)
+        almntdata[i] = np.array([aend[i]-astart[i]+1, bend[i]-bstart[i]+1, ascore, bscore], dtype=int)
 
     out = deque()
     count = 0
     dist_bkp = np.array([-np.float32('inf')]*<Py_ssize_t>len(n), dtype = np.float32)
-    pred_bkp = np.array([-1]*<Py_ssize_t>len(n), dtype = np.int)
+    pred_bkp = np.array([-1]*<Py_ssize_t>len(n), dtype = int)
     for i in n:
         nodepath.clear()
         pred = pred_bkp.copy()
@@ -1501,7 +1501,7 @@ cdef greedySubsetSelectorHeuristic(long[:] cluster, transBlocksData, long[:] see
                         skiplist[i]=1
                         break
 
-    skipindexmap = np.zeros(n, np.int)      ## smallest index for a tempcluster for which to check the skiplist
+    skipindexmap = np.zeros(n, int)      ## smallest index for a tempcluster for which to check the skiplist
     ## For a given candidate, if all of its ME candidates have already been added to the skiplist, then that candidate will be selected as part of output
     for i in range(n):
         if tempcluster[i] ==0:
@@ -1721,7 +1721,7 @@ cdef greedySubsetSelector(cluster, transBlocksData, seedblocks, iterCount = 100)
         outblocks[seedblocks[i]] = 1
         tempcluster[seedblocks[i]] = 0
     transBlocksScore = {}
-    for i in np.nonzero(tempcluster)[0].astype(np.int):
+    for i in np.nonzero(tempcluster)[0].astype(int):
         transBlocksScore[i] = (transBlocksData[i].aEnd - transBlocksData[i].aStart) + (transBlocksData[i].bEnd - transBlocksData[i].bStart)
 
     # Find best cluster subset
@@ -1851,10 +1851,10 @@ def getBestClusterSubset(cluster, transBlocksData, bRT, tdolp, chromo='', aGroup
     seedBlocks = [i for i in cluster if transBlocksData[i].status == 1]
     if len(cluster) > 100000:
         logger.info('Large (>100000 candidates) TD cluster (with '+ str(len(cluster)) +' candidate TDs) identified. Using low-memory high-runtime approach. Iterative sampling disabled. Using less stringent progressive elimination.')
-        output = greedySubsetSelectorHeuristic(np.array(cluster, np.int), transBlocksData, np.array(seedBlocks, np.int), aGroups, bGroups, threshold, tdolp)
+        output = greedySubsetSelectorHeuristic(np.array(cluster, int), transBlocksData, np.array(seedBlocks, int), aGroups, bGroups, threshold, tdolp)
     elif len(cluster) > 10000:
         logger.info('Large (>10000 candidates) TD cluster (with '+ str(len(cluster)) +' candidate TDs) identified. Using low-memory high-runtime approach. Iterative sampling disabled.')
-        output = greedySubsetSelector2(np.array(cluster, np.int), transBlocksData, np.array(seedBlocks, np.int), aGroups, bGroups, threshold, tdolp)
+        output = greedySubsetSelector2(np.array(cluster, int), transBlocksData, np.array(seedBlocks, int), aGroups, bGroups, threshold, tdolp)
     elif len(cluster) < 50:
         output = bruteSubsetSelector(cluster, transBlocksData, seedBlocks, bRT)
         if output == "Failed":
