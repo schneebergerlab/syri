@@ -39,12 +39,6 @@ def intersect(*lists):
     import numpy as np
     return reduce(np.intersect1d, list(lists))
 
-#
-# def extractSeq(filePath, seqID, start=0, end=-1):
-#     querySeq = [seq for id, seq in readfasta(filePath) if id == seqID][0]
-#     querySeq.seq = querySeq[start:end+1]
-#     writefasta(querySeq, seqID+"_"+str(start)+"_"+str(end)+".fasta")
-#
 
 def fileRemove(fName):
     try:

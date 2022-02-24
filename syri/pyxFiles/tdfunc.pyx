@@ -7,7 +7,7 @@ from collections import deque
 from datetime import datetime
 import logging
 import time
-from syri.bin.func.myUsefulFunctions import *
+from syri.scripts.func import *
 from multiprocessing import Pool
 from functools import partial
 from gc import collect

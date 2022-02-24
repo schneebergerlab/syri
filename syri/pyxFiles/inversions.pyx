@@ -1,19 +1,17 @@
 # cython: language_level = 3
 # distutils: language = c++
 import numpy as np
-from igraph import Graph
+# from igraph import Graph
 from collections import deque, Counter
 from libcpp.map cimport map as cpp_map
 from libcpp.vector cimport vector as cpp_vec
 from libcpp.deque cimport deque as cpp_deq
 from libcpp cimport bool as bool_t
-from syri.bin.func.myUsefulFunctions import *
-# from scipy.stats import *
+from syri.scripts.func import *
 import pandas as pd
 from gc import collect
 import logging
-from datetime import datetime
-from syri.pyxFiles.synsearchFunctions import apply_TS, alignmentBlock
+from syri.synsearchFunctions import apply_TS, alignmentBlock
 from syri.pyxFiles.function cimport getConnectivityGraph
 from cython.operator cimport dereference as deref, preincrement as inc
 
@@ -582,11 +580,6 @@ def getInversions(coords,chromo, threshold, synData, tUC, tUP):
     logger.debug("found neighbours " + chromo)
 
     synBlockScore = [(i.aLen + i.bLen)*i.iden for index, i in synData.iterrows()]
-    
-    ## Save(pickle) all intermediate objects so that getProfitable can be quickly optimised
-    #import pickle
-    #with open("profitable_arguments.pickle", 'wb') as fout:
-    #    pickle.dump([invblocks, invertedCoordsOri, neighbourSyn, synBlockScore, synData, tUC, tUP, threshold], fout)
         
     profitable = [inversion(i) for i in getProfitable(invblocks, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values.astype('float32'), neighbourSyn, np.array(synBlockScore, dtype = 'float32'), synData.aStart.values, synData.aEnd.values, tUC, tUP, threshold)]
     logger.debug("found profitable " + chromo)

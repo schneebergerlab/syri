@@ -2,12 +2,10 @@
 # distutils: language = c++
 
 import numpy as np
-from syri.bin.func.myUsefulFunctions import *
+from syri.scripts.func import *
 from igraph import Graph
-from collections import Counter, deque, defaultdict
+from collections import deque
 from scipy.stats import *
-import pandas as pd
-import os
 import logging
 
 from libcpp.vector cimport vector as cpp_vec
@@ -144,6 +142,7 @@ cpdef inline getmeblocks(long[:] astart, long[:] aend, long[:] bstart, long[:] b
 
 
 cpdef inline getConnectivityGraph(blocksList):
+    from igraph import Graph
     outOG = Graph().as_directed()
     outOG.add_vertices(len(blocksList))
     if len(blocksList) == 0:

@@ -3,13 +3,11 @@
 # cython: language_level = 3
 
 import numpy as np
-from syri.bin.func.myUsefulFunctions import *
+from syri.scripts.func import *
 import sys
-import time
-from igraph import Graph
-from collections import Counter, deque, defaultdict
+from collections import deque, defaultdict
 from scipy.stats import *
-from datetime import datetime, date
+from datetime import datetime
 import pandas as pd
 from multiprocessing import Pool
 from functools import partial
@@ -21,19 +19,17 @@ import psutil
 from cython.operator cimport dereference as deref, preincrement as inc
 from libcpp.map cimport map as cpp_map
 from libcpp.deque cimport deque as cpp_deq
+from syri.pyxFiles.function cimport getmeblocks, getOverlapWithSynBlocks
 cimport numpy as np
 cimport cython
 
 np.random.seed(1)
 
-from syri.pyxFiles.function cimport getmeblocks, getOverlapWithSynBlocks
 
 def samtocoords(f):
     from pandas import DataFrame
     from collections import deque
-
     logger = logging.getLogger('SAM reader')
-
     rc = {}        # Referece chromosomes
     rcs = {}        # Selected chromosomes
     al = deque()    # Individual alignment

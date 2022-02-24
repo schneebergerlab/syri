@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/scripts/env python3
 # -*- coding: utf-8 -*-
 """
 Spyder Editor
@@ -11,7 +11,13 @@ from collections import defaultdict, namedtuple
 from itertools import product
 import sys
 from warnings import warn
-
+from syri import __version__
+import pandas as pd
+import numpy as np
+from collections import defaultdict, deque, Counter
+from syri.scripts.func import mergeRanges, readfasta, revcomp
+from syri.synsearchFunctions import readSAMBAM
+import operator
 
 try:
     from longestrunsubsequence import lrs
@@ -971,7 +977,8 @@ def scaf(args):
 
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
+def main(cmd):
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("coords", help='Alignment coordinates in a tsv format', type=argparse.FileType("r"))
     parser.add_argument("ref", help='Assembly of genome A in multi-fasta format', type=argparse.FileType("r"))
@@ -981,14 +988,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', dest='out', help="output file prefix", default="out", type=str)
     parser.add_argument('-noref', dest='noref', help="Use this parameter when no assembly is at chromosome level", default=False, action='store_true')
     parser.add_argument('-F', dest="ftype", help="Input coords type. T: Table, S: SAM, B: BAM", default="T", choices=['T', 'S', 'B'])
-    args = parser.parse_args()
-    import pandas as pd
-    import numpy as np
-    from collections import defaultdict, deque, Counter
-    from syri.bin.func.myUsefulFunctions import mergeRanges, readfasta, revcomp
-    from syri.pyxFiles.synsearchFunctions import readSAMBAM
-    # from Bio.SeqIO import parse
-    import logging
-    import operator
+    parser.add_argument('--version', action='version', version='{version}'.format(version=__version__))
+    args = parser.parse_args(cmd)
     scaf(args)
     print('Finished chroder')

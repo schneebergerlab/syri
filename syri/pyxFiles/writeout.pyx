@@ -2,13 +2,13 @@
 # distutils: language = c++
 
 import numpy as np
-from syri.bin.func.myUsefulFunctions import *
-import sys
-import time
-from igraph import *
-from collections import Counter, deque, defaultdict
-from scipy.stats import *
-from datetime import datetime, date
+from syri.scripts.func import *
+# import sys
+# import time
+# from igraph import *
+from collections import deque, defaultdict
+# from scipy.stats import *
+from datetime import date
 import pandas as pd
 import os
 import logging

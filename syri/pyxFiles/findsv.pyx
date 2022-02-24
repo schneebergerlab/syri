@@ -2,20 +2,11 @@
 # distutils: language = c++
 
 import numpy as np
-from syri.bin.func.myUsefulFunctions import *
-import sys
-import time
+from syri.scripts.func import *
 from igraph import *
-from collections import Counter, deque, defaultdict
 from scipy.stats import *
-from datetime import datetime, date
 import pandas as pd
-from multiprocessing import Pool
-from functools import partial
-import os
-from gc import collect
 import logging
-import psutil
 
 cimport numpy as np
 cimport cython

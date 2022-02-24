@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/scripts/env python3
 
 # -*- coding: utf-8 -*-
 """
@@ -7,59 +7,15 @@ Created on Wed May 10 13:05:51 2017
 @author: goel
 """
 import argparse
+from syri import __version__
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    optional = parser._action_groups.pop()
-    required = parser.add_argument_group("Input Files")
-    required.add_argument("-c", dest="infile", help="File containing alignment coordinates", type=argparse.FileType('r'), required=True)
-    required.add_argument("-r", dest="ref", help="Genome A (which is considered as reference for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
-    required.add_argument("-q", dest="qry", help="Genome B (which is considered as query for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
-    required.add_argument("-d", dest="delta", help=".delta file from mummer. Required for short variation (SNPs/indels) identification when CIGAR string is not available", type=argparse.FileType('r'))
-
-    optional.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM", default="T", choices=['T', 'S', 'B'])
-    optional.add_argument('-k', dest="keep", help="Keep intermediate output files", default=False, action="store_true")
-    optional.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
-    optional.add_argument("--lf", dest="log_fin", help="Name of log file", type=argparse.FileType("w"), default="syri.log")
-    optional.add_argument('--dir', dest='dir', help="path to working directory (if not current directory). All files must be in this directory.", action='store')
-    optional.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
-    optional.add_argument("--seed", dest="seed", help="seed for generating random numbers", type=int, default=1)
-    optional.add_argument('--nc', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
-    optional.add_argument('--novcf', dest="novcf", help="Do not combine all files into one output file", default=False, action="store_true")
-    optional.add_argument('-f', dest='f', help='Filter out low quality alignments', default=True, action='store_false')
-
-    parser._action_groups.append(optional)
-    # Parameters for identification of structural rearrangements
-    srargs = parser.add_argument_group("SR identification")
-    srargs.add_argument("--nosr", dest="nosr", help="Set to skip structural rearrangement identification", action="store_true", default=False)
-    srargs.add_argument("--tdgaplen", dest="tdgl", help="Maximum allowed gap-length between two alignments of a multi-alignment translocation or duplication (TD). Larger values increases TD identification sensitivity but also runtime.", type=int, default=500000)
-    srargs.add_argument("--tdmaxolp", dest="tdolp", help="Maximum allowed overlap between two translocations. Value should be in range (0,1].", type=float, default=0.8)
-    srargs.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
-    srargs.add_argument("--unic", dest="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type=int, default=1000)
-    srargs.add_argument("--unip", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would allow selection of TDs which are more overlapped with \
-     other regions.", type=float, default=0.5)
-    srargs.add_argument("--inc", dest="increaseBy", help="Minimum score increase required to add another alignment to translocation cluster solution", type=int, default=1000)
-    srargs.add_argument("--no-chrmatch", dest='chrmatch', help="Do not allow SyRI to automatically match chromosome ids between the two genomes if they are not equal", default=False, action='store_true')
-
-    # Parameters for identification of short variations
-    shvargs = parser.add_argument_group("ShV identification")
-    shvargs.add_argument("--nosv", dest="nosv", help="Set to skip structural variation identification", action="store_true", default=False)
-    shvargs.add_argument("--nosnp", dest="nosnp", help="Set to skip SNP/Indel (within alignment) identification", action="store_true", default=False)
-    # shvargs.add_argument("-align", dest="align", help="Alignment file to parse to show-snps for SNP/Indel identification", action="store_false", type=argparse.FileType("r"))
-    shvargs.add_argument("--all", help="Use duplications too for variant identification",  action="store_true", default=False)
-    shvargs.add_argument("--allow-offset", dest='offset', help='BPs allowed to overlap', default=5, type=int, action="store")
-    shvargs.add_argument('--cigar', dest="cigar", help="Find SNPs/indels using CIGAR string. Necessary for alignment generated using aligners other than nucmers", default=False, action='store_true')
-    shvargs.add_argument('-s', dest="sspath", help="path to show-snps from mummer", default="show-snps")
-    # shvargs.add_argument('-buff', dest="buff", help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=0)
-
-    args = parser.parse_args()
-
+# if __name__ == "__main__":
+def syri(args):
     # Check that correct version of python is being used
     import logging
     import logging.config
     import os
     import sys
-
     logging.config.dictConfig({
         'version': 1,
         'disable_existing_loggers': False,
@@ -135,21 +91,14 @@ if __name__ == "__main__":
     except Exception as E:
         sys.exit(E)
 
-    # from pandas import __version__ as pdversion
-    # if pdversion != '0.23.4':
-    #     logger.warning('Using pandas version: ' + pdversion + '. Expected vesion: 0.23.4. This might result in unexpected errors.')
-    # logger.debug('Python and Pandas version are ok')
-
     ###################################################################
     # Check if input files are present
     ###################################################################
-  
     ## Check presence of input files for SV identification
     if not args.nosv:
         if args.ref is None or args.qry is None:
             logger.error("Reference and query assembly fasta files are required for SV identification.")
             sys.exit()
-    
     ## Check presence of input files ShV identification
     if not args.nosnp:
         if not args.cigar:
@@ -160,10 +109,8 @@ if __name__ == "__main__":
     ###################################################################
     # Read alignments and compare lengths with genome fasta
     ###################################################################
-    from syri.pyxFiles.synsearchFunctions import readCoords
-    from syri.bin.func.myUsefulFunctions import readfasta
-    # from Bio.SeqIO import parse
-    # from Bio.Alphabet import generic_dna
+    from syri.synsearchFunctions import readCoords
+    from syri.scripts.func import readfasta
     import numpy as np
     
     coords, chrlink = readCoords(args.infile.name, args.chrmatch, args.dir, args.prefix, args, args.cigar)
@@ -182,11 +129,9 @@ if __name__ == "__main__":
     for achr in achrs:
         achr_size[achr] = np.max(np.max(coords.loc[coords.aChr == achr, ['aStart', 'aEnd']]))
         bchr_size[achr] = np.max(np.max(coords.loc[coords.bChr == achr, ['bStart', 'bEnd']]))
-    #print(achr_size, bchr_size, len(chrlink))
-    
+
     key_found = []
     if args.ref is not None:
-        # for fasta in parse(args.ref.name, 'fasta', generic_dna):
         for chrid, seq in readfasta(args.ref.name).items():
             if chrid in achrs:
                 try:
@@ -245,7 +190,7 @@ if __name__ == "__main__":
     ###################################################################
     # Identify structural rearrangements
     ###################################################################
-    from syri.pyxFiles.synsearchFunctions import startSyri
+    from syri.synsearchFunctions import startSyri
     if not args.nosr:
         startSyri(args, coords[["aStart", "aEnd", "bStart", "bEnd", "aLen", "bLen", "iden", "aDir", "bDir", "aChr", "bChr"]])
 
@@ -303,11 +248,62 @@ if __name__ == "__main__":
         getVCF("syri.out", "syri.vcf", args.dir, args.prefix)
         getsum("syri.out", "syri.summary", args.dir, args.prefix)
 
-    from syri.bin.func.myUsefulFunctions import fileRemove
+    from syri.scripts.func import fileRemove
     if not args.keep:
         for fin in ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", "sv.txt", "notAligned.txt", "snps.txt"]:
             fileRemove(args.dir + args.prefix + fin)
     print("Finished syri")
+
+def main(cmd):
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    optional = parser._action_groups.pop()
+    required = parser.add_argument_group("Input Files")
+    required.add_argument("-c", dest="infile", help="File containing alignment coordinates", type=argparse.FileType('r'), required=True)
+    required.add_argument("-r", dest="ref", help="Genome A (which is considered as reference for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
+    required.add_argument("-q", dest="qry", help="Genome B (which is considered as query for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
+    required.add_argument("-d", dest="delta", help=".delta file from mummer. Required for short variation (SNPs/indels) identification when CIGAR string is not available", type=argparse.FileType('r'))
+
+    other = parser.add_argument_group("Additional arguments")
+    other.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM", default="T", choices=['T', 'S', 'B'])
+    other.add_argument('-f', dest='f', help='Filter out low quality alignments', default=True, action='store_false')
+    other.add_argument('-k', dest="keep", help="Keep intermediate output files", default=False, action="store_true")
+    other.add_argument('--dir', dest='dir', help="path to working directory (if not current directory). All files must be in this directory.", action='store')
+    other.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
+    other.add_argument("--seed", dest="seed", help="seed for generating random numbers", type=int, default=1)
+    other.add_argument('--nc', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
+    other.add_argument('--novcf', dest="novcf", help="Do not combine all files into one output file", default=False, action="store_true")
+
+    # Parameters for identification of structural rearrangements
+    srargs = parser.add_argument_group("SR identification")
+    srargs.add_argument("--nosr", dest="nosr", help="Set to skip structural rearrangement identification", action="store_true", default=False)
+    srargs.add_argument("--tdgaplen", dest="tdgl", help="Maximum allowed gap-length between two alignments of a multi-alignment translocation or duplication (TD). Larger values increases TD identification sensitivity but also runtime.", type=int, default=500000)
+    srargs.add_argument("--tdmaxolp", dest="tdolp", help="Maximum allowed overlap between two translocations. Value should be in range (0,1].", type=float, default=0.8)
+    srargs.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
+    srargs.add_argument("--unic", dest="TransUniCount", help="Number of uniques bps for selecting translocation. Smaller values would select smaller TLs better, but may increase time and decrease accuracy.", type=int, default=1000)
+    srargs.add_argument("--unip", dest="TransUniPercent", help="Percent of unique region requried to select translocation. Value should be in range (0,1]. Smaller values would allow selection of TDs which are more overlapped with \
+     other regions.", type=float, default=0.5)
+    srargs.add_argument("--inc", dest="increaseBy", help="Minimum score increase required to add another alignment to translocation cluster solution", type=int, default=1000)
+    srargs.add_argument("--no-chrmatch", dest='chrmatch', help="Do not allow SyRI to automatically match chromosome ids between the two genomes if they are not equal", default=False, action='store_true')
+
+    # Parameters for identification of short variations
+    shvargs = parser.add_argument_group("ShV identification")
+    shvargs.add_argument("--nosv", dest="nosv", help="Set to skip structural variation identification", action="store_true", default=False)
+    shvargs.add_argument("--nosnp", dest="nosnp", help="Set to skip SNP/Indel (within alignment) identification", action="store_true", default=False)
+    # shvargs.add_argument("-align", dest="align", help="Alignment file to parse to show-snps for SNP/Indel identification", action="store_false", type=argparse.FileType("r"))
+    shvargs.add_argument("--all", help="Use duplications too for variant identification",  action="store_true", default=False)
+    shvargs.add_argument("--allow-offset", dest='offset', help='BPs allowed to overlap', default=5, type=int, action="store")
+    shvargs.add_argument('--cigar', dest="cigar", help="Find SNPs/indels using CIGAR string. Necessary for alignment generated using aligners other than nucmers", default=False, action='store_true')
+    shvargs.add_argument('-s', dest="sspath", help="path to show-snps from mummer", default="show-snps")
+    # shvargs.add_argument('-buff', dest="buff", help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=0)
+
+    optional.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
+    optional.add_argument("--lf", dest="log_fin", help="Name of log file", type=argparse.FileType("w"), default="syri.log")
+    optional.add_argument('--version', action='version', version='{version}'.format(version=__version__))
+    parser._action_groups.append(optional)
+
+    args = parser.parse_args(cmd)
+    syri(args)
+
 
 
 

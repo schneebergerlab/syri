@@ -1,20 +1,9 @@
-import numpy as np
-from syri.bin.func.myUsefulFunctions import *
-import sys
-import time
 from igraph import *
-from collections import Counter, deque, defaultdict
 from scipy.stats import *
-from datetime import datetime, date
+from datetime import datetime
 import pandas as pd
-from multiprocessing import Pool
-from functools import partial
-import os
-from gc import collect
-from Bio.SeqIO import parse
-import logging
-import psutil
-from syri.pyxFiles.function cimport getAllLongestPaths, getConnectivityGraph
+
+getAllLongestPaths, getConnectivityGraph
 
 cimport numpy as np
 cimport cython
