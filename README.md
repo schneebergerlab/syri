@@ -1,8 +1,14 @@
 ## Pre-requisite:
-1. Python >=3.8 and the following packages: Cython-0.29.23, numpy-1.20.2, scipy-1.6.2, pandas-1.2.4, python-igraph-0.9.1, psutil-5.8.0, pysam-0.16.0.1, and matplotlib-3.3.4
+1. Python >=3.8 and the following packages: Cython-0.29.23, numpy-1.21.2, scipy-1.6.2, pandas-1.2.4, python-igraph-0.9.1, psutil-5.8.0, pysam-0.16.0.1, and matplotlib-3.3.4
 2. C/C++ compiler: g++
 
 ## Recent major updates:
+(10-03-2022)
+* SyRI is now available on anaconda and can be installed using:
+```
+conda install -c bioconda syri 
+```
+
 (17-01-2022)
 * Making the python >3.8 version as the default (master) branch. For using older version, use the following command:
 ```
@@ -16,14 +22,20 @@ conda install -c bioconda plotsr
 
 
 ## Installation:
-Download/clone the repository, open the folder and run:
+Easiest way to install SyRI is through anaconda:
+```
+conda install -c bioconda syri 
+```
 
+For manual installation, download/clone the repository, open the folder and run:
 `python setup.py install`
-
 This will install the cython modules.
 
 ## Running:
-Executables will be in `syri/bin/` folder and can be run directly from the terminal.
+After installation, SyRI would be in your path and can be run directly from command. Test the installation using:
+```
+syri -h
+```
 
 Detailed information is available at: https://schneebergerlab.github.io/syri
 
