@@ -127,8 +127,8 @@ def syri(args):
     achr_size = {}
     bchr_size = {}
     for achr in achrs:
-        achr_size[achr] = np.max(np.max(coords.loc[coords.aChr == achr, ['aStart', 'aEnd']]))
-        bchr_size[achr] = np.max(np.max(coords.loc[coords.bChr == achr, ['bStart', 'bEnd']]))
+        achr_size[achr] = coords.loc[coords.aChr == achr, ['aStart', 'aEnd']].max().max()
+        bchr_size[achr] = coords.loc[coords.bChr == achr, ['bStart', 'bEnd']].max().max()
 
     key_found = []
     if args.ref is not None:

@@ -57,7 +57,8 @@ def readSRData(cwdPath, prefix, dup = False):
         coordsData["aChr"] = list(np.repeat(annoData[1], repCount))
         coordsData["bChr"] = list(np.repeat(annoData[5], repCount))
         coordsData["state"] = fileType.split("Out.txt")[0]
-        annoCoords = annoCoords.append(coordsData.copy())
+        # annoCoords = annoCoords.append(coordsData.copy())
+        annoCoords = pd.concat([annoCoords, coordsData.copy()])
 
     fileData = None
     try:
@@ -89,7 +90,8 @@ def readSRData(cwdPath, prefix, dup = False):
         coordsData1.loc[coordsData1.state == "invDuplication","state"] = "ctxInvDup"
         if not dup:
             coordsData1 = coordsData1.loc[coordsData1["state"].isin(["ctx","invCtx"])]
-        annoCoords = annoCoords.append(coordsData1)
+        # annoCoords = annoCoords.append(coordsData1)
+        annoCoords = pd.concat([annoCoords, coordsData1])
 
     annoCoords.columns = ["aStart","aEnd","bStart","bEnd","group","aChr","bChr","state"]
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
@@ -107,17 +109,27 @@ def getsnps(blocks, allAlignments):
         outsnps = pd.DataFrame()
         for row in alignments.itertuples(index=False):
             if not 'inv' in row.state:
-                outsnps = outsnps.append(snps.loc[(snps[0] > row.aStart) &
+                # outsnps = outsnps.append(snps.loc[(snps[0] > row.aStart) &
+                #                         (snps[0] < row.aEnd) &
+                #                         (snps[3] > row.bStart) &
+                #                         (snps[3] < row.bEnd) &
+                #                         (snps[9] == 1)])
+                outsnps = pd.concat([outsnps, snps.loc[(snps[0] > row.aStart) &
                                         (snps[0] < row.aEnd) &
                                         (snps[3] > row.bStart) &
                                         (snps[3] < row.bEnd) &
-                                        (snps[9] == 1)])
+                                        (snps[9] == 1)]])
             else:
-                outsnps = outsnps.append(snps.loc[(snps[0] > row.aStart) &
+                # outsnps = outsnps.append(snps.loc[(snps[0] > row.aStart) &
+                #                         (snps[0] < row.aEnd) &
+                #                         (snps[3] < row.bStart) &
+                #                         (snps[3] > row.bEnd) &
+                #                         (snps[9] == -1)])
+                outsnps = pd.concat([outsnps, snps.loc[(snps[0] > row.aStart) &
                                         (snps[0] < row.aEnd) &
                                         (snps[3] < row.bStart) &
                                         (snps[3] > row.bEnd) &
-                                        (snps[9] == -1)])
+                                        (snps[9] == -1)]])
 
             outsnps.drop_duplicates(inplace=True)
             outsnps.sort_values([0,3], inplace=True)

@@ -549,7 +549,7 @@ def getInversions(coords,chromo, threshold, synData, tUC, tUP):
         return(invertedCoordsOri, [],[],invertedCoordsOri,[],[])
 
     invertedCoords = invertedCoordsOri.copy()
-    maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
+    maxCoords = invertedCoords[["bStart","bEnd"]].max().max()
 
     invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart
     invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd

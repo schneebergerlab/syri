@@ -51,7 +51,8 @@ def readSRData(cwdPath, prefix, dup = False):
         coordsData["aChr"] = list(np.repeat(annoData[1], repCount))
         coordsData["bChr"] = list(np.repeat(annoData[5], repCount))
         coordsData["state"] = fileType.split("Out.txt")[0]
-        annoCoords = annoCoords.append(coordsData.copy())
+        # annoCoords = annoCoords.append(coordsData.copy())
+        annoCoords = pd.concat([annoCoords, coordsData.copy()])
 
     fileData = None
 
@@ -84,7 +85,8 @@ def readSRData(cwdPath, prefix, dup = False):
         coordsData1.loc[coordsData1.state == "invDuplication","state"] = "ctxInvDup"
         if not dup:
             coordsData1 = coordsData1.loc[coordsData1["state"].isin(["ctx","invCtx"])]
-        annoCoords = annoCoords.append(coordsData1)
+        # annoCoords = annoCoords.append(coordsData1)
+        annoCoords = pd.concat([annoCoords, coordsData1])
 
     annoCoords.columns = ["aStart","aEnd","bStart","bEnd","group","aChr","bChr","state"]
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
@@ -460,7 +462,8 @@ def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
         coordsData = fileData.loc[fileData[0] == "#",[2,3,6,7,1,5]].copy()
         coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
         coordsData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
-        annoCoords = annoCoords.append(coordsData.copy())
+        # annoCoords = annoCoords.append(coordsData.copy())
+        annoCoords = pd.concat([annoCoords, coordsData.copy()])
 
     try:
         fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header = None, dtype = object)
@@ -476,7 +479,8 @@ def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
     coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
     coordsData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
 
-    annoCoords = annoCoords.append(coordsData.copy())
+    # annoCoords = annoCoords.append(coordsData.copy())
+    annoCoords = pd.concat([annoCoords, coordsData.copy()])
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
     annoCoords.index = range(len(annoCoords))
 

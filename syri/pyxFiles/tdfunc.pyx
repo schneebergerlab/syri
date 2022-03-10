@@ -456,7 +456,7 @@ def readAnnoCoords(cwdPath, uniChromo, prefix):
         synData.append(list(map(int,line[:4]))+[chromo,chromo])
     fin.close()
     synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"])
-    annoCoords = annoCoords.append(synData)
+    annoCoords = pd.concat([annoCoords, synData])
 
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt"]:
         data = []
@@ -467,7 +467,7 @@ def readAnnoCoords(cwdPath, uniChromo, prefix):
                 data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
         fin.close()
         data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
-        annoCoords = annoCoords.append(data)
+        annoCoords = pd.concat([annoCoords, data])
 
     annoCoords[["aStart","aEnd","bStart","bEnd"]] = annoCoords[["aStart","aEnd","bStart","bEnd"]].astype("int64")
     annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"],inplace = True)
@@ -1163,7 +1163,7 @@ def blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
         invTransBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, invertedCoords, threshold)
 
         invertedCoords = invertedBlocks.copy()
-        maxCoords = np.max(np.max(invertedCoords[["bStart","bEnd"]]))
+        maxCoords = invertedCoords[["bStart","bEnd"]].max().max()
         invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart
         invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
         outInvertedBlocks = makeBlocksTree(invertedCoords.aStart.values, invertedCoords.aEnd.values, invertedCoords.bStart.values, invertedCoords.bEnd.values, threshold, invTransBlocksNeighbours[0].values, invTransBlocksNeighbours[1].values, tdgl)
@@ -1979,6 +1979,6 @@ def getDupGenome(dupData, allTransBlocksData, transClasses, astart, aend, bstart
                 break
         if not found:
             dupGenomes.append("A")
-    dupData["dupGenomes"] = pd.Series(dupGenomes, index = dupData.index)
+    dupData["dupGenomes"] = pd.Series(dupGenomes, index = dupData.index, dtype=str)
     return(dupData)
 

@@ -508,7 +508,6 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl, tdolp)
     inPlaceIndices = sorted(list(synData.index.values) + list(invData.index.values))
     inPlaceBlocks = chromBlocks[chromBlocks.index.isin(sorted(list(synData.index.values)))].copy()
 
-
     for i in bestInvPath:
         invPos = profitable[i].invPos
         invBlockData = invertedCoordsOri.iloc[invPos]
@@ -517,13 +516,14 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl, tdolp)
         invCoord.append(invCoord[3] - invCoord[2])
         invCoord.append(sum((invBlockData.aLen+invBlockData.bLen)*invBlockData.iden)/(invCoord[-2] + invCoord[-1]))
         invCoord.extend([1,-1,chromo,chromo])
-        for j in range(profitable[i].neighbours[0]+1,profitable[i].neighbours[1]):
+        for j in range(profitable[i].neighbours[0]+1, profitable[i].neighbours[1]):
             inPlaceBlocks = inPlaceBlocks[inPlaceBlocks.index != synData.iloc[j].name]
             try:
                 inPlaceIndices.remove(synData.iloc[j].name)
             except:
                 pass
-        inPlaceBlocks = inPlaceBlocks.append(pd.Series(invCoord, index = inPlaceBlocks.columns, name = invPos[0]))
+        # inPlaceBlocks = inPlaceBlocks.append(pd.Series(invCoord, index = inPlaceBlocks.columns, name = invPos[0]))
+        inPlaceBlocks = pd.concat([inPlaceBlocks, pd.DataFrame(dict(zip(inPlaceBlocks.columns, invCoord)), index=[0])])
 
     inPlaceBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
     inPlaceBlocks.index = range(inPlaceBlocks.shape[0])
@@ -866,7 +866,8 @@ def outSyn(cwdPath, threshold, prefix):
                 data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
                 data["class"] = i.split("Out.txt")[0]
                 if len(data)>0:
-                    reCoords = reCoords.append(data)
+                    # reCoords = reCoords.append(data)
+                    reCoords = pd.concat([reCoords, data])
             else:
                 for line in fin:
                     line = line.strip().split("\t")
@@ -874,9 +875,11 @@ def outSyn(cwdPath, threshold, prefix):
                         data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5],ctxAnnoDict[line[8]]])
                 data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","class"], dtype=object)
                 if len(data)>0:
-                    reCoords = reCoords.append(data)
+                    # reCoords = reCoords.append(data)
+                    reCoords = pd.concat([reCoords, data])
 
-    allBlocks = synData[["aStart","aEnd","bStart","bEnd","aChr","bChr","class"]].append(reCoords)
+    # allBlocks = synData[["aStart","aEnd","bStart","bEnd","aChr","bChr","class"]].append(reCoords)
+    allBlocks = pd.concat([synData[["aStart","aEnd","bStart","bEnd","aChr","bChr","class"]], reCoords])
     allBlocks.index = range(allBlocks.shape[0])
     allBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace= True)
     synLocs = {np.where(allBlocks.index.values == i)[0][0]:i for i in range(synData.shape[0])}
