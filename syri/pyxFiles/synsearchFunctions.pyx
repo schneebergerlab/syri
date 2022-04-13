@@ -437,6 +437,7 @@ def startSyri(args, coords):
     prefix = args.prefix
     tUC = args.TransUniCount
     tUP = args.TransUniPercent
+    invgl = args.invgl
     tdgl = args.tdgl
     tdolp = args.tdolp
 
@@ -449,7 +450,7 @@ def startSyri(args, coords):
     # Identify intra-chromosomal events (synteny, inversions, intra-trans, intra-dup) for each chromosome as a separate
     # process in parallel
     with Pool(processes = nCores) as pool:
-        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, tdgl=tdgl, tdolp=tdolp), uniChromo)
+        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, invgl=invgl, tdgl=tdgl, tdolp=tdolp), uniChromo)
 
     # Merge output of all chromosomes
     mergeOutputFiles(uniChromo,cwdPath, prefix)
@@ -463,7 +464,7 @@ def startSyri(args, coords):
     return 'Finished'
 
 
-def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl, tdolp):
+def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl, tdolp):
     logger = logging.getLogger("syri."+chromo)
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
     logger.info(chromo+" " + str(coordsData.shape))
@@ -494,7 +495,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl, tdolp)
     logger.info("Identifying Inversions for chromosome " + chromo)
 
     from syri.inversions import getInversions
-    invertedCoordsOri, profitable, bestInvPath, invData, synInInv, badSyn = getInversions(coords,chromo, threshold, synData, tUC, tUP)
+    invertedCoordsOri, profitable, bestInvPath, invData, synInInv, badSyn = getInversions(coords,chromo, threshold, synData, tUC, tUP, invgl)
 
     ##########################################################
     #### Identify Translocation and duplications
@@ -797,18 +798,20 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, tdgl, tdolp)
 ########################################################################################################################
 
 
-cpdef apply_TS(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold):
+cpdef apply_TS(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold, int mxgap = 100000000000):
     cdef:
         Py_ssize_t                              i, j,  n = len(astart)
         cpp_map[long, cpp_deq[long]]            df
         cpp_map[long, cpp_deq[long]].iterator   mapit
-    for i in range(n):
-        for j in range(i+1,n):
-            if (astart[j] - astart[i]) > threshold:
-                if (aend[j] - aend[i]) > threshold:
-                    if (bstart[j] - bstart[i]) > threshold:
-                        if (bend[j] - bend[i]) > threshold:
-                            df[i].push_back(j)
+    for i in range(<Py_ssize_t> n):
+        for j in range(<Py_ssize_t> i+1, <Py_ssize_t> n):
+            if (astart[j] - aend[i]) < mxgap:        # Select only alignments with small gaps
+                if (astart[j] - astart[i]) > threshold:
+                    if (aend[j] - aend[i]) > threshold:
+                        if (bstart[j] - bend[i]) < mxgap:        # Select only alignments with small gaps
+                            if (bstart[j] - bstart[i]) > threshold:
+                                if (bend[j] - bend[i]) > threshold:
+                                    df[i].push_back(j)
     out = {}
     for i in range(n):
         if df.count(i)== 1:

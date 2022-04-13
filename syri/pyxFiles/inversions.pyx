@@ -534,7 +534,7 @@ cpdef dict getNeighbourSyn(np.ndarray aStartInv, np.ndarray aEndInv, np.ndarray 
 
 
 
-def getInversions(coords,chromo, threshold, synData, tUC, tUP):
+def getInversions(coords,chromo, threshold, synData, tUC, tUP, invgl):
     logger = logging.getLogger("getinversion."+chromo)
 
     class inversion:
@@ -558,7 +558,7 @@ def getInversions(coords,chromo, threshold, synData, tUC, tUP):
 
     if len(invertedCoordsOri) > 0:
         # invTree = pd.DataFrame(apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold), index = range(len(invertedCoords)), columns = invertedCoords.index.values)
-        invTree = apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold)
+        invTree = apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold, mxgap=invgl)
     else:
         # invTree = pd.DataFrame([], index = range(len(invertedCoords)), columns = invertedCoords.index.values)
         invTree = {}

@@ -753,7 +753,7 @@ cpdef makeBlocksTree(long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd,
         cpp_map[long, cpp_deq[long]].iterator       it
 
     for i in range(<Py_ssize_t> n):
-        for j in range(<Py_ssize_t> i, <Py_ssize_t> n):
+        for j in range(<Py_ssize_t> i+1, <Py_ssize_t> n):
             if (aStart[j] - aEnd[i]) < tdgl:        # Select only alignments with small gaps
                 if (aStart[j] - aStart[i]) > threshold:
                     if (aEnd[j] - aEnd[i]) > threshold:
