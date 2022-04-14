@@ -66,7 +66,7 @@ def syri(args):
         logger.warning('For specifying output folder use --dir, use --prefix for modifying the output file names. Current --prefix ({}) may result in crashes.'.format(args.prefix))
 
     # Set CIGAR FLAG
-    if args.ftype in ['S', 'B']:
+    if args.ftype in ['S', 'B', 'P']:
         args.cigar = True
 
     # Check invgl flag
@@ -278,7 +278,7 @@ def main(cmd):
     required.add_argument("-d", dest="delta", help=".delta file from mummer. Required for short variation (SNPs/indels) identification when CIGAR string is not available", type=argparse.FileType('r'))
 
     other = parser.add_argument_group("Additional arguments")
-    other.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM", default="T", choices=['T', 'S', 'B'])
+    other.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM, P: PAF", default="T", choices=['T', 'S', 'B', 'P'])
     other.add_argument('-f', dest='f', help='Filter out low quality alignments', default=True, action='store_false')
     other.add_argument('-k', dest="keep", help="Keep intermediate output files", default=False, action="store_true")
     other.add_argument('--dir', dest='dir', help="path to working directory (if not current directory). All files must be in this directory.", action='store')
@@ -307,7 +307,7 @@ def main(cmd):
     # shvargs.add_argument("-align", dest="align", help="Alignment file to parse to show-snps for SNP/Indel identification", action="store_false", type=argparse.FileType("r"))
     shvargs.add_argument("--all", help="Use duplications too for variant identification",  action="store_true", default=False)
     shvargs.add_argument("--allow-offset", dest='offset', help='BPs allowed to overlap', default=5, type=int, action="store")
-    shvargs.add_argument('--cigar', dest="cigar", help="Find SNPs/indels using CIGAR string. Necessary for alignment generated using aligners other than nucmers", default=False, action='store_true')
+    shvargs.add_argument('--cigar', dest="cigar", help="Find SNPs/indels using CIGAR string. Necessary for alignments generated using aligners other than nucmers", default=False, action='store_true')
     shvargs.add_argument('-s', dest="sspath", help="path to show-snps from mummer", default="show-snps")
     # shvargs.add_argument('-buff', dest="buff", help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=0)
 

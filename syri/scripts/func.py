@@ -140,4 +140,13 @@ def readfasta(f):
         out[chrid] = ''.join(chrseq)
     # TODO: add check for the validation of input fasta files
     return out
+# END
 
+def cgtpl(cg):
+    """
+    Takes a cigar string as input and returns a cigar tuple
+    """
+    for i in "MIDNSHPX=":
+        cg = cg.replace(i, ';'+i+',')
+    return [i.split(';') for i in cg.split(',')[:-1]]
+#end

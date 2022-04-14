@@ -89,8 +89,8 @@ def samtocoords(f):
                     re,
                     qs,
                     qe,
-                    re-rs+1,
-                    abs(qs-qe+1),
+                    abs(re-rs) + 1,
+                    abs(qs-qe) + 1,
                     format((sum([i[0] for i in cgt if i[1] == '=']) / sum(
                         [i[0] for i in cgt if i[1] in ['=', 'X', 'I', 'D']])) * 100, '.2f'),
                     1,
@@ -111,7 +111,7 @@ def samtocoords(f):
     al.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
     al.index = range(len(al.index))
     return al
-
+# END
 
 def readSAMBAM(fin, type='B'):
     import pysam
@@ -212,7 +212,53 @@ def readSAMBAM(fin, type='B'):
     except Exception as e:
         logger.error("Error in reading BAM/SAM file. " + str(e))
         sys.exit()
+# END
 
+def readPAF(paf):
+    coords = deque()
+    logger = logging.getLogger('Reading BAM/SAM file')
+    try:
+        with open(paf, 'r') as fin:
+            for line in fin:
+                line = line.strip().split()
+                astart = int(line[7]) + 1
+                aend = int(line[8])
+                adir = 1
+                bdir = 1 if line[4] == '+' else -1
+                bstart = int(line[2]) + 1 if bdir == 1 else int(line[3])
+                bend = int(line[3]) if bdir == 1 else int(line[2]) + 1
+                alen = abs(aend - astart) + 1
+                blen = abs(bend - bstart) + 1 if bdir == 1 else bstart - bend + 1
+                cg = [i.split(":")[-1] for i in line[12:] if i[:2] == 'cg']
+                if len(cg) != 1:
+                    logger.error("CIGAR string is not present in PAF at line {}. Exiting.".format("\t".join(line)))
+                    sys.exit()
+                cg = cg[0]
+                ## Check CIGAR:
+                if not all([True if i[1] in {'I', 'D', 'H', 'S', 'X', '='} else False for i in cgtpl(cg)]):
+                    logger.error("Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: " + str(cg))
+                    sys.exit()
+                if len(cgtpl(cg)) > 2:
+                    if any([True if i[1] in {'H', 'S'} else False for i in cgtpl(cg)]):
+                        logger.error("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + str(cg))
+                        sys.exit()
+
+                iden = round((sum([int(i[0]) for i in cgtpl(cg) if i[1] == '='])/sum([int(i[0]) for i in cgtpl(cg) if i[1] in {'=', 'X', 'D', 'I'}]))*100, 2)
+                achr = line[5]
+                bchr = line[0]
+                coords.append([astart, aend, bstart, bend, alen, blen, iden, adir, bdir, achr, bchr, cg])
+        coords = pd.DataFrame(coords)
+        coords.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
+        coords.index = range(len(coords.index))
+        coords[6] = coords[6].astype('float')
+        return coords
+    except FileNotFoundError:
+        logger.error("Cannot open {} file. Exiting".format(paf))
+        sys.exit()
+    except ValueError as e:
+        logger.error("Error in reading PAF: {}. Exiting".format(e))
+        sys.exit()
+# END
 
 def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     logger = logging.getLogger('Reading Coords')
@@ -238,6 +284,13 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
         logger.info("Reading input from BAM file")
         try:
             coords = readSAMBAM(coordsfin, type='B')
+        except Exception as e:
+            logger.error("Error in reading the alignment file" + e)
+            sys.exit()
+    elif args.ftype == 'P':
+        logger.info("Reading input from PAF file")
+        try:
+            coords = readPAF(coordsfin)
         except Exception as e:
             logger.error("Error in reading the alignment file" + e)
             sys.exit()
