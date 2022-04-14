@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 
 if __name__=='__main__':
@@ -7,16 +8,17 @@ if __name__=='__main__':
     args = parser.parse_args()
 
     ids = [line.strip() for line in args.seqnames.readlines()]
-
-    from Bio.SeqIO import parse
-    from Bio.Seq import reverse_complement
+    # from syri.scripts.func import readfasta, revcomp
+    from func import readfasta, revcomp
+    # from Bio.SeqIO import parse
+    # from Bio.Seq import reverse_complement
     import re
 
     with open(args.fa.name+'.rc', 'w') as fout:
-        for fasta in parse(args.fa.name, 'fasta'):
-            fout.write('>'+fasta.id+'\n')
-            if fasta.id in ids:
-                fout.write(re.sub("(.{64})", "\\1\n", str(reverse_complement(fasta.seq)), 0, re.DOTALL))
+        for chrid, seq in readfasta(args.fa.name).items():
+            fout.write('>'+chrid+'\n')
+            if chrid in ids:
+                fout.write(re.sub("(.{64})", "\\1\n", str(revcomp(seq)), 0, re.DOTALL))
             else:
-                fout.write(re.sub("(.{64})", "\\1\n", str(fasta.seq), 0, re.DOTALL))
+                fout.write(re.sub("(.{64})", "\\1\n", str(seq), 0, re.DOTALL))
             fout.write('\n')
