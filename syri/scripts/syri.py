@@ -51,11 +51,19 @@ def syri(args):
 
     logger = logging.getLogger("Running SyRI")
 
-    # Set CWD
+    # Set CWD and check if it exists
     if args.dir is None:
         args.dir = os.getcwd() + os.sep
     else:
-        args.dir = args.dir + os.sep
+        if os.path.isdir(args.dir):
+            args.dir = args.dir + os.sep
+        else:
+            logger.error(args.dir + ' is not a valid folder. Exiting.')
+            sys.exit()
+
+    # Check prefix
+    if os.sep in args.prefix:
+        logger.warning('For specifying output folder use --dir, use --prefix for modifying the output file names. Current --prefix ({}) may result in crashes.'.format(args.prefix))
 
     # Set CIGAR FLAG
     if args.ftype in ['S', 'B']:
@@ -63,7 +71,7 @@ def syri(args):
 
     # Check invgl flag
     if args.invgl < 0:
-        logger.error('--invgaplen cannot be negative.')
+        logger.error('--invgaplen cannot be negative. Exiting.')
         sys.exit()
     elif args.invgl < 10000:
         logger.warning('A low value for --invgaplen is provided (' + str(args.invgl) + '). This may result in long execution time.')
