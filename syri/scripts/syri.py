@@ -309,8 +309,7 @@ def main(cmd):
     shvargs.add_argument("--allow-offset", dest='offset', help='BPs allowed to overlap', default=5, type=int, action="store")
     shvargs.add_argument('--cigar', dest="cigar", help="Find SNPs/indels using CIGAR string. Necessary for alignments generated using aligners other than nucmers", default=False, action='store_true')
     shvargs.add_argument('-s', dest="sspath", help="path to show-snps from mummer", default="show-snps")
-    # shvargs.add_argument('-buff', dest="buff", help="Remove SNPs which have other variants or alignment break within buff size bps", type=int, default=0)
-
+    # shvargs.add_argument('--maxsvseq', dest="mss", help="Sets the upper limit on the size of SV for which bases would be outputted files. Currently, only affects insertions, deletions and HDRs. (-1 means no cut-off)", type=int, default=-1)
     optional.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
     optional.add_argument("--lf", dest="log_fin", help="Name of log file", type=argparse.FileType("w"), default="syri.log")
     optional.add_argument('--version', action='version', version='{version}'.format(version=__version__))
