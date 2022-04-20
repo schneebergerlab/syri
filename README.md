@@ -3,36 +3,21 @@
 2. C/C++ compiler: g++
 
 ## Recent major updates:
-(10-03-2022)
-* SyRI is now available on anaconda and can be installed using:
-```
-conda install -c bioconda syri 
-```
-
-(17-01-2022)
-* Making the python >3.8 version as the default (master) branch. For using older version, use the following command:
-```
-git clone --single-branch --branch V1.4.1 https://github.com/schneebergerlab/syri.git
-```
-* [Plotsr](https://github.com/schneebergerlab/plotsr) is now a separate package. It can be installed using anaconda:
-```
-conda install -c bioconda plotsr
-```
-* Removed biopython as a dependency. Now uses inbuild function to read fasta files.
-
 
 ## Installation:
 Easiest way to install SyRI is through anaconda:
 ```
-conda install -c bioconda syri 
+# Create a new environment and install syri with all dependencies
+conda create -n syri_env -c bioconda syri
+# Activate the environment
+conda activate syri_env
 ```
 
 For manual installation, download/clone the repository, open the folder and run:
 `python setup.py install`
-This will install the cython modules.
 
 ## Running:
-After installation, SyRI would be in your path and can be run directly from command. Test the installation using:
+After installation, SyRI would be in your path and can be run directly from command line. Test the installation using:
 ```
 syri -h
 ```
@@ -52,6 +37,23 @@ Current solution to this problem is to manually check alignments. If the majorit
 
 
 ## Older Updates:
+(10-03-2022)
+* SyRI is now available on anaconda and can be installed using:
+```
+conda install -c bioconda syri
+```
+
+(17-01-2022)
+* Making the python >3.8 version as the default (master) branch. For using older version, use the following command:
+```
+git clone --single-branch --branch V1.4.1 https://github.com/schneebergerlab/syri.git
+```
+* [Plotsr](https://github.com/schneebergerlab/plotsr) is now a separate package. It can be installed using anaconda:
+```
+conda install -c bioconda plotsr
+```
+* Removed biopython as a dependency. Now uses inbuild function to read fasta files.
+
 (12-10-2021)
 * Issues in inversion detection: The recent releases of minimap2 (2.18-2.22) have some bug which results in inverted regions not getting aligned correctly. This issue is mostly fixed in the current master branch (HEAD node) of minimap2 repository. So, for accurate structural rearrangement identification with SyRI please use the latest version of minimap2.
 
