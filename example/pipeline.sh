@@ -19,7 +19,7 @@ head -151797 GCA_000977955.2_Sc_YJM1447_v1_genomic.fna > GCA_000977955.2_Sc_YJM1
 ## IN CASE, THAT IS NOT THE CASE, SYRI WOULD TRY TO FIND HOMOLOGOUS GENOMES USING
 ## WHOLE GENOME ALIGNMENTS, BUT THAT METHOD IS HEURISTICAL AND CAN RESULT IN 
 ## SUBOPTIMAL RESULTS.
-## ALSO, IT IS REQUIRED THAT THE TWO GENOMES (FASTA FILES) SHOULD HAVE SAME NUMBER
+## ALSO, IT IS REQUIRED THAT THE TWO GENOMES (FASTA FILES) HAVE THE SAME NUMBER
 ## OF CHROMOSOMES.
 
 ln -sf GCA_000146045.2_R64_genomic.fna refgenome
@@ -37,7 +37,7 @@ minimap2 -ax asm5 --eqx refgenome qrygenome > out.sam
 ## But they could also lead to significant increase in redundant alignments which
 ## leads to increase in runtime of the alignment tool and SyRI.
 
-## Ryn SyRI with SAM or BAM file as input
+## Run SyRI with SAM or BAM file as input
 python3 $PATH_TO_SYRI -c out.sam -r refgenome -q qrygenome -k -F S
 # OR
 samtools view -b out.sam > out.bam
