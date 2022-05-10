@@ -3,6 +3,11 @@
 2. C/C++ compiler: g++
 
 ## Recent major updates:
+(10-05-2022)
+* SyRI v1.6 is now available.
+* Added `--invgaplen` parameter to regulate the gap length between alignments of an inversion. This can also be used to filter out inversions with very different sizes between the reference and query genomes
+* Added reader for PAF files and can be used using `-F P`
+
 
 ## Installation:
 Easiest way to install SyRI is through anaconda:
