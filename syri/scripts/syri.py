@@ -290,7 +290,7 @@ def main(cmd):
     # Parameters for identification of structural rearrangements
     srargs = parser.add_argument_group("SR identification")
     srargs.add_argument("--nosr", dest="nosr", help="Set to skip structural rearrangement identification", action="store_true", default=False)
-    srargs.add_argument("--invgaplen", dest="invgl", help="Maximum allowed gap-length between two alignments of a multi-alignment inversion.", type=int, default=500000)
+    srargs.add_argument("--invgaplen", dest="invgl", help="Maximum allowed gap-length between two alignments of a multi-alignment inversion. It affects the selection of large inversions that can have different length in the reference and query genomes.", type=int, default=1000000000)
     srargs.add_argument("--tdgaplen", dest="tdgl", help="Maximum allowed gap-length between two alignments of a multi-alignment translocation or duplication (TD). Larger values increases TD identification sensitivity but also runtime.", type=int, default=500000)
     srargs.add_argument("--tdmaxolp", dest="tdolp", help="Maximum allowed overlap between two translocations. Value should be in range (0,1].", type=float, default=0.8)
     srargs.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
