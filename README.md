@@ -12,7 +12,7 @@ conda create -n syri_env -c bioconda syri
 # Activate the environment
 conda activate syri_env
 ```
-
+2
 For manual installation, download/clone the repository, open the folder and run:
 `python setup.py install`
 
