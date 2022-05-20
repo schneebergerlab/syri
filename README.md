@@ -3,7 +3,7 @@
 Syri compares alignments between two chromosome-level assemblies and identifies synteny and structural rearrangements.
 
 ![Example](./example/ampril_col0_chr3_6600000_10000000.png)
-<i> Figure generated using [plotsr](https://github.com/schneebergerlab/plotsr/blob/master/README.md) </i>
+<i> Figure generated using [plotsr](https://github.com/schneebergerlab/plotsr) </i>
 
 ## Pre-requisite:
 
