@@ -469,7 +469,11 @@ def getTSV(cwdpath, prefix, ref):
                     logger.error("too many notA regions")
                     sys.exit()
             fout.write("\t".join(list(map(str, row))) + "\n")
-            row_old = row
+            # Update row_old when chromosome change or the max coordinate increases
+            if row_old == -1: row_old = row
+            elif row.achr != row_old.achr: row_old = row
+            elif row_old.aend < row.aend: row_old = row
+            # row_old = row
 
             try:
                 a = annogrp.get_group(row.id)
