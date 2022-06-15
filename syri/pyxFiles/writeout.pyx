@@ -625,8 +625,7 @@ def getVCF(finname, foutname, cwdpath, prefix):
                     pos.append(_info)
                     fout.write('\t'.join(pos) + '\n')
     return 0
-
-
+# END
 
 def getsum(finname, foutname, cwdpath, prefix):
     """
