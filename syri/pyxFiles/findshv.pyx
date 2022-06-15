@@ -272,7 +272,6 @@ def getshv(args, coords, chrlink):
                                         (coords.bEnd == row.bEnd) &
                                         (coords.aChr == row.aChr) &
                                         (coords.bChr == row.bChr), 'cigar']
-
                         brks = findall("(\d+)([IDX=])?", cg.iloc[0])
 
                         # chech for validity of CIGAR string

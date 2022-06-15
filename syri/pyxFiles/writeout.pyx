@@ -3,11 +3,7 @@
 
 import numpy as np
 from syri.scripts.func import *
-# import sys
-# import time
-# from igraph import *
 from collections import deque, defaultdict
-# from scipy.stats import *
 from datetime import date
 import pandas as pd
 import os
@@ -135,9 +131,7 @@ def getTSV(cwdpath, prefix, ref):
         logger.debug("Number of SV annotations read from file: " + str(svdata.shape[0]))
         svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr']
         svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
-
         entries = deque()
-
         for row in svdata.itertuples(index=False):
             if row.vartype == "#":
                 _parent = anno.loc[(anno.achr == row.achr) &
@@ -169,7 +163,6 @@ def getTSV(cwdpath, prefix, ref):
                 "bseq": "-"
             })
             count += 1
-
         sv = pd.DataFrame.from_records(entries)
         if sv.shape[0] != 0:
             logger.debug("SV found in SV file. Number of SV that will be reported." + str(sv.shape[0]))
@@ -202,7 +195,6 @@ def getTSV(cwdpath, prefix, ref):
 
         if not isempty:
             logger.debug("Number of NOTAL annotations read from file: " + str(notal.shape[0]))
-
             notal.columns = ["gen", "start", "end", "chr"]
             notal[["start", "end"]] = notal[["start", "end"]].astype("int")
             entries = defaultdict()
@@ -247,7 +239,6 @@ def getTSV(cwdpath, prefix, ref):
         notal = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass', 'selected'])
     logger.debug("Number of NOTAL annotations to output: " + str(notal.shape[0]))
 
-
     def p_indel():
         vtype = "INS" if indel == 1 else "DEL"
         entries.append({
@@ -264,15 +255,12 @@ def getTSV(cwdpath, prefix, ref):
             'id': vtype + str(count),
             'dupclass': "-"
         })
-
     entries = deque()
-
     logger.debug('Get SNP data')
     hasSNP = True
     if not os.path.isfile(cwdpath + prefix + "snps.txt"):
         hasSNP = False
         logger.info(cwdpath + prefix + "snps.txt"+' cannot be opened. Cannot output SNPs and short indels.')
-
     if hasSNP:
         with open(cwdpath + prefix + "snps.txt", "r") as fin:
             indel = 0                           # marker for indel status. 0 = no_indel, 1 = insertion, -1 = deletion
@@ -284,7 +272,6 @@ def getTSV(cwdpath, prefix, ref):
             _bc = -1
             _p = -1
             _seq = ""
-
             i = 1
             for line in fin:
                 i += 1
@@ -342,7 +329,7 @@ def getTSV(cwdpath, prefix, ref):
                         _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
                     elif indel == 1:
                         n = _be-1 if 'INV' in _parent else _be+1
-                        if int(line[0]) != _as or line[1] != "." or line[10] != _ac or int(line[3])!=n:
+                        if int(line[0]) != _as or line[1] != "." or line[10] != _ac or int(line[3]) != n:
                             p_indel()
                             _seq = ""
                             count += 1
@@ -359,7 +346,7 @@ def getTSV(cwdpath, prefix, ref):
                             _be = int(line[3])
                             _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
                     elif indel == -1:
-                        if int(line[3]) != _bs or line[2] != "." or line[11] != _bc or int(line[0])!=(_ae+1):
+                        if int(line[3]) != _bs or line[2] != "." or line[11] != _bc or int(line[0]) != (_ae+1):
                             p_indel()
                             _seq = ""
                             count += 1
@@ -410,7 +397,8 @@ def getTSV(cwdpath, prefix, ref):
         # Add previous characted
         snpdata.loc[_indices, "aseq"] = _seq
         snpdata.loc[_dir, "bseq"] = _seq.loc[_dir] + snpdata.loc[_dir, "bseq"]
-        snpdata.loc[_inv, "bseq"] = _seq.loc[_inv] + snpdata.loc[_inv, "bseq"].str[::-1]
+        # snpdata.loc[_inv, "bseq"] = _seq.loc[_inv] + snpdata.loc[_inv, "bseq"].str[::-1]
+        snpdata.loc[_inv, "bseq"] = _seq.loc[_inv] + snpdata.loc[_inv, "bseq"]
 
         # Change coordinates
         snpdata.loc[_dir, "bstart"] = snpdata.loc[_dir, "bstart"] - 1

@@ -95,7 +95,6 @@ def readfasta(f):
     out = {}
     chrid = ''
     chrseq = deque()
-
     # Test if the file is Gzipped or not
     with gzopen(f, 'rb') as fin:
         try:
@@ -103,7 +102,6 @@ def readfasta(f):
             isgzip = True
         except BadGzipFile:
             isgzip = False
-
     try:
         if isgzip:
             with gzopen(f, 'rb') as fin:
@@ -135,7 +133,6 @@ def readfasta(f):
                         chrseq.append(line.strip())
     except Exception as e:
         raise Exception(e)
-
     if chrid != '':
         out[chrid] = ''.join(chrseq)
     # TODO: add check for the validation of input fasta files

@@ -7,7 +7,7 @@ from igraph import *
 from scipy.stats import *
 import pandas as pd
 import logging
-
+from collections import deque
 cimport numpy as np
 cimport cython
 
@@ -92,6 +92,7 @@ def readSRData(cwdPath, prefix, dup = False):
     annoCoords.sort_values(by = ["aChr", "aStart","aEnd","bChr", "bStart","bEnd"], inplace = True)
     annoCoords.index = range(len(annoCoords))
     return annoCoords
+# END
 
 def getSV(cwdPath, allAlignments, prefix, offset):
     """
@@ -129,15 +130,13 @@ def getSV(cwdPath, allAlignments, prefix, offset):
             else:
                 n = blocksAlign.iat[j, 3] - blocksAlign.iat[j + 1, 2] - 1
 
-            if offset <= m <= 0:  ## No significant overlap of reference genome
+            if offset <= m <= 0:  ## No significant overlap in reference genome
                 if offset <= n <= 0:  ## No significant overlap in query genome
                     continue
                 elif n > 0:
                     s = str(min(blocksAlign.iat[j, 1], blocksAlign.iat[j + 1, 0]))
                     if ordered:
                         fout.write("\t".join(["INS",
-                                              # str(blocksAlign.iat[j, 1]),
-                                              # str(blocksAlign.iat[j + 1, 0]),
                                               s,
                                               s,
                                               str(blocksAlign.iat[j, 3] + 1),
@@ -146,8 +145,6 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                                               blocksAlign.iat[0, 6]]) + "\n")
                     else:
                         fout.write("\t".join(["INS",
-                                              # str(blocksAlign.iat[j, 1]),
-                                              # str(blocksAlign.iat[j + 1, 0]),
                                               s,
                                               s,
                                               str(blocksAlign.iat[j, 3] - 1),
@@ -192,8 +189,6 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         fout.write("\t".join(["DEL",
                                               str(blocksAlign.iat[j, 1] + 1),
                                               str(blocksAlign.iat[j + 1, 0] - 1),
-                                              # str(blocksAlign.iat[j, 3]),
-                                              # str(blocksAlign.iat[j + 1, 2]),
                                               e,
                                               e,
                                               blocksAlign.iat[0, 5],
@@ -203,8 +198,6 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         fout.write("\t".join(["DEL",
                                               str(blocksAlign.iat[j, 1] + 1),
                                               str(blocksAlign.iat[j + 1, 0] - 1),
-                                              # str(blocksAlign.iat[j, 3]),
-                                              # str(blocksAlign.iat[j + 1, 2]),
                                               e,
                                               e,
                                               blocksAlign.iat[0, 5],
@@ -282,8 +275,6 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         fout.write("\t".join(["DEL",
                                               str(blocksAlign.iat[j, 1] + 1),
                                               str(blocksAlign.iat[j + 1, 0] - 1),
-                                              # str(blocksAlign.iat[j, 3]),
-                                              # str(blocksAlign.iat[j + 1, 2]),
                                               e,
                                               e,
                                               blocksAlign.iat[0, 5],
@@ -293,8 +284,6 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                         fout.write("\t".join(["DEL",
                                               str(blocksAlign.iat[j, 1] + 1),
                                               str(blocksAlign.iat[j + 1, 0] - 1),
-                                              # str(blocksAlign.iat[j, 3]),
-                                              # str(blocksAlign.iat[j + 1, 2]),
                                               e,
                                               e,
                                               blocksAlign.iat[0, 5],
@@ -347,10 +336,8 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                                               blocksAlign.iat[0, 6]]) + "\n")
 
             elif m < offset:
-
                 j_prop = abs(m) / (blocksAlign.iat[j, 1] - blocksAlign.iat[j, 0])
                 j1_prop = abs(m) / (blocksAlign.iat[j + 1, 1] - blocksAlign.iat[j + 1, 0])
-
                 if n >= offset:
                     if ordered:
                         sCoord = round(
@@ -374,12 +361,10 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                                               str(eCoord),
                                               blocksAlign.iat[0, 5],
                                               blocksAlign.iat[0, 6]]) + "\n")
-
                 if n < offset:
                     maxOverlap = max(abs(m), abs(n))
                     if abs(m - n) < 0.1 * maxOverlap:  ## no SV if the overlap on both genomes is of similar size
                         continue
-
                     if abs(m) > abs(n):
                         if ordered:
                             sCoord = round(blocksAlign.iat[j, 3] - j_prop * (
@@ -393,7 +378,6 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                                                   str(eCoord),
                                                   blocksAlign.iat[0, 5],
                                                   blocksAlign.iat[0, 6]]) + "\n")
-
                         else:
                             sCoord = round(blocksAlign.iat[j, 3] + j_prop * (
                                         blocksAlign.iat[j, 2] - blocksAlign.iat[j, 3]))
@@ -435,9 +419,43 @@ def getSV(cwdPath, allAlignments, prefix, offset):
                                                   str(blocksAlign.iat[j, 3]),
                                                   blocksAlign.iat[0, 5],
                                                   blocksAlign.iat[0, 6]]) + "\n")
-
     fout.close()
     return None
+# END
+
+def addsvseq(svfin, refname, qryname, hdrseq):
+    vt = {'INS', 'DEL', 'HDR'} if hdrseq else {'INS', 'DEL'}
+    svdata = deque()
+    # Read sv.txt generated using getSV
+    with open(svfin, 'r') as fin:
+        for line in fin:
+            svdata.append(line.strip().split())
+    gseq = readfasta(refname)
+    # Add reference genome sequence
+    for sv in svdata:
+        if sv[0] not in vt:
+            sv.append('-')
+            continue
+        if sv[0] == 'INS':
+            sv.append('-')
+            continue
+        sv.append(gseq[sv[5]][(int(sv[1])-1):int(sv[2])])
+    gseq = readfasta(refname)
+    # Add reference genome sequence
+    for sv in svdata:
+        if sv[0] not in vt:
+            sv.append('-')
+            continue
+        if sv[0] == 'DEL':
+            sv.append('-')
+            continue
+        sv.append(gseq[sv[5]][(int(sv[1])-1):int(sv[2])])
+
+
+
+
+
+
 
 
 def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
@@ -536,4 +554,4 @@ def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
 
 #    fout.close()
     return None
-
+# END
