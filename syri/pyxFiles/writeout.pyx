@@ -95,7 +95,7 @@ def getsrtable(cwdpath, prefix):
     anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
     anno.sort_values(['achr', 'astart', 'aend'], inplace=True)
     return anno
-
+# END
 
 def extractseq(_gen, _pos):
     chrs = defaultdict(dict)
@@ -103,7 +103,7 @@ def extractseq(_gen, _pos):
         if chrid in _pos.keys():
             chrs[chrid] = {_i: seq[_i-1] for _i in _pos[chrid]}
     return chrs
-
+# END
 
 def getTSV(cwdpath, prefix, ref):
     """
@@ -129,7 +129,7 @@ def getTSV(cwdpath, prefix, ref):
     if hasSV:
         svdata = pd.read_table(cwdpath + prefix + "sv.txt", header=None)
         logger.debug("Number of SV annotations read from file: " + str(svdata.shape[0]))
-        svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr']
+        svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr', 'aseq', 'bseq']
         svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
         entries = deque()
         for row in svdata.itertuples(index=False):
@@ -159,8 +159,8 @@ def getTSV(cwdpath, prefix, ref):
                 'parent': _parent,
                 'id': row.vartype + str(count),
                 'dupclass': "-",
-                'aseq': "-",
-                "bseq": "-"
+                'aseq': row.aseq,
+                "bseq": row.bseq
             })
             count += 1
         sv = pd.DataFrame.from_records(entries)
@@ -514,7 +514,7 @@ def getTSV(cwdpath, prefix, ref):
                     line[5] = chroms[line[5]]
                 fout.write("\t".join(line) + '\n')
     return 0
-
+# END
 
 def getVCF(finname, foutname, cwdpath, prefix):
     """
@@ -750,26 +750,4 @@ def getsum(finname, foutname, cwdpath, prefix):
         logger.error('Cannot create file' + cwdpath + prefix + foutname + '. Permission denied.')
         sys.exit()
     return 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# END
