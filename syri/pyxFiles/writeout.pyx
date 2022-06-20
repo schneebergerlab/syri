@@ -8,13 +8,14 @@ from datetime import date
 import pandas as pd
 import os
 import logging
+import sys
 
 np.random.seed(1)
-
 
 ##################################################################
 ### Generate formatted output
 ##################################################################
+
 
 def getsrtable(cwdpath, prefix):
     import re
@@ -97,15 +98,289 @@ def getsrtable(cwdpath, prefix):
     return anno
 # END
 
-def extractseq(_gen, _pos):
+
+def extractseq(gen: str, pos: defaultdict):
     chrs = defaultdict(dict)
-    for chrid, seq in readfasta(_gen).items():
-        if chrid in _pos.keys():
-            chrs[chrid] = {_i: seq[_i-1] for _i in _pos[chrid]}
+    for chrid, seq in readfasta(gen).items():
+        if chrid in pos.keys():
+            chrs[chrid] = {i: seq[i-1] for i in pos[chrid]}
     return chrs
 # END
 
-def getTSV(cwdpath, prefix, ref):
+
+def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
+    """
+    Read the SVs from sv.txt. Update the position and base to include upstream base/pos so that the SVs are suitable for writing in VCF format as well
+    :param fin: path to sv.txt
+    :param anno: SR annotation coordinates
+    :param count: variation counter
+    :param ref: variation counter
+    :return: Dataframe containing all SVs with corrected reference pos (for indels) and sequence (after adding upstream base with correct orientiation)
+    """
+    # Define logger
+    logger = logging.getLogger("parsesvs")
+    logger.debug('f: {}'.format(f))
+    if not os.path.isfile(f):
+        logger.info('{f} cannot be opened. Cannot output SVs.'.format(f=f))
+        sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
+    else:
+        # Read sv.txt
+        svdata = pd.read_table(f, header=None)
+        logger.debug("Number of SV annotations read from file: " + str(svdata.shape[0]))
+        svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr', 'aseq', 'bseq']
+        # Ensure that chromosome names are strings
+        svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
+        # Read data
+        entries = deque()
+        for row in svdata.itertuples(index=False):
+            if row.vartype == "#":
+                parent = anno.loc[(anno.achr == row.achr) &
+                                   (anno.astart == row.astart) &
+                                   (anno.aend == row.aend) &
+                                   (anno.bchr == row.bchr) &
+                                   (anno.bstart == row.bstart) &
+                                   (anno.bend == row.bend) &
+                                   (anno.parent == "-"), "id"]
+                if len(parent) != 1:
+                    logger.error("Error in finding parent for SV")
+                    logger.error(row.to_string() + "\t" + parent.to_string())
+                    sys.exit()
+                else:
+                    parent = parent.to_string(index=False, header=False)
+                continue
+            entries.append({
+                'achr': row.achr,
+                'astart': row.astart,
+                'aend': row.aend,
+                'bchr': row.bchr,
+                'bstart': row.bstart,
+                'bend': row.bend,
+                'vartype': row.vartype,
+                'parent': parent,
+                'id': row.vartype + str(count),
+                'dupclass': "-",
+                'aseq': row.aseq,
+                "bseq": row.bseq
+            })
+            count += 1
+        sv = pd.DataFrame.from_records(entries)
+        if sv.shape[0] != 0:
+            logger.debug("SV found in SV file. Number of SV that will be reported." + str(sv.shape[0]))
+            sv.index = sv['id']
+            sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+            sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+            sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
+            # Get sequence at start position in reference sequence
+            positions = defaultdict()
+            for grp in sv.groupby('achr'):
+                p = deque()
+                p.extend(grp[1].loc[grp[1].vartype == "INS", "astart"].tolist())
+                p.extend((grp[1].loc[grp[1].vartype == "DEL", "astart"] - 1).tolist())
+                p.extend((grp[1].loc[grp[1].vartype == "HDR", "astart"] - 1).tolist())
+                positions[grp[0]] = sorted(p)
+            seq = extractseq(ref, positions)
+            logger.debug('Fixing coords for insertions and deletions')
+            # Update sequence and position for insertions
+            indices = sv.loc[sv.vartype == "INS"].index.values
+            s = pd.Series([seq[row[0]][row[1]] for row in sv.loc[indices].itertuples(index=False)], index=indices)
+            sv.loc[indices, "aseq"] = s
+            sv.loc[indices, "bseq"] = s + sv.loc[indices, 'bseq']
+            d = indices[~sv.loc[indices, "parent"].str.contains("INV")]
+            sv.loc[d, "bstart"] = sv.loc[d, "bstart"] - 1
+            # For inverted annotations, select the position matching the selected reference base and swap the coordinates so that  in output qry start < end
+            i = indices[sv.loc[indices, "parent"].str.contains("INV")]
+            sv.loc[i, "bstart"] = sv.loc[i, "bstart"] + 1
+            sv.loc[i, "bstart"] = sv.loc[i, "bstart"] + sv.loc[i, "bend"]
+            sv.loc[i, "bend"] = sv.loc[i, "bstart"] - sv.loc[i, "bend"]
+            sv.loc[i, "bstart"] = sv.loc[i, "bstart"] - sv.loc[i, "bend"]
+
+            # Update sequence and positions for deletions
+            indices = sv.loc[sv.vartype == "DEL"].index.values
+            s = pd.Series([seq[row[0]][row[1]-1] for row in sv.loc[indices].itertuples(index=False)], index=indices)
+            sv.loc[indices, "aseq"] = s + sv.loc[indices, 'aseq']
+            sv.loc[indices, "bseq"] = s
+            sv.loc[indices, "astart"] = sv.loc[indices, "astart"] - 1
+            ## For deletions in inverted annotations, do not need to change coordinates
+
+            # Update sequence and positions for HDRs
+            indices = sv.loc[sv.vartype == "HDR"].index.values
+            s = pd.Series([seq[row[0]][row[1]-1] for row in sv.loc[indices].itertuples(index=False)], index=indices)
+            sv.loc[indices, "aseq"] = s + sv.loc[indices, 'aseq']
+            sv.loc[indices, "bseq"] = s + sv.loc[indices, 'bseq']
+            sv.loc[indices, "astart"] = sv.loc[indices, "astart"] - 1
+            d = indices[~sv.loc[indices, "parent"].str.contains("INV")]
+            sv.loc[d, "bstart"] = sv.loc[d, "bstart"] - 1
+            # For inverted annotations, select the position matching the selected reference base and swap the coordinates so that  in output qry start < end
+            i = indices[sv.loc[indices, "parent"].str.contains("INV")]
+            sv.loc[i, "bstart"] = sv.loc[i, "bstart"] + 1
+            sv.loc[i, "bstart"] = sv.loc[i, "bstart"] + sv.loc[i, "bend"]
+            sv.loc[i, "bend"] = sv.loc[i, "bstart"] - sv.loc[i, "bend"]
+            sv.loc[i, "bstart"] = sv.loc[i, "bstart"] - sv.loc[i, "bend"]
+        else:
+            logger.debug("NO SV found in SV file. NO SV will be reported.")
+            sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
+    logger.debug("Number of SV annotations to output: " + str(sv.shape[0]))
+    return sv, count
+# END
+
+def parsesnps(f: str, anno: pd.DataFrame, count: int, ref: str):
+    def p_indel():
+        vtype = "INS" if indel == 1 else "DEL"
+        entries.append({
+            'achr': achr,
+            'astart': astart,
+            'aend': aend,
+            'bchr': bchr,
+            'bstart': bstart,
+            'bend': bend,
+            'vartype': vtype,
+            'parent': p,
+            'aseq': "-" if vtype == "INS" else seq,
+            'bseq': "-" if vtype == "DEL" else seq,
+            'id': vtype + str(count),
+            'dupclass': "-"
+        })
+    # END
+    logger = logging.getLogger("parsesnps")
+    logger.debug('parsing SNPs and short indels for writing')
+    logger.debug('f: {}'.format(f))
+    if not os.path.isfile(f):
+        logger.warning('{f} cannot be opened. Cannot output SNPs and short indels.'.format(f=f))
+        snp = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
+    else:
+        entries = deque()
+        with open(f, "r") as fin:
+            indel = 0                           # marker for indel status. 0 = no_indel, 1 = insertion, -1 = deletion
+            astart, aend, bstart, bend, achr, bchr, p = [-1] * 7
+            seq = ""
+            i = 1
+            for line in fin:
+                i += 1
+                line = line.strip().split("\t")
+                try:
+                    if line[0] == "#" and len(line) == 7:
+                        if indel != 0:
+                            p_indel()
+                            indel = 0
+                            seq = ""
+                        parent = anno.loc[(anno.achr == line[5]) &
+                                          (anno.astart == int(line[1])) &
+                                          (anno.aend == int(line[2])) &
+                                          (anno.bchr == line[6]) &
+                                          (anno.bstart == int(line[3])) &
+                                          (anno.bend == int(line[4])) &
+                                          (anno.parent == "-"), "id"]
+                        if len(parent) != 1:
+                            logger.error("Error in finding parent for SNP")
+                            logger.error("\t".join(line) + "\t" + parent.to_string())
+                            sys.exit()
+                        else:
+                            parent = parent.to_string(index=False, header=False)
+                        continue
+                    elif line[1] != "." and line[2] != "." and len(line) == 12:
+                        if indel != 0:
+                            p_indel()
+                            indel = 0
+                            seq = ""
+                        count += 1
+                        entries.append({
+                            'achr': line[10],
+                            'astart': int(line[0]),
+                            'aend': int(line[0]),
+                            'bchr': line[11],
+                            'bstart': int(line[3]),
+                            'bend': int(line[3]),
+                            'vartype': "SNP",
+                            'parent': parent,
+                            'aseq': line[1],
+                            'bseq': line[2],
+                            'id': "SNP" + str(count),
+                            'dupclass': "-"
+                        })
+                    elif indel == 0:
+                        count += 1
+                        astart, aend = int(line[0]), int(line[0])
+                        bstart, bend = int(line[3]), int(line[3])
+                        achr, bchr = line[10], line[11]
+                        p = parent
+                        indel = 1 if line[1] == "." else -1
+                        seq = seq + line[2] if line[1] == "." else seq + line[1]
+                    elif indel == 1:
+                        n = bend-1 if 'INV' in parent else bend+1
+                        if int(line[0]) != astart or line[1] != "." or line[10] != achr or int(line[3]) != n:
+                            p_indel()
+                            seq = ""
+                            count += 1
+                            astart, aend = int(line[0]), int(line[0])
+                            bstart, bend = int(line[3]), int(line[3])
+                            achr, bchr = line[10], line[11]
+                            p = parent
+                            indel = 1 if line[1] == "." else -1
+                            seq = seq + line[2] if line[1] == "." else seq + line[1]
+                        else:
+                            bend = int(line[3])
+                            seq = seq + line[2] if line[1] == "." else seq + line[1]
+                    elif indel == -1:
+                        if int(line[3]) != bstart or line[2] != "." or line[11] != bchr or int(line[0]) != (aend+1):
+                            p_indel()
+                            seq = ""
+                            count += 1
+                            astart, aend = int(line[0]), int(line[0])
+                            bstart, bend = int(line[3]), int(line[3])
+                            achr, bchr = line[10], line[11]
+                            p = parent
+                            indel = 1 if line[1] == "." else -1
+                            seq = seq + line[2] if line[1] == "." else seq + line[1]
+                        else:
+                            aend = int(line[0])
+                            seq = seq + line[2] if line[1] == "." else seq + line[1]
+                except IndexError as _e:
+                    logger.error(_e)
+                    logger.error("\t".join(line))
+                    sys.exit()
+
+        snp = pd.DataFrame.from_records(entries)
+        try:
+            snp.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snp.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+            snp.index = snp['id']
+            snp = snp.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+            snp.sort_values(['achr', 'astart', 'aend'], inplace=True)
+        except KeyError as e:
+            snp = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
+            logger.warning('No SNPs were found. This could be an error. Remove any old snps.txt and try re-running without --nosnp.')
+        logger.debug("Number of SNPs annotations read: " + str(snp.shape[0]))
+        positions = defaultdict()
+        for c in snp.achr.unique():
+            positions[c] = snp.loc[(snp.achr == c) & (snp.vartype == "INS"), "astart"].tolist() + (snp.loc[(snp.achr == c) & (snp.vartype == "DEL"), "astart"] - 1).tolist()
+        seq = extractseq(ref, positions)
+        logger.debug('Fixing coords for insertions and deletions')
+
+        # Update sequence and positions for deletions
+        indices = snp.loc[snp.vartype == "INS"].index.values
+        s = pd.Series([seq[row[0]][row[1]] for row in snp.loc[indices].itertuples(index=False)], index=indices)
+        snp.loc[indices, "aseq"] = s
+        snp.loc[indices, "bseq"] = s + snp.loc[indices, 'bseq']
+        d = indices[~snp.loc[indices, "parent"].str.contains("INV")]
+        snp.loc[d, "bstart"] = snp.loc[d, "bstart"] - 1
+        # For inverted annotations, select the position matching the selected reference base and swap the coordinates so that  in output qry start < end
+        i = indices[snp.loc[indices, "parent"].str.contains("INV")]
+        snp.loc[i, "bstart"] = snp.loc[i, "bstart"] + 1
+        snp.loc[i, "bstart"] = snp.loc[i, "bstart"] + snp.loc[i, "bend"]
+        snp.loc[i, "bend"] = snp.loc[i, "bstart"] - snp.loc[i, "bend"]
+        snp.loc[i, "bstart"] = snp.loc[i, "bstart"] - snp.loc[i, "bend"]
+
+        # Update sequence and positions for deletions
+        indices = snp.loc[snp.vartype == "DEL"].index.values
+        s = pd.Series([seq[row[0]][row[1]-1] for row in snp.loc[indices].itertuples(index=False)], index=indices)
+        snp.loc[indices, "aseq"] = s + snp.loc[indices, 'aseq']
+        snp.loc[indices, "bseq"] = s
+        snp.loc[indices, "astart"] = snp.loc[indices, "astart"] - 1
+        ## For deletions in inverted annotations, do not need to change coordinates
+    return snp, count
+# END
+
+
+def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
     """
     :param cwdpath: Path containing all input files
     :return: A TSV file containing genomic annotation for the entire genome
@@ -120,69 +395,23 @@ def getTSV(cwdpath, prefix, ref):
     anno = getsrtable(cwdpath, prefix)
     logger.debug("Number of SR annotations: " + str(anno.shape[0]))
     count = 1
+    # Read structure variants
     logger.debug('Get SV data')
-    hasSV = True
-    if not os.path.isfile(cwdpath + prefix + "sv.txt"):
-        hasSV = False
-        logger.info(cwdpath + prefix + "sv.txt"+' cannot be opened. Cannot output SVs.')
-
-    if hasSV:
-        svdata = pd.read_table(cwdpath + prefix + "sv.txt", header=None)
-        logger.debug("Number of SV annotations read from file: " + str(svdata.shape[0]))
-        svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr', 'aseq', 'bseq']
-        svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
-        entries = deque()
-        for row in svdata.itertuples(index=False):
-            if row.vartype == "#":
-                _parent = anno.loc[(anno.achr == row.achr) &
-                                   (anno.astart == row.astart) &
-                                   (anno.aend == row.aend) &
-                                   (anno.bchr == row.bchr) &
-                                   (anno.bstart == row.bstart) &
-                                   (anno.bend == row.bend) &
-                                   (anno.parent == "-"), "id"]
-                if len(_parent) != 1:
-                    logger.error("Error in finding parent for SV")
-                    logger.error(row.to_string() + "\t" + _parent.to_string())
-                    sys.exit()
-                else:
-                    _parent = _parent.to_string(index=False, header=False)
-                continue
-            entries.append({
-                'achr': row.achr,
-                'astart': row.astart,
-                'aend': row.aend,
-                'bchr': row.bchr,
-                'bstart': row.bstart,
-                'bend': row.bend,
-                'vartype': row.vartype,
-                'parent': _parent,
-                'id': row.vartype + str(count),
-                'dupclass': "-",
-                'aseq': row.aseq,
-                "bseq": row.bseq
-            })
-            count += 1
-        sv = pd.DataFrame.from_records(entries)
-        if sv.shape[0] != 0:
-            logger.debug("SV found in SV file. Number of SV that will be reported." + str(sv.shape[0]))
-            sv.index = sv['id']
-            sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-            sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
-            sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
-        else:
-            logger.debug("NO SV found in SV file. NO SV will be reported.")
-            sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
-    else:
-        sv = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
-    logger.debug("Number of SV annotations to output: " + str(sv.shape[0]))
-
+    sv, count = parsesvs(cwdpath + prefix + "sv.txt", anno, count, ref)
+    if not hdrseq:
+        sv.loc[sv.vartype == 'HDR', 'aseq'] = '-'
+        sv.loc[sv.vartype == 'HDR', 'bseq'] = '-'
+    if maxs != -1:
+        sv.loc[(sv.vartype.isin(['HDR', 'DEL'])) & (sv.aend - sv.astart > maxs), 'aseq'] = '-'
+        sv.loc[(sv.vartype.isin(['HDR', 'DEL'])) & (sv.aend - sv.astart > maxs), 'bseq'] = '-'
+        sv.loc[(sv.vartype.isin(['HDR', 'INS'])) & (sv.bend - sv.bstart > maxs), 'aseq'] = '-'
+        sv.loc[(sv.vartype.isin(['HDR', 'INS'])) & (sv.bend - sv.bstart > maxs), 'bseq'] = '-'
+    # Read not aligned regions
     logger.debug('Get notal data')
     hasNotal = True
     if not os.path.isfile(cwdpath + prefix + "notAligned.txt"):
         hasNotal = False
         logger.info(cwdpath + prefix + "notAligned.txt"+' cannot be opened. Cannot output not aligned regions.')
-
     if hasNotal:
         isempty = False
         try:
@@ -238,197 +467,22 @@ def getTSV(cwdpath, prefix, ref):
     else:
         notal = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass', 'selected'])
     logger.debug("Number of NOTAL annotations to output: " + str(notal.shape[0]))
-
-    def p_indel():
-        vtype = "INS" if indel == 1 else "DEL"
-        entries.append({
-            'achr': _ac,
-            'astart': _as,
-            'aend': _ae,
-            'bchr': _bc,
-            'bstart': _bs,
-            'bend': _be,
-            'vartype': vtype,
-            'parent': _p,
-            'aseq': "-" if vtype == "INS" else _seq,
-            'bseq': "-" if vtype == "DEL" else _seq,
-            'id': vtype + str(count),
-            'dupclass': "-"
-        })
-    entries = deque()
-    logger.debug('Get SNP data')
-    hasSNP = True
-    if not os.path.isfile(cwdpath + prefix + "snps.txt"):
-        hasSNP = False
-        logger.info(cwdpath + prefix + "snps.txt"+' cannot be opened. Cannot output SNPs and short indels.')
-    if hasSNP:
-        with open(cwdpath + prefix + "snps.txt", "r") as fin:
-            indel = 0                           # marker for indel status. 0 = no_indel, 1 = insertion, -1 = deletion
-            _as = -1                            # astart
-            _ae = -1
-            _bs = -1
-            _be = -1
-            _ac = -1
-            _bc = -1
-            _p = -1
-            _seq = ""
-            i = 1
-            for line in fin:
-                i += 1
-                line = line.strip().split("\t")
-                try:
-                    if line[0] == "#" and len(line) == 7:
-                        if indel != 0:
-                            p_indel()
-                            indel = 0
-                            _seq = ""
-                        _parent = anno.loc[(anno.achr == line[5]) &
-                                           (anno.astart == int(line[1])) &
-                                           (anno.aend == int(line[2])) &
-                                           (anno.bchr == line[6]) &
-                                           (anno.bstart == int(line[3])) &
-                                           (anno.bend == int(line[4])) &
-                                           (anno.parent == "-"), "id"]
-                        if len(_parent) != 1:
-                            logger.error("Error in finding parent for SNP")
-                            logger.error("\t".join(line) + "\t" + _parent.to_string())
-                            sys.exit()
-                        else:
-                            _parent = _parent.to_string(index=False, header=False)
-                        continue
-                    elif line[1] != "." and line[2] != "." and len(line) == 12:
-                        if indel != 0:
-                            p_indel()
-                            indel = 0
-                            _seq = ""
-                        count += 1
-                        entries.append({
-                            'achr': line[10],
-                            'astart': int(line[0]),
-                            'aend': int(line[0]),
-                            'bchr': line[11],
-                            'bstart': int(line[3]),
-                            'bend': int(line[3]),
-                            'vartype': "SNP",
-                            'parent': _parent,
-                            'aseq': line[1],
-                            'bseq': line[2],
-                            'id': "SNP" + str(count),
-                            'dupclass': "-"
-                        })
-                    elif indel == 0:
-                        count += 1
-                        _as = int(line[0])
-                        _ae = int(line[0])
-                        _bs = int(line[3])
-                        _be = int(line[3])
-                        _ac = line[10]
-                        _bc = line[11]
-                        _p = _parent
-                        indel = 1 if line[1] == "." else -1
-                        _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-                    elif indel == 1:
-                        n = _be-1 if 'INV' in _parent else _be+1
-                        if int(line[0]) != _as or line[1] != "." or line[10] != _ac or int(line[3]) != n:
-                            p_indel()
-                            _seq = ""
-                            count += 1
-                            _as = int(line[0])
-                            _ae = int(line[0])
-                            _bs = int(line[3])
-                            _be = int(line[3])
-                            _ac = line[10]
-                            _bc = line[11]
-                            _p = _parent
-                            indel = 1 if line[1] == "." else -1
-                            _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-                        else:
-                            _be = int(line[3])
-                            _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-                    elif indel == -1:
-                        if int(line[3]) != _bs or line[2] != "." or line[11] != _bc or int(line[0]) != (_ae+1):
-                            p_indel()
-                            _seq = ""
-                            count += 1
-                            _as = int(line[0])
-                            _ae = int(line[0])
-                            _bs = int(line[3])
-                            _be = int(line[3])
-                            _ac = line[10]
-                            _bc = line[11]
-                            _p = _parent
-                            indel = 1 if line[1] == "." else -1
-                            _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-                        else:
-                            _ae = int(line[0])
-                            _seq = _seq + line[2] if line[1] == "." else _seq + line[1]
-                except IndexError as _e:
-                    logger.error(_e)
-                    logger.error("\t".join(line))
-                    sys.exit()
-
-        snpdata = pd.DataFrame.from_records(entries)
-        try:
-            snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snpdata.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-            snpdata.index = snpdata['id']
-            snpdata = snpdata.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
-            snpdata.sort_values(['achr', 'astart', 'aend'], inplace=True)
-        except KeyError as e:
-            snpdata = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
-            logger.warning('No SNPs were found. This could be an error. Remove any old snps.txt and try re-running without --nosnp.')
-    else:
-        snpdata = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'])
-    logger.debug("Number of SNPs annotations read: " + str(snpdata.shape[0]))
-
-    positions = defaultdict()
-    for _chr in snpdata.achr.unique():
-        positions[_chr] = snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "INS"), "astart"].tolist() + (snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "DEL"), "astart"] - 1).tolist()
-
-    seq = extractseq(ref, positions)
-    logger.debug('Fixing coords for insertions and deletions')
-
-    for _chr in snpdata.achr.unique():
-        # Fix coordinates and sequence for insertions
-        _indices = snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "INS")].index.values
-        _seq = pd.Series([seq[_chr][_i] for _i in snpdata.loc[_indices, "astart"]], index=_indices)
-        _dir = _indices[~snpdata.loc[_indices, "parent"].str.contains("INV")]
-        _inv = _indices[snpdata.loc[_indices, "parent"].str.contains("INV")]
-
-        # Add previous characted
-        snpdata.loc[_indices, "aseq"] = _seq
-        snpdata.loc[_dir, "bseq"] = _seq.loc[_dir] + snpdata.loc[_dir, "bseq"]
-        # snpdata.loc[_inv, "bseq"] = _seq.loc[_inv] + snpdata.loc[_inv, "bseq"].str[::-1]
-        snpdata.loc[_inv, "bseq"] = _seq.loc[_inv] + snpdata.loc[_inv, "bseq"]
-
-        # Change coordinates
-        snpdata.loc[_dir, "bstart"] = snpdata.loc[_dir, "bstart"] - 1
-        snpdata.loc[_inv, "bend"] = snpdata.loc[_inv, "bstart"] + snpdata.loc[_inv, "bend"]
-        snpdata.loc[_inv, "bstart"] = snpdata.loc[_inv, "bend"] - snpdata.loc[_inv, "bstart"] + 1
-        snpdata.loc[_inv, "bend"] = snpdata.loc[_inv, "bend"] - snpdata.loc[_inv, "bstart"] + 1
-
-        # Fix coordinates and sequence for deletions
-        _indices = snpdata.loc[(snpdata.achr == _chr) & (snpdata.vartype == "DEL")].index.values
-        _seq = pd.Series([seq[_chr][_i-1] for _i in snpdata.loc[_indices, "astart"]], index=_indices)
-        _dir = _indices[~snpdata.loc[_indices, "parent"].str.contains("INV")]
-        _inv = _indices[snpdata.loc[_indices, "parent"].str.contains("INV")]
-
-        # Add previous characted
-        snpdata.loc[_indices, "aseq"] = _seq + snpdata.loc[_indices, "aseq"]
-        snpdata.loc[_indices, "bseq"] = _seq
-
-        # Change coordinates
-        snpdata.loc[_indices, "astart"] = snpdata.loc[_indices, "astart"] - 1
-        snpdata.loc[_inv, "bstart"] = snpdata.loc[_inv, "bstart"] + 1
-        snpdata.loc[_inv, "bend"] = snpdata.loc[_inv, "bend"] + 1
+    # Read short variants
+    logger.debug('Get SNPs/indels data')
+    snp, count = parsesnps(cwdpath + prefix + "snps.txt", anno, count, ref)
+    if maxs != -1:
+        snp.loc[(snp.vartype == 'DEL') & (snp.aend - snp.astart > maxs), 'aseq'] = '-'
+        snp.loc[(snp.vartype == 'DEL') & (snp.aend - snp.astart > maxs), 'bseq'] = '-'
+        snp.loc[(snp.vartype == 'INS') & (snp.bend - snp.bstart > maxs), 'aseq'] = '-'
+        snp.loc[(snp.vartype == 'INS') & (snp.bend - snp.bstart > maxs), 'bseq'] = '-'
 
     events = anno.loc[anno.parent == "-"]
     logger.debug('Starting output file generation')
-
     with open(cwdpath + prefix + "syri.out", "w") as fout:
-        logger.debug("All annotation count. " + "SR anno: " + str(anno.shape[0]) + " SV anno: " + str(sv.shape[0]) + " ShV anno: " + str(snpdata.shape[0]) + " notal anno: " + str(notal.shape[0]))
+        logger.debug("All annotation count. " + "SR anno: " + str(anno.shape[0]) + " SV anno: " + str(sv.shape[0]) + " ShV anno: " + str(snp.shape[0]) + " notal anno: " + str(notal.shape[0]))
         annogrp = anno.groupby('parent')
         svgrp = sv.groupby('parent')
-        snpdatagrp = snpdata.groupby('parent')
+        snpgrp = snp.groupby('parent')
 
         notA = notal.loc[notal.achr != "-"].copy()
         notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
@@ -478,7 +532,7 @@ def getTSV(cwdpath, prefix, ref):
                 logger.debug('Error in finding key for anno.' + e)
 
             try:
-                c = snpdatagrp.get_group(row.id)
+                c = snpgrp.get_group(row.id)
             except KeyError:
                 c = pd.DataFrame()
             except Exception as e:
@@ -515,6 +569,7 @@ def getTSV(cwdpath, prefix, ref):
                 fout.write("\t".join(line) + '\n')
     return 0
 # END
+
 
 def getVCF(finname, foutname, cwdpath, prefix):
     """
@@ -607,12 +662,12 @@ def getVCF(finname, foutname, cwdpath, prefix):
                 pos.append(_info)
                 fout.write('\t'.join(pos) + '\n')
 
-            elif line[10] in ['CPG', 'CPL', 'TDM', 'HDR']:
+            elif line[10] in ['CPG', 'CPL', 'TDM']:
                 _info = ";".join(['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=ShV', 'DupType=.'])
                 pos.append(_info)
                 fout.write('\t'.join(pos) + '\n')
 
-            elif line[10] in ['SNP', 'DEL', 'INS']:
+            elif line[10] in ['SNP', 'DEL', 'INS', 'HDR']:
                 if (line[3] == '-') != (line[4] == '-'):
                     logger.error("Inconsistency in annotation type. Either need seq for both or for none.")
                 elif line[3] == '-' and line[4] == '-':
@@ -626,6 +681,7 @@ def getVCF(finname, foutname, cwdpath, prefix):
                     fout.write('\t'.join(pos) + '\n')
     return 0
 # END
+
 
 def getsum(finname, foutname, cwdpath, prefix):
     """

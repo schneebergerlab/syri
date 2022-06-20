@@ -223,7 +223,7 @@ def syri(args):
             if args.prefix+file not in listDir:
                 logger.error(file + " is not present in the directory. Exiting")
                 sys.exit()
-        from syri.findsv import readSRData, getSV, getNotAligned
+        from syri.findsv import readSRData, getSV, addsvseq, getNotAligned
         if args.ref is None or args.qry is None:
             logger.error("Reference and query assembly fasta files are required for SV identification.")
             sys.exit()
@@ -231,7 +231,7 @@ def syri(args):
         allAlignments = readSRData(args.dir, args.prefix, args.all)
         getSV(args.dir, allAlignments, args.prefix, args.offset)
         #TODO: finalise the below SV call
-        addsvseq()
+        addsvseq(args.dir + args.prefix + "sv.txt", args.ref.name, args.qry.name)
         getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name, chrlink)
 
     ###################################################################
@@ -258,7 +258,7 @@ def syri(args):
         if args.ref is None:
             logger.error("Reference genome fasta file is required for combining outputs.")
             sys.exit()
-        getTSV(args.dir, args.prefix, args.ref.name)
+        getTSV(args.dir, args.prefix, args.ref.name, args.hdrseq, args.maxs)
         logger.info('Generating VCF')
         getVCF("syri.out", "syri.vcf", args.dir, args.prefix)
         getsum("syri.out", "syri.summary", args.dir, args.prefix)
