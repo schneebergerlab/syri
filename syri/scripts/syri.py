@@ -9,7 +9,7 @@ Created on Wed May 10 13:05:51 2017
 import argparse
 from syri import __version__
 
-# if __name__ == "__main__":
+
 def syri(args):
     # Check that correct version of python is being used
     import logging
@@ -126,7 +126,8 @@ def syri(args):
     from syri.synsearchFunctions import readCoords
     from syri.scripts.func import readfasta
     import numpy as np
-    
+
+    # chrlink is a dict with query genome ID as key and matching reference genome as values
     coords, chrlink = readCoords(args.infile.name, args.chrmatch, args.dir, args.prefix, args, args.cigar)
     achrs = np.unique(coords.aChr).tolist()
     bchrs = np.unique(coords.bChr).tolist()
@@ -231,7 +232,7 @@ def syri(args):
         allAlignments = readSRData(args.dir, args.prefix, args.all)
         getSV(args.dir, allAlignments, args.prefix, args.offset)
         #TODO: finalise the below SV call
-        addsvseq(args.dir + args.prefix + "sv.txt", args.ref.name, args.qry.name)
+        addsvseq(args.dir + args.prefix + "sv.txt", args.ref.name, args.qry.name, chrlink)
         getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name, chrlink)
 
     ###################################################################
