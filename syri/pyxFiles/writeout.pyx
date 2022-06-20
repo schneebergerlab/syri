@@ -182,7 +182,7 @@ def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
             logger.debug('Fixing coords for insertions and deletions')
             # Update sequence and position for insertions
             indices = sv.loc[sv.vartype == "INS"].index.values
-            s = pd.Series([seq[row[0]][row[1]] for row in sv.loc[indices].itertuples(index=False)], index=indices)
+            s = pd.Series([seq[row[0]][row[1]] for row in sv.loc[indices].itertuples(index=False)], index=indices, dtype=str)
             sv.loc[indices, "aseq"] = s
             sv.loc[indices, "bseq"] = s + sv.loc[indices, 'bseq']
             d = indices[~sv.loc[indices, "parent"].str.contains("INV")]
@@ -196,7 +196,7 @@ def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
 
             # Update sequence and positions for deletions
             indices = sv.loc[sv.vartype == "DEL"].index.values
-            s = pd.Series([seq[row[0]][row[1]-1] for row in sv.loc[indices].itertuples(index=False)], index=indices)
+            s = pd.Series([seq[row[0]][row[1]-1] for row in sv.loc[indices].itertuples(index=False)], index=indices, dtype=str)
             sv.loc[indices, "aseq"] = s + sv.loc[indices, 'aseq']
             sv.loc[indices, "bseq"] = s
             sv.loc[indices, "astart"] = sv.loc[indices, "astart"] - 1
