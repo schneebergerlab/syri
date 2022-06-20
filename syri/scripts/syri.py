@@ -16,6 +16,22 @@ def syri(args):
     import logging.config
     import os
     import sys
+
+    logger = logging.getLogger("Running SyRI")
+    # Set CWD and check if it exists
+    if args.dir is None:
+        args.dir = os.getcwd() + os.sep
+    else:
+        if os.path.isdir(args.dir):
+            args.dir = args.dir + os.sep
+        else:
+            logger.error(args.dir + ' is not a valid folder. Exiting.')
+            sys.exit()
+
+    # Check prefix
+    if os.sep in args.prefix:
+        logger.warning('For specifying output folder use --dir, use --prefix for modifying the output file names. Current --prefix ({}) may result in crashes.'.format(args.prefix))
+
     logging.config.dictConfig({
         'version': 1,
         'disable_existing_loggers': False,
@@ -35,7 +51,7 @@ def syri(args):
             },
             'log_file': {
                 'class': 'logging.FileHandler',
-                'filename': args.log_fin.name,
+                'filename': args.dir + args.prefix + args.log_fin.name,
                 'mode': 'a',
                 'formatter': 'log_file',
                 'level': args.log,
@@ -48,22 +64,6 @@ def syri(args):
             },
         },
     })
-
-    logger = logging.getLogger("Running SyRI")
-
-    # Set CWD and check if it exists
-    if args.dir is None:
-        args.dir = os.getcwd() + os.sep
-    else:
-        if os.path.isdir(args.dir):
-            args.dir = args.dir + os.sep
-        else:
-            logger.error(args.dir + ' is not a valid folder. Exiting.')
-            sys.exit()
-
-    # Check prefix
-    if os.sep in args.prefix:
-        logger.warning('For specifying output folder use --dir, use --prefix for modifying the output file names. Current --prefix ({}) may result in crashes.'.format(args.prefix))
 
     # Set CIGAR FLAG
     if args.ftype in ['S', 'B', 'P']:
