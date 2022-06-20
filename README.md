@@ -11,9 +11,13 @@ Syri compares alignments between two chromosome-level assemblies and identifies 
 2. C/C++ compiler: g++
 
 ## Recent major updates:
+(20-06-2022)
+* Added printing of large indels and HDR.
+* Added parameter `--maxsize` to regulate the maximum size of SV for which sequence would be printed.
+* Added parameter `--hdrseq` to toggle printing of HDR sequences.
+
 
 (10-05-2022)
-
 * SyRI v1.6 is now available.
 * Added `--invgaplen` parameter to regulate the gap length between alignments of an inversion. This can also be used to filter out inversions with very different sizes between the reference and query genomes
 * Added reader for PAF files and can be used using `-F P`
