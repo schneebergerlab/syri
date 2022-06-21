@@ -18,6 +18,7 @@ def syri(args):
     import sys
 
     logger = logging.getLogger("Running SyRI")
+    os.remove("syri.log")
     # Set CWD and check if it exists
     if args.dir is None:
         args.dir = os.getcwd() + os.sep

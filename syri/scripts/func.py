@@ -5,7 +5,6 @@ Created on Mon Jun 19 15:36:01 2017
 """
 import operator as op
 from functools import reduce
-# from Bio import SeqIO
 from os import remove
 
 
