@@ -595,6 +595,10 @@ def getVCF(finname, foutname, cwdpath, prefix):
               'vartype': str,
               'dupclass': str}
     data = data.astype(dtypes)
+    # Translation string for fixing IUPAC codes in sequence strings
+    old = 'ACGTNacgtnRYSWKMBDHVryswkmbdhv'
+    rev = 'ACGTNacgtnACCAGACAAAaccagacaaa'
+    tab = str.maketrans(old, rev)
     try:
         data['achr'] = data['achr'].astype('int')
     except ValueError as ve:
@@ -675,7 +679,7 @@ def getVCF(finname, foutname, cwdpath, prefix):
                     pos.append(_info)
                     fout.write('\t'.join(pos) + '\n')
                 elif line[3] != '-' and line[4] != '-':
-                    pos = [line[0], line[1], line[8], line[3], line[4], '.', 'PASS']
+                    pos = [line[0], line[1], line[8], line[3].translate(tab), line[4].translate(tab), '.', 'PASS']
                     _info = ";".join(['END=' + line[2], 'ChrB=' + line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=' + line[9], 'VarType=ShV', 'DupType=.'])
                     pos.append(_info)
                     fout.write('\t'.join(pos) + '\n')
