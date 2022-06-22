@@ -269,7 +269,7 @@ def syri(args):
     if not args.keep:
         for fin in ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", "sv.txt", "notAligned.txt", "snps.txt"]:
             fileRemove(args.dir + args.prefix + fin)
-    print("Finished syri")
+    logger.warning("Finished syri")
 
 def main(cmd):
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
