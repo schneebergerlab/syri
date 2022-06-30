@@ -605,7 +605,7 @@ def getVCF(finname, foutname, cwdpath, prefix):
         logger.debug('Chromosome values are sorted lexicographically.')
     data.sort_values(['achr', 'astart', 'aend'], inplace=True)
     data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']] = data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']].astype(str)
-
+    # TODO: Add contig/chrom information in the VCF
     with open(cwdpath + prefix + foutname, 'w') as fout:
         fout.write('##fileformat=VCFv4.3\n')
         fout.write('##fileDate=' + str(date.today()).replace('-', '') + '\n')

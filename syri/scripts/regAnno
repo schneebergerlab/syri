@@ -104,8 +104,8 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers()
     
     parser_region = subparsers.add_parser("region", help="get annotation for the region")
-    parser_getbed = subparsers.add_parser("getbed", help= "get bed file for the regions")
-    parser_snpanno = subparsers.add_parser("snpanno", help= "get annotation for SNPs list")
+    parser_getbed = subparsers.add_parser("getbed", help="get bed file for the regions")
+    parser_snpanno = subparsers.add_parser("snpanno", help="get annotation for SNPs list")
     
     if len(sys.argv[1:]) == 0:
         parser.print_help()
@@ -114,20 +114,20 @@ if __name__ == "__main__":
     parser_region.set_defaults(func=getRegion)
     parser_region.add_argument("chr", help="Chromosome ID", type=str)
     parser_region.add_argument("start", help="region start", type=int)
-    parser_region.add_argument("end", help = "region end", type=int)
-    parser_region.add_argument("-q",help="search region in query genome",action="store_true", default=False)
-    parser_region.add_argument("-f",help="files to search",type=argparse.FileType('r'), nargs="+", default = None )
+    parser_region.add_argument("end", help="region end", type=int)
+    parser_region.add_argument("-q", help="search region in query genome", action="store_true", default=False)
+    parser_region.add_argument("-f", help="files to search", type=argparse.FileType('r'), nargs="+", default=None)
     
     parser_getbed.set_defaults(func=getBed)
-    parser_getbed.add_argument("-q",help="search region in query genome",action="store_true", default=False)
-    parser_getbed.add_argument("-f", help="files to search",type=argparse.FileType('r'), nargs="+", default = None)
-    parser_getbed.add_argument("-m",help="margin to add on the regions", type= int, default = 0)
-    parser_getbed.add_argument("-a",help="output region annotation", action="store_true", default = False)
+    parser_getbed.add_argument("-q", help="search region in query genome", action="store_true", default=False)
+    parser_getbed.add_argument("-f", help="files to search", type=argparse.FileType('r'), nargs="+", default=None)
+    parser_getbed.add_argument("-m", help="margin to add on the regions", type=int, default=0)
+    parser_getbed.add_argument("-a", help="output region annotation", action="store_true", default=False)
     
     parser_snpanno.set_defaults(func=getSnpAnno)
-    parser_snpanno.add_argument("fin", help ="input file in tab separated format. Column 1: Chr. Column 2: position", type=argparse.FileType('r'), default = None)
-    parser_snpanno.add_argument("-q",help="search annotation in query genome",action="store_true", default=False)
-    parser_snpanno.add_argument("-f", help="files to search. by default all files will be searched",type=argparse.FileType('r'), nargs="+", default = None)
+    parser_snpanno.add_argument("fin", help="input file in tab separated format. Column 1: Chr. Column 2: position", type=argparse.FileType('r'), default=None)
+    parser_snpanno.add_argument("-q", help="search annotation in query genome", action="store_true", default=False)
+    parser_snpanno.add_argument("-f", help="files to search. by default all files will be searched", type=argparse.FileType('r'), nargs="+", default=None)
        
     
     cwdPath = os.getcwd()+os.sep
