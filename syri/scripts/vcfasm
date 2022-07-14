@@ -74,7 +74,7 @@ def hapmerge(args):
             if var.chrom != lastchr:
                 if var.chrom not in cids:
                     cids.append(var.chrom)
-            vd[var.chrom].append((var.pos, var.ref, var.alts))
+            vd[var.chrom].append((var.pos, var.ref.upper(), tuple(map(str.upper, var.alts))))                  # Convert bases to upper case to allow correct comparison
         gp = deque()            # garb pos
         v1d = defaultdict(dict)
         for k in vd:
@@ -238,7 +238,11 @@ def filindsize(args):
         for var in v1.fetch():
             if len(var.ref) == 1 and len(var.alts) == 1 and len(var.alts[0]) == 1:
                 vo.write(str(var))
-            elif imin <= abs(len(var.ref) - max([len(a) for a in var.alts])) <= imax:
+            elif not imin <= len(var.ref) <= imax:
+                continue
+            elif any([not imin <= len(a) <= imax for a in var.alts]):
+                continue
+            else:
                 vo.write(str(var))
     logger.info(f'Finished filindsize SNPs/indels. Output saved in {outvcf}')
     return 0
@@ -252,7 +256,7 @@ if __name__ == "__main__":
     # Define subparsers
     parser_vcfshv = subparsers.add_parser("vcfshv", help="Filter VCF file from syri to select SNPs and indels", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_hapmerge = subparsers.add_parser("hapmerge", help="Merge VCF files corresponding two variantions in the haploid assemblies of a diploid organism. VCF should only have SNPs and indels before merging.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser_filindsize = subparsers.add_parser("filindsize", help="Filter indels in a VCF file based on size. Currently, can only handle VCF having only SNPs and indels.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser_filindsize = subparsers.add_parser("filindsize", help="Filter indels in a VCF file based on size of ref/alt allele. Currently, can only handle VCF having only SNPs and indels.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # Check whether any command is selected ####################################
     if len(sys.argv[1:]) == 0:
         parser.print_help()
