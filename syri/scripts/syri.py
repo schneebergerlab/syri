@@ -158,7 +158,7 @@ def syri(args):
                     pass
                 key_found = key_found + [chrid]
                 if len(seq) < achr_size[chrid]:
-                    logger.error('Length of reference sequence of ' + id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                    logger.error('Length of reference sequence of ' + chrid + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                     sys.exit()
         for achr in achrs:
             if achr not in key_found:
@@ -178,7 +178,7 @@ def syri(args):
                         pass
                     key_found = key_found + [chrid]
                     if len(seq) < bchr_size[chrlink[chrid]]:
-                        logger.error('Length of query sequence of ' + id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                        logger.error('Length of query sequence of ' + chrid + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                         sys.exit()
             for bchr in list(chrlink.keys()):
                 if bchr not in key_found:
@@ -195,7 +195,7 @@ def syri(args):
                         pass
                     key_found = key_found + [chrid]
                     if len(seq) < bchr_size[chrid]:
-                        logger.error('Length of query sequence of ' + id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                        logger.error('Length of query sequence of ' + chrid + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                         sys.exit()
             for bchr in list(bchr_size.keys()):
                 if bchr not in key_found:
