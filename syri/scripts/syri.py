@@ -18,7 +18,10 @@ def syri(args):
     import sys
 
     logger = logging.getLogger("Running SyRI")
-    os.remove("syri.log")
+    try:
+        os.remove("syri.log")
+    except FileNotFoundError:
+        pass
     # Set CWD and check if it exists
     if args.dir is None:
         args.dir = os.getcwd() + os.sep

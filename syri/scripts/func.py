@@ -8,6 +8,22 @@ from functools import reduce
 from os import remove
 
 
+def readfaidxbed(f):
+    """
+    Reads .faidx file from a genome assembly and returns a BED file consisting
+    for entire chromosomes
+    """
+    from collections import deque
+    import pybedtools as bt
+    fabed = deque()
+    with open(f, 'r') as fin:
+        for line in fin:
+            line = line.strip().split()
+            fabed.append([line[0], 1, int(line[1])])
+    return list(fabed)
+# END
+
+
 def unlist(nestedList):
     """Take a nested-list as input and return a 1d list of all elements in it"""
 
