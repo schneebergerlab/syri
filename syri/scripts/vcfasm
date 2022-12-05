@@ -48,6 +48,39 @@ def setlogconfig(lg):
 # END
 
 
+def vcfshv(args):
+    """
+    Takes a VCF file and filter SNPs, insertions, deletions.
+    :return:
+    """
+    # :param vcf: Input VCF file
+    # :param outvcf: Output VCF file
+    import logging
+    from pysam import VariantFile
+    vcf1 = args.vcf1.name
+    outvcf = args.out.name
+    setlogconfig(args.log)
+    logger = logging.getLogger("vcfshv")
+    v1 = VariantFile(vcf1, 'r')
+    header = v1.header
+    # header.formats.add(id='GT', number=1, type='String', description="Genotype after merging haplotype calls")
+    # header.samples.add(sample)
+    passlist = set([f'<{c}>' for c in v1.header.alts.keys() if c not in {'SNP', 'INS', 'DEL'}])
+    try:
+        vo = VariantFile(outvcf, 'w', header=header)
+        vo.close()
+    except Exception as e:
+        logger.error(f"Error in opening output VCF file. {e}")
+    # TODO: Figure out how to write directly to the output VariantFile object
+    with open(outvcf, 'a') as vo:
+        for var in v1.fetch():
+            if var.alts[0] not in passlist:
+                vo.write(str(var))
+    logger.info(f'Finished filtering SNPs/indels. Output saved in {outvcf}')
+    return 0
+# END
+
+
 def hapmerge(args):
     """
     Merges VCF files from different haplotypes of a sample.
@@ -175,39 +208,6 @@ def hapmerge(args):
 # END
 
 
-def vcfshv(args):
-    """
-    Takes a VCF file and filter SNPs, insertions, deletions.
-    :return:
-    """
-    # :param vcf: Input VCF file
-    # :param outvcf: Output VCF file
-    import logging
-    from pysam import VariantFile
-    vcf1 = args.vcf1.name
-    outvcf = args.out.name
-    setlogconfig(args.log)
-    logger = logging.getLogger("vcfshv")
-    v1 = VariantFile(vcf1, 'r')
-    header = v1.header
-    # header.formats.add(id='GT', number=1, type='String', description="Genotype after merging haplotype calls")
-    # header.samples.add(sample)
-    passlist = set([f'<{c}>' for c in v1.header.alts.keys() if c not in {'SNP', 'INS', 'DEL'}])
-    try:
-        vo = VariantFile(outvcf, 'w', header=header)
-        vo.close()
-    except Exception as e:
-        logger.error(f"Error in opening output VCF file. {e}")
-    # TODO: Figure out how to write directly to the output VariantFile object
-    with open(outvcf, 'a') as vo:
-        for var in v1.fetch():
-            if var.alts[0] not in passlist:
-                vo.write(str(var))
-    logger.info(f'Finished filtering SNPs/indels. Output saved in {outvcf}')
-    return 0
-# END
-
-
 def filindsize(args):
     """
     Filter indels in a VCF file based on size
@@ -246,9 +246,54 @@ def filindsize(args):
                 vo.write(str(var))
     logger.info(f'Finished filindsize SNPs/indels. Output saved in {outvcf}')
     return 0
-
-
 # END
+
+
+def addGT(args):
+    """
+    Filter indels in a VCF file based on size
+    :param args: Input arguments
+    :return: VCF file filtered with indels within the selected range.
+    """
+    # Set parameters for addGT
+    # parser_addGT.add_argument("vcf", help='Input VCF file', type=argparse.FileType('r'))
+    # parser_addGT.add_argument("out", help='Output VCF file', type=argparse.FileType('w'))
+    # parser_addGT.add_argument("-s", help='Sample name', type=str, default='sample')
+    # parser_addGT.add_argument("-p", help='Ploidy', type=int, default=2)
+    #
+
+    import logging
+    from pysam import VariantFile
+    vcf = args.vcf.name
+    out = args.out.name
+    s = args.s
+    p = args.p
+    setlogconfig(args.log)
+    logger = logging.getLogger("addGT")
+    v1 = VariantFile(vcf, 'r')
+    h = v1.header
+    v1.close()
+    h.add_sample(s)
+    h.formats.add(id='GT', number='1', type='String', description="Genotype")
+    gt = [1]*p
+    with VariantFile(vcf, 'r') as fin, VariantFile(out, 'w', header=h) as fout:
+        for rec in fin:
+            # break
+            pos = rec.pos
+            ref = rec.ref
+            try:
+                r = fout.new_record(contig=rec.chrom, start=pos-1, stop=pos+len(ref)-1, alleles=rec.alleles, id=rec.id, filter=rec.filter)
+            except ValueError:
+                print(rec)
+                sys.exit()
+            for k, v in dict(rec.info).items():
+                r.info[k] = v
+            r.samples[s]['GT'] = gt
+            fout.write(r)
+    logger.info(f'Finished filindsize SNPs/indels. Output saved in {out}')
+    return 0
+# END
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -257,6 +302,8 @@ if __name__ == "__main__":
     parser_vcfshv = subparsers.add_parser("vcfshv", help="Filter VCF file from syri to select SNPs and indels", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_hapmerge = subparsers.add_parser("hapmerge", help="Merge VCF files corresponding two variantions in the haploid assemblies of a diploid organism. VCF should only have SNPs and indels before merging.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser_filindsize = subparsers.add_parser("filindsize", help="Filter indels in a VCF file based on size of ref/alt allele. Currently, can only handle VCF having only SNPs and indels.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser_addGT = subparsers.add_parser("addGT", help="Adds GT tag to the VCF file based on the ploidy. Assumes that all varitions are HOM_ALT.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
     # Check whether any command is selected ####################################
     if len(sys.argv[1:]) == 0:
         parser.print_help()
@@ -271,12 +318,18 @@ if __name__ == "__main__":
     parser_hapmerge.add_argument("vcf2", help='Input VCF file where haplotype 2 is used as query against the reference', type=argparse.FileType('r'))
     parser_hapmerge.add_argument("out", help='Output file name', type=argparse.FileType('w'))
     parser_hapmerge.add_argument("sample", help='Sample name to be added in output VCF file', type=str, default='sample')
-    # Set parameters for hapmerge
+    # Set parameters for filindsize
     parser_filindsize.set_defaults(func=filindsize)
     parser_filindsize.add_argument("vcf1", help='Input VCF file where haplotype 1 is used as query against the reference', type=argparse.FileType('r'))
     parser_filindsize.add_argument("out", help='Output file name', type=argparse.FileType('w'))
     parser_filindsize.add_argument("--min", help='Minimum indel size to select', type=int, default=1)
     parser_filindsize.add_argument("--max", help='Maximum indel size to select', type=int, default=100)
+    # Set parameters for addGT
+    parser_addGT.set_defaults(func=addGT)
+    parser_addGT.add_argument("vcf", help='Input VCF file', type=argparse.FileType('r'))
+    parser_addGT.add_argument("out", help='Output VCF file', type=argparse.FileType('w'))
+    parser_addGT.add_argument("-s", help='Sample name', type=str, default='sample')
+    parser_addGT.add_argument("-p", help='Ploidy', type=int, default=2)
 
     # Common arguments
     parser.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])

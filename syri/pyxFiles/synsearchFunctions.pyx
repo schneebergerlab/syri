@@ -261,6 +261,17 @@ def readPAF(paf):
 # END
 
 def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
+    """
+    :param coordsfin: Path to alignment file
+    :param chrmatch: Boolean. True to stop automatic chromosome matching.
+    :param cwdpath: str. Path to current working directory
+    :param prefix: str. Prefix
+    :param args: Namespace. Required values:
+        ftype: type of alignment input
+        f: perform alignment filtering or not
+    :param cigar: Boolean. Whether input file contains cigar string
+    :return:
+    """
     logger = logging.getLogger('Reading Coords')
     logger.debug(args.ftype)
     chrlink = {}

@@ -54,7 +54,7 @@ cpdef invPath(cpp_map[long, cpp_vec[long]] invpos, long[:, :] neighbour, float[:
         maxid = parents[maxid]
     return [path[i] for i in range(<Py_ssize_t> path.size())]
 
-cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd, float[:] iDen, cpp_map[int, cpp_vec[long]] neighbourSyn, float[:] synBlockScore, long[:] aStartSyn, long[:] aEndSyn, long tUC, float tUP, long threshold, brk = -1):
+cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd, float[:] iDen, cpp_map[int, cpp_vec[long]] neighbourSyn, float[:] synBlockScore, long[:] aStartSyn, long[:] aEndSyn, long tUC, float tUP, long threshold):
     cdef:
         long                            i, j, k, l, current, count
         long                            n_topo, n_edges, n_syn
@@ -96,7 +96,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
     #print('starting')
     n_syn = len(synBlockScore)
     invG = getConnectivityGraph(invblocks)
-    out = deque()
+    out1, out2 = deque(), deque()
 
     # get neighbours of inverted alignments
     for i in range(<Py_ssize_t> neighbourSyn.size()):
@@ -312,9 +312,9 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
                     stb.push_back(bEnd[r_path.back()])
                     endb.push_back(bStart[r_path.front()])
                     profit.push_back(revenue - cost)
-                    
-        if i == brk:
-            break
+                    # Get all inversions that are possible with respect to syntenic alignments.
+                    # REASON: It is possible that inversions conserved in a population are not called in a simple pairwise comparison. By saving all profitable inversions, we can try to do joint calling of inversions thus allowing better selection of conserved inversions
+                    out1.append([r_path[index] for index in range(<Py_ssize_t> r_path.size())])
 
     path.clear()
     lp = st.size()
@@ -327,13 +327,30 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
 
     parents = np.array([-1]*lp, dtype = 'int')
     
+    # for i in range(lp):
+    #     for j in range(lp-1,i,-1):
+    #         if st_list[j] > end_list[i]-threshold:
+    #             if stb_list[j] > endb_list[i] -threshold:
+    #                 if profit[j] + totscore[i] > totscore[j]:
+    #                     totscore[j] = profit[j] + totscore[i]
+    #                     parents[j] = i
+    #         else:
+    #             break
+
+    # New conditions for selecting neighboring overlapping inversion for co-existence. These conditions allows for better selections of overlapping neighboring inversions and is also more consistent with TD identification.
+    # 1) Either the inversions have > tUC unique bases
+    # 2) Or they have > tUP percent unique region
+    # 3) The total score must be higher then the current score
     for i in range(lp):
-        for j in range(lp-1,i,-1):
-            if st_list[j] > end_list[i]-threshold:
-                if stb_list[j] > endb_list[i] -threshold:
-                    if profit[j] + totscore[i] > totscore[j]:
-                        totscore[j] = profit[j] + totscore[i]
-                        parents[j] = i
+        for j in range(lp-1, i, -1):
+            if end_list[j] - end_list[i] > tUC and endb_list[j] - endb_list[i] > tUC:
+                if profit[j] + totscore[i] > totscore[j]:
+                    totscore[j] = profit[j] + totscore[i]
+                    parents[j] = i
+            elif (end_list[j] - end_list[i])/(end_list[j] - st_list[j]) > tUP and (endb_list[j] - endb_list[i])/(endb_list[j] - stb_list[j]) > tUP:
+                if profit[j] + totscore[i] > totscore[j]:
+                    totscore[j] = profit[j] + totscore[i]
+                    parents[j] = i
             else:
                 break
 
@@ -474,14 +491,16 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
                 #  of syntenic regions needed to be removed
                 if revenue > 1.1*cost:
                     if count in goodinvs:
-                        out.append(([r_path[k] for k in range(current)], revenue - cost, leftSyn, rightSyn))
+                        out2.append(([r_path[k] for k in range(current)], revenue - cost, leftSyn, rightSyn))
                     count += 1
-        if i == brk:
-            return out
-    return out
+    return out1, out2
    
 
 cpdef getInvBlocks(invTree, invertedCoordsOri):
+    '''
+    For each candidate inversion, select child and parent inversions. These are 
+    inversions that can exist before the focal inversion without conflicts 
+    '''
     cdef int nrow, i, child
 
     invBlocks = [alignmentBlock(i, invTree[i], invertedCoordsOri.iloc[i]) for i in invTree.keys()]
@@ -491,7 +510,6 @@ cpdef getInvBlocks(invTree, invertedCoordsOri):
             block.children = list(set(block.children) - set(invBlocks[block.children[i]].children))
             i+=1
         block.children.sort()
-
         for child in block.children:
             invBlocks[child].addParent(block.id)
     return(invBlocks)
@@ -549,7 +567,7 @@ def getInversions(coords,chromo, threshold, synData, tUC, tUP, invgl):
         return(invertedCoordsOri, [],[],invertedCoordsOri,[],[])
 
     invertedCoords = invertedCoordsOri.copy()
-    maxCoords = invertedCoords[["bStart","bEnd"]].max().max()
+    maxCoords = invertedCoords.loc[:, ["bStart","bEnd"]].max().max()
 
     invertedCoords.bStart = maxCoords + 1 - invertedCoords.bStart
     invertedCoords.bEnd = maxCoords + 1 - invertedCoords.bEnd
@@ -557,10 +575,8 @@ def getInversions(coords,chromo, threshold, synData, tUC, tUP, invgl):
     nrow = pd.Series(range(invertedCoords.shape[0]))
 
     if len(invertedCoordsOri) > 0:
-        # invTree = pd.DataFrame(apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold), index = range(len(invertedCoords)), columns = invertedCoords.index.values)
         invTree = apply_TS(invertedCoords.aStart.values,invertedCoords.aEnd.values,invertedCoords.bStart.values,invertedCoords.bEnd.values, threshold, mxgap=invgl)
     else:
-        # invTree = pd.DataFrame([], index = range(len(invertedCoords)), columns = invertedCoords.index.values)
         invTree = {}
 
     logger.debug("found inv Tree " + chromo)
@@ -579,9 +595,14 @@ def getInversions(coords,chromo, threshold, synData, tUC, tUP, invgl):
 
     logger.debug("found neighbours " + chromo)
 
-    synBlockScore = [(i.aLen + i.bLen)*i.iden for index, i in synData.iterrows()]
-        
-    profitable = [inversion(i) for i in getProfitable(invblocks, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values.astype('float32'), neighbourSyn, np.array(synBlockScore, dtype = 'float32'), synData.aStart.values, synData.aEnd.values, tUC, tUP, threshold)]
+    synBlockScore = [(i.aLen + i.bLen)*i.iden for i in synData.itertuples(index=False)]
+
+    # all_profit: All inversion candidates that are profitable with respect to the syntenic regions
+    # max_profit: Set of inversions that result in maximum score
+    all_profit, max_profit = getProfitable(invblocks, invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, invertedCoordsOri.iden.values.astype('float32'), neighbourSyn, np.array(synBlockScore, dtype = 'float32'), synData.aStart.values, synData.aEnd.values, tUC, tUP, threshold)
+    # TODO: Set up a strategy to save the intermediate selected inversion (all_profit) that can then be used for multigenome SR calling
+    profitable = [inversion(i) for i in max_profit]
+
     logger.debug("found profitable " + chromo)
 
     del(invblocks, invTree, neighbourSyn, synBlockScore)
@@ -590,7 +611,6 @@ def getInversions(coords,chromo, threshold, synData, tUC, tUP, invgl):
     #### Find optimal set of inversions from all profitable inversions
     #####################################################################
     if len(profitable) > 0:
-        # bestInvPath = invPath({i:profitable[i].invPos for i in range(len(profitable))}, np.array([i.neighbours for i in profitable]), np.array([i.profit for i in profitable], dtype='float32'), invertedCoordsOri.aStart.values, invertedCoordsOri.aEnd.values, invertedCoordsOri.bStart.values, invertedCoordsOri.bEnd.values, threshold)
         bestInvPath = list(range(len(profitable)))
     else:
         bestInvPath = []
