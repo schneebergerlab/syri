@@ -5,7 +5,7 @@ import numpy as np
 from syri.scripts.func import *
 from igraph import Graph
 from collections import deque
-from scipy.stats import *
+# from scipy.stats import *
 import logging
 
 from libcpp.vector cimport vector as cpp_vec

@@ -361,7 +361,7 @@ cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long
             maxscore = totscore[i]
             maxid = i
     if maxid == -1:
-        return out
+        return out1, out2
     path.push_front(maxid)
     while parents[maxid] != -1:
         path.push_front(parents[maxid])

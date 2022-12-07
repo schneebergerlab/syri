@@ -6,7 +6,7 @@ import numpy as np
 from syri.scripts.func import *
 import sys
 from collections import deque, defaultdict
-from scipy.stats import *
+# from scipy.stats import *
 from datetime import datetime
 import pandas as pd
 from multiprocessing import Pool
