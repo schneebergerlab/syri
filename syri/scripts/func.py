@@ -5,8 +5,23 @@ Created on Mon Jun 19 15:36:01 2017
 """
 import operator as op
 from functools import reduce
-# from Bio import SeqIO
 from os import remove
+
+
+def readfaidxbed(f):
+    """
+    Reads .faidx file from a genome assembly and returns a BED file consisting
+    for entire chromosomes
+    """
+    from collections import deque
+    import pybedtools as bt
+    fabed = deque()
+    with open(f, 'r') as fin:
+        for line in fin:
+            line = line.strip().split()
+            fabed.append([line[0], 1, int(line[1])])
+    return list(fabed)
+# END
 
 
 def unlist(nestedList):
@@ -95,7 +110,6 @@ def readfasta(f):
     out = {}
     chrid = ''
     chrseq = deque()
-
     # Test if the file is Gzipped or not
     with gzopen(f, 'rb') as fin:
         try:
@@ -103,7 +117,6 @@ def readfasta(f):
             isgzip = True
         except BadGzipFile:
             isgzip = False
-
     try:
         if isgzip:
             with gzopen(f, 'rb') as fin:
@@ -135,7 +148,6 @@ def readfasta(f):
                         chrseq.append(line.strip())
     except Exception as e:
         raise Exception(e)
-
     if chrid != '':
         out[chrid] = ''.join(chrseq)
     # TODO: add check for the validation of input fasta files

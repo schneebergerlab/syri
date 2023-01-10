@@ -87,7 +87,7 @@ def readSRData(cwdPath, prefix, dup = False):
         coordsData1.loc[coordsData1.state == "translocation","state"] = "ctx"
         coordsData1.loc[coordsData1.state == "invTranslocation","state"] = "invCtx"
         coordsData1.loc[coordsData1.state == "duplication","state"] = "ctxDup"
-        coordsData1.loc[coordsData1.state == "invDuplication","state"] = "ctxInvDup"
+        coordsData1.loc[coordsData1.state == "invDuplication","state"] = "ctxinvDup"
         if not dup:
             coordsData1 = coordsData1.loc[coordsData1["state"].isin(["ctx","invCtx"])]
         # annoCoords = annoCoords.append(coordsData1)
@@ -272,7 +272,6 @@ def getshv(args, coords, chrlink):
                                         (coords.bEnd == row.bEnd) &
                                         (coords.aChr == row.aChr) &
                                         (coords.bChr == row.bChr), 'cigar']
-
                         brks = findall("(\d+)([IDX=])?", cg.iloc[0])
 
                         # chech for validity of CIGAR string

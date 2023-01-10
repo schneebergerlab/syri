@@ -9,13 +9,33 @@ Created on Wed May 10 13:05:51 2017
 import argparse
 from syri import __version__
 
-# if __name__ == "__main__":
+
 def syri(args):
     # Check that correct version of python is being used
     import logging
     import logging.config
     import os
     import sys
+
+    logger = logging.getLogger("Running SyRI")
+    try:
+        os.remove("syri.log")
+    except FileNotFoundError:
+        pass
+    # Set CWD and check if it exists
+    if args.dir is None:
+        args.dir = os.getcwd() + os.sep
+    else:
+        if os.path.isdir(args.dir):
+            args.dir = args.dir + os.sep
+        else:
+            logger.error(args.dir + ' is not a valid folder. Exiting.')
+            sys.exit()
+
+    # Check prefix
+    if os.sep in args.prefix:
+        logger.warning('For specifying output folder use --dir, use --prefix for modifying the output file names. Current --prefix ({}) may result in crashes.'.format(args.prefix))
+
     logging.config.dictConfig({
         'version': 1,
         'disable_existing_loggers': False,
@@ -35,7 +55,7 @@ def syri(args):
             },
             'log_file': {
                 'class': 'logging.FileHandler',
-                'filename': args.log_fin.name,
+                'filename': args.dir + args.prefix + args.log_fin.name,
                 'mode': 'a',
                 'formatter': 'log_file',
                 'level': args.log,
@@ -48,22 +68,6 @@ def syri(args):
             },
         },
     })
-
-    logger = logging.getLogger("Running SyRI")
-
-    # Set CWD and check if it exists
-    if args.dir is None:
-        args.dir = os.getcwd() + os.sep
-    else:
-        if os.path.isdir(args.dir):
-            args.dir = args.dir + os.sep
-        else:
-            logger.error(args.dir + ' is not a valid folder. Exiting.')
-            sys.exit()
-
-    # Check prefix
-    if os.sep in args.prefix:
-        logger.warning('For specifying output folder use --dir, use --prefix for modifying the output file names. Current --prefix ({}) may result in crashes.'.format(args.prefix))
 
     # Set CIGAR FLAG
     if args.ftype in ['S', 'B', 'P']:
@@ -126,7 +130,8 @@ def syri(args):
     from syri.synsearchFunctions import readCoords
     from syri.scripts.func import readfasta
     import numpy as np
-    
+
+    # chrlink is a dict with query genome ID as key and matching reference genome as values
     coords, chrlink = readCoords(args.infile.name, args.chrmatch, args.dir, args.prefix, args, args.cigar)
     achrs = np.unique(coords.aChr).tolist()
     bchrs = np.unique(coords.bChr).tolist()
@@ -156,7 +161,7 @@ def syri(args):
                     pass
                 key_found = key_found + [chrid]
                 if len(seq) < achr_size[chrid]:
-                    logger.error('Length of reference sequence of ' + id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                    logger.error('Length of reference sequence of ' + chrid + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                     sys.exit()
         for achr in achrs:
             if achr not in key_found:
@@ -176,7 +181,7 @@ def syri(args):
                         pass
                     key_found = key_found + [chrid]
                     if len(seq) < bchr_size[chrlink[chrid]]:
-                        logger.error('Length of query sequence of ' + id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                        logger.error('Length of query sequence of ' + chrid + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                         sys.exit()
             for bchr in list(chrlink.keys()):
                 if bchr not in key_found:
@@ -193,7 +198,7 @@ def syri(args):
                         pass
                     key_found = key_found + [chrid]
                     if len(seq) < bchr_size[chrid]:
-                        logger.error('Length of query sequence of ' + id + ' is less than the maximum coordinate of its aligned regions. Exiting.')
+                        logger.error('Length of query sequence of ' + chrid + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                         sys.exit()
             for bchr in list(bchr_size.keys()):
                 if bchr not in key_found:
@@ -223,13 +228,15 @@ def syri(args):
             if args.prefix+file not in listDir:
                 logger.error(file + " is not present in the directory. Exiting")
                 sys.exit()
-        from syri.findsv import readSRData, getSV, getNotAligned
+        from syri.findsv import readSRData, getSV, addsvseq, getNotAligned
         if args.ref is None or args.qry is None:
             logger.error("Reference and query assembly fasta files are required for SV identification.")
             sys.exit()
     if not args.nosv:
         allAlignments = readSRData(args.dir, args.prefix, args.all)
         getSV(args.dir, allAlignments, args.prefix, args.offset)
+        #TODO: finalise the below SV call
+        addsvseq(args.dir + args.prefix + "sv.txt", args.ref.name, args.qry.name, chrlink)
         getNotAligned(args.dir, args.prefix, args.ref.name, args.qry.name, chrlink)
 
     ###################################################################
@@ -242,7 +249,6 @@ def syri(args):
             if args.delta is None:
                 logger.error("Please provide delta file. Exiting")
                 sys.exit()
-
         getshv(args, coords, chrlink)
 
     ###################################################################
@@ -257,7 +263,7 @@ def syri(args):
         if args.ref is None:
             logger.error("Reference genome fasta file is required for combining outputs.")
             sys.exit()
-        getTSV(args.dir, args.prefix, args.ref.name)
+        getTSV(args.dir, args.prefix, args.ref.name, args.hdrseq, args.maxs)
         logger.info('Generating VCF')
         getVCF("syri.out", "syri.vcf", args.dir, args.prefix)
         getsum("syri.out", "syri.summary", args.dir, args.prefix)
@@ -266,7 +272,7 @@ def syri(args):
     if not args.keep:
         for fin in ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", "sv.txt", "notAligned.txt", "snps.txt"]:
             fileRemove(args.dir + args.prefix + fin)
-    print("Finished syri")
+    logger.warning("Finished syri")
 
 def main(cmd):
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -279,7 +285,7 @@ def main(cmd):
 
     other = parser.add_argument_group("Additional arguments")
     other.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM, P: PAF", default="T", choices=['T', 'S', 'B', 'P'])
-    other.add_argument('-f', dest='f', help='Filter out low quality alignments', default=True, action='store_false')
+    other.add_argument('-f', dest='f', help='As a default, syri filters out low quality and small alignments. Use this parameter to use the full list of alignments without any filtering.', default=True, action='store_false')
     other.add_argument('-k', dest="keep", help="Keep intermediate output files", default=False, action="store_true")
     other.add_argument('--dir', dest='dir', help="path to working directory (if not current directory). All files must be in this directory.", action='store')
     other.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
@@ -290,7 +296,7 @@ def main(cmd):
     # Parameters for identification of structural rearrangements
     srargs = parser.add_argument_group("SR identification")
     srargs.add_argument("--nosr", dest="nosr", help="Set to skip structural rearrangement identification", action="store_true", default=False)
-    srargs.add_argument("--invgaplen", dest="invgl", help="Maximum allowed gap-length between two alignments of a multi-alignment inversion.", type=int, default=500000)
+    srargs.add_argument("--invgaplen", dest="invgl", help="Maximum allowed gap-length between two alignments of a multi-alignment inversion. It affects the selection of large inversions that can have different length in the reference and query genomes.", type=int, default=1000000000)
     srargs.add_argument("--tdgaplen", dest="tdgl", help="Maximum allowed gap-length between two alignments of a multi-alignment translocation or duplication (TD). Larger values increases TD identification sensitivity but also runtime.", type=int, default=500000)
     srargs.add_argument("--tdmaxolp", dest="tdolp", help="Maximum allowed overlap between two translocations. Value should be in range (0,1].", type=float, default=0.8)
     srargs.add_argument("-b", dest="bruteRunTime", help="Cutoff to restrict brute force methods to take too much time (in seconds). Smaller values would make algorithm faster, but could have marginal effects on accuracy. In general case, would not be required.", type=int, default=60)
@@ -309,7 +315,8 @@ def main(cmd):
     shvargs.add_argument("--allow-offset", dest='offset', help='BPs allowed to overlap', default=5, type=int, action="store")
     shvargs.add_argument('--cigar', dest="cigar", help="Find SNPs/indels using CIGAR string. Necessary for alignments generated using aligners other than nucmers", default=False, action='store_true')
     shvargs.add_argument('-s', dest="sspath", help="path to show-snps from mummer", default="show-snps")
-    # shvargs.add_argument('--maxsvseq', dest="mss", help="Sets the upper limit on the size of SV for which bases would be outputted files. Currently, only affects insertions, deletions and HDRs. (-1 means no cut-off)", type=int, default=-1)
+    shvargs.add_argument('--hdrseq', dest="hdrseq", help="Output highly-diverged regions (HDRs) sequence.", action='store_true', default=False)
+    shvargs.add_argument('--maxsize', dest="maxs", help="Max size for printing sequence of large SVs (insertions, deletions and HDRs). Only affect printing (.out/.vcf file) and not the selection. SVs larger than this value would be printed as symbolic SVs. For no cut-off use -1.", type=int, default=-1)
     optional.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
     optional.add_argument("--lf", dest="log_fin", help="Name of log file", type=argparse.FileType("w"), default="syri.log")
     optional.add_argument('--version', action='version', version='{version}'.format(version=__version__))
