@@ -588,7 +588,7 @@ def getVCF(finname, foutname, cwdpath, prefix):
             '##INFO=<ID=EndB,Number=1,Type=Integer,Description="End position on non-reference genome">' + '\n')
         fout.write('##INFO=<ID=Parent,Number=1,Type=String,Description="ID of the parent SR">' + '\n')
         fout.write(
-            '##INFO=<ID=VarType,Number=1,Type=String,Description="Start position on non-reference genome">' + '\n')
+            '##INFO=<ID=VarType,Number=1,Type=String,Description="SR for syntenic regions, ShV for short variants, missing otherwise">' + '\n')
         fout.write(
             '##INFO=<ID=DupType,Number=1,Type=String,Description="Copy gain or loss in the non-reference genome">' + '\n')
         # fout.write('##INFO=<ID=NotAlGen,Number=1,Type=String,Description="Genome containing the not aligned region">' + '\n')
