@@ -385,8 +385,11 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
 
     # Filter small alignments
     if args.f:
+        logger.info('Filtering alignments')
+        logger.debug('Number of alignments before filtering: {}'.format(coords.shape[0]))
         coords = coords.loc[coords.iden > 90]
         coords = coords.loc[(coords.aLen>100) & (coords.bLen>100)]
+        logger.debug('Number of alignments after filtering: {}'.format(coords.shape[0]))
 
     ## check for bstart > bend when bdir is -1
     check = np.unique(coords.loc[coords.bDir == -1, 'bStart'] > coords.loc[coords.bDir == -1, 'bEnd'])
