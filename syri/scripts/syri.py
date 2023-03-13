@@ -89,7 +89,6 @@ def syri(args):
         logger.warning('A high value for --tdgaplen is provided (' + str(args.tdgl) + '). TDs identification may take a lot of time.')
 
     # Check TDOLP flag
-
     if args.tdolp <= 0 or args.tdolp > 1:
         logger.error('--tdmaxolp Value should be in range (0,1].')
         sys.exit()
@@ -265,7 +264,7 @@ def syri(args):
             sys.exit()
         getTSV(args.dir, args.prefix, args.ref.name, args.hdrseq, args.maxs)
         logger.info('Generating VCF')
-        getVCF("syri.out", "syri.vcf", args.dir, args.prefix)
+        getVCF("syri.out", "syri.vcf", args.dir, args.prefix, args.sname)
         getsum("syri.out", "syri.summary", args.dir, args.prefix)
 
     from syri.scripts.func import fileRemove
@@ -292,6 +291,7 @@ def main(cmd):
     other.add_argument("--seed", dest="seed", help="seed for generating random numbers", type=int, default=1)
     other.add_argument('--nc', dest="nCores", help="number of cores to use in parallel (max is number of chromosomes)", type=int, default=1)
     other.add_argument('--novcf', dest="novcf", help="Do not combine all files into one output file", default=False, action="store_true")
+    other.add_argument('--samplename', dest="sname", help="Sample name to be used in the output VCF file.", type=str, default='sample')
 
     # Parameters for identification of structural rearrangements
     srargs = parser.add_argument_group("SR identification")

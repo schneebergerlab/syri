@@ -571,7 +571,7 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
 # END
 
 
-def getVCF(finname, foutname, cwdpath, prefix):
+def getVCF(finname, foutname, cwdpath, prefix, sname):
     """
     does not output notal in qry genome
     :param finname:
@@ -642,48 +642,43 @@ def getVCF(finname, foutname, cwdpath, prefix):
             '##INFO=<ID=VarType,Number=1,Type=String,Description="SR for syntenic regions, ShV for short variants, missing otherwise">' + '\n')
         fout.write(
             '##INFO=<ID=DupType,Number=1,Type=String,Description="Copy gain or loss in the non-reference genome">' + '\n')
+        fout.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">' + '\n')
         # fout.write('##INFO=<ID=NotAlGen,Number=1,Type=String,Description="Genome containing the not aligned region">' + '\n')
 
-        fout.write('\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']) + '\n')
+        fout.write('\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', sname]) + '\n')
+
+        ## Format information
+        frmt = '\t'.join(['GT', '1'])
+        ## Iterate over each line from syri.out
         for line in data.itertuples(index=False):
             pos = [line[0], line[1], line[8], 'N', '<' + line[10] + '>', '.', 'PASS']
 
             if line[10] in ["SYN", "INV", "TRANS", "INVTR", "DUP", "INVDP"]:
                 _info = ';'.join(['END='+line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=.', 'VarType='+'SR', 'DupType='+line[11]])
-                pos.append(_info)
-                fout.write('\t'.join(pos) + '\n')
 
             elif line[10] == "NOTAL":
                 if line[0] != "-":
-                    _info = ';'.join(
-                        ['END=' + line[2], 'ChrB=.', 'StartB=.', 'EndB=.', 'Parent=.', 'VarType=.', 'DupType=.'])
-                    pos.append(_info)
-                    fout.write('\t'.join(pos) + '\n')
+                    _info = ';'.join(['END=' + line[2], 'ChrB=.', 'StartB=.', 'EndB=.', 'Parent=.', 'VarType=.', 'DupType=.'])
 
             elif line[10] in ["SYNAL", "INVAL", "TRANSAL", "INVTRAL", "DUPAL", "INVDPAL"]:
-                _info = ';'.join(
-                    ['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=.', 'DupType=.'])
-                pos.append(_info)
-                fout.write('\t'.join(pos) + '\n')
+                _info = ';'.join(['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=.', 'DupType=.'])
 
             elif line[10] in ['CPG', 'CPL', 'TDM']:
                 _info = ";".join(['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=ShV', 'DupType=.'])
-                pos.append(_info)
-                fout.write('\t'.join(pos) + '\n')
 
             elif line[10] in ['SNP', 'DEL', 'INS', 'HDR']:
                 if (line[3] == '-') != (line[4] == '-'):
                     logger.error("Inconsistency in annotation type. Either need seq for both or for none.")
                 elif line[3] == '-' and line[4] == '-':
                     _info = ";".join(['END=' + line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent='+line[9], 'VarType=ShV', 'DupType=.'])
-                    pos.append(_info)
-                    fout.write('\t'.join(pos) + '\n')
                 elif line[3] != '-' and line[4] != '-':
                     if line[3].translate(tab).upper() == line[4].translate(tab).upper(): continue
                     pos = [line[0], line[1], line[8], line[3].translate(tab), line[4].translate(tab), '.', 'PASS']
                     _info = ";".join(['END=' + line[2], 'ChrB=' + line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=' + line[9], 'VarType=ShV', 'DupType=.'])
-                    pos.append(_info)
-                    fout.write('\t'.join(pos) + '\n')
+
+            pos.append(_info)
+            pos.append(frmt)
+            fout.write('\t'.join(pos) + '\n')
     return 0
 # END
 
