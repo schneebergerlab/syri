@@ -507,6 +507,9 @@ def startSyri(args, coords):
     # process in parallel
     with Pool(processes = nCores) as pool:
         pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, invgl=invgl, tdgl=tdgl, tdolp=tdolp), uniChromo)
+    # for chromo in uniChromo:
+    #     print(chromo)
+    #     syri(chromo,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, invgl=invgl, tdgl=tdgl, tdolp=tdolp)
 
     # Merge output of all chromosomes
     mergeOutputFiles(uniChromo,cwdPath, prefix)
@@ -1097,7 +1100,8 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
             if row["aEnd"] < allBlocks.loc[currentCluster[-1]]["aEnd"] + threshold:
                 continue
             else:
-                allClasses = allBlocks["class"][index:]
+                # allClasses = allBlocks["class"][index:]
+                allClasses = allBlocks.iloc[index:]["class"]
                 if len(np.where(allClasses=="syn")[0]) > 0:
                     nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
                     if row["aStart"] > allBlocks.loc[nextSyn]["aStart"] - threshold:
@@ -1128,7 +1132,8 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
             if row["bEnd"] < allBlocks.loc[currentCluster[-1]]["bEnd"] + threshold:
                 continue
             else:
-                allClasses = allBlocks["class"][index:]
+                # allClasses = allBlocks["class"][index:]
+                allClasses = allBlocks.iloc[index:]["class"]
                 if len(np.where(allClasses=="syn")[0]) > 0:
                     nextSyn = allClasses.index[np.where(allClasses=="syn")[0][0]]
                     if row["bStart"] > allBlocks.loc[nextSyn]["bStart"] - threshold:
