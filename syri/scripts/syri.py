@@ -48,17 +48,17 @@ def syri(args):
             },
         },
         'handlers': {
-            'stdout': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'stdout',
-                'level': 'WARNING',
-            },
             'log_file': {
                 'class': 'logging.FileHandler',
                 'filename': args.dir + args.prefix + args.log_fin.name,
                 'mode': 'a',
                 'formatter': 'log_file',
                 'level': args.log,
+            },
+            'stdout': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'stdout',
+                'level': 'WARNING',
             },
         },
         'loggers': {
@@ -271,7 +271,7 @@ def syri(args):
     if not args.keep:
         for fin in ["synOut.txt", "invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt", "ctxOut.txt", "sv.txt", "notAligned.txt", "snps.txt"]:
             fileRemove(args.dir + args.prefix + fin)
-    logger.warning("Finished syri")
+    logger.info("Finished syri")
 
 def main(cmd):
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)

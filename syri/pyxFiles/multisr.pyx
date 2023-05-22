@@ -1,5 +1,5 @@
 from igraph import *
-from scipy.stats import *
+# from scipy.stats import *
 from datetime import datetime
 import pandas as pd
 

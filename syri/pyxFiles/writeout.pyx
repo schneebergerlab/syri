@@ -485,9 +485,10 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
         snpgrp = snp.groupby('parent')
 
         notA = notal.loc[notal.achr != "-"].copy()
-        notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
+        # notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
+        notA[["astart", "aend"]] = notA[["astart", "aend"]].astype("int")
         notB = notal.loc[notal.bchr != "-"].copy()
-        notB.loc[:, ["bstart", "bend"]] = notB.loc[:, ["bstart", "bend"]].astype("int")
+        notB[["bstart", "bend"]] = notB[["bstart", "bend"]].astype("int")
         row_old = -1
         for row in events.itertuples(index=False):
             if len(notA) > 0:

@@ -5,7 +5,7 @@ import numpy as np
 from syri.scripts.func import *
 from igraph import *
 from collections import defaultdict
-from scipy.stats import *
+# from scipy.stats import *
 import pandas as pd
 from functools import partial
 import os

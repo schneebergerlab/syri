@@ -3,10 +3,11 @@
 # cython: language_level = 3
 
 import numpy as np
+
 from syri.scripts.func import *
 import sys
 from collections import deque, defaultdict
-from scipy.stats import *
+# from scipy.stats import *
 from datetime import datetime
 import pandas as pd
 from multiprocessing import Pool
@@ -53,7 +54,7 @@ def samtocoords(f):
                     continue
 
                 if 'M' in l[5]:
-                    logger.error('Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: ' + l[5])
+                    logger.error(f'Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: {l[5]}. If using minimap2 for alignment, then use the --eqx parameter.')
                     sys.exit()
                 cgt = [[int(j[0]), j[1]] for j in [i.split(';') for i in l[5].replace('S', ';S,').replace('H', ';H,').replace('=', ';=,').replace('X', ';X,').replace('I', ';I,').replace('D', ';D,').split(',')[:-1]]]
                 if len(cgt) > 2:
@@ -162,7 +163,7 @@ def readSAMBAM(fin, type='B'):
 
             ## Check CIGAR:
             if False in [False if i[0] not in [1,2,4,5,7,8] else True for i in aln.cigartuples]:
-                logger.error("Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: " + str(aln.cigarstring))
+                logger.error(f'Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: {aln.cigarstring}. If using minimap2 for alignment, then use the --eqx parameter.')
                 sys.exit()
             if len(aln.cigartuples) > 2:
                 if True in [True if i[0] in [4,5] else False for i in aln.cigartuples[1:-1]]:
@@ -236,7 +237,7 @@ def readPAF(paf):
                 cg = cg[0]
                 ## Check CIGAR:
                 if not all([True if i[1] in {'I', 'D', 'H', 'S', 'X', '='} else False for i in cgtpl(cg)]):
-                    logger.error("Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: " + str(cg))
+                    logger.error(f'Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: {cg}. If using minimap2 for alignment, then use the --eqx parameter.')
                     sys.exit()
                 if len(cgtpl(cg)) > 2:
                     if any([True if i[1] in {'H', 'S'} else False for i in cgtpl(cg)]):
@@ -385,7 +386,7 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
 
     # Filter small alignments
     if args.f:
-        logger.info('Filtering alignments')
+        logger.info('Filtering low-quality alignments (alignment quality < 90, alignment length < 100)')
         logger.debug('Number of alignments before filtering: {}'.format(coords.shape[0]))
         coords = coords.loc[coords.iden > 90]
         coords = coords.loc[(coords.aLen>100) & (coords.bLen>100)]
@@ -506,7 +507,9 @@ def startSyri(args, coords):
     # Identify intra-chromosomal events (synteny, inversions, intra-trans, intra-dup) for each chromosome as a separate
     # process in parallel
     with Pool(processes = nCores) as pool:
-        pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, invgl=invgl, tdgl=tdgl, tdolp=tdolp), uniChromo)
+        p = pool.map(partial(syri,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, invgl=invgl, tdgl=tdgl, tdolp=tdolp), uniChromo)
+    if p != [None]*len(uniChromo):
+        sys.exit()
     # for chromo in uniChromo:
     #     print(chromo)
     #     syri(chromo,threshold=threshold,coords=coords, cwdPath= cwdPath, bRT = bRT, prefix = prefix, tUC=tUC, tUP=tUP, invgl=invgl, tdgl=tdgl, tdolp=tdolp)
@@ -798,62 +801,61 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
 
     ## Grouping Syn blocks : Final synblock identification is done after ctx identification.
     allBlocks, outClusters = groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn)
+    if outClusters == [[]]:
+        logger.error(f"No syntenic region found for chromosome: {chromo}. This is potentially caused by the two assemblies having different strands for this chromosomes. Reverse complementing the chromosome to ensure that the same strands are analysed. Exiting.")
+        return -1
 
     orderedBlocks = outPlaceBlocks[outPlaceBlocks.bDir == 1]
     invertedBlocks = outPlaceBlocks[outPlaceBlocks.bDir == -1]
 
-
 ########################################################################################################################
-    fout = open(cwdPath+prefix+chromo+"_synOut.txt","w")
-    for i in outClusters:
-        fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"],"\n"])))
-        for j in i:
-            fout.write("\t".join(map(str,allBlocks.loc[j][:-1])))
-            if j in synInInv:
-                fout.write("\tSyn_in_Inv\n")
-            else:
+    with open(cwdPath+prefix+chromo+"_synOut.txt","w") as fout:
+        for i in outClusters:
+            fout.write("\t".join(map(str,["#",allBlocks.at[i[0],"aStart"],allBlocks.at[i[-1],"aEnd"],"-",allBlocks.at[i[0],"bStart"],allBlocks.at[i[-1],"bEnd"],"\n"])))
+            for j in i:
+                fout.write("\t".join(map(str,allBlocks.loc[j][:-1])))
+                if j in synInInv:
+                    fout.write("\tSyn_in_Inv\n")
+                else:
+                    fout.write("\n")
+########################################################################################################################
+
+    with open(cwdPath+prefix+chromo+"_dupOut.txt","w") as fout:
+        for i in dupData.index.values:
+            fout.write("\t".join(map(str,["#",dupData.at[i,"aStart"],dupData.at[i,"aEnd"],"-",dupData.at[i,"bStart"],dupData.at[i,"bEnd"],"-", dupData.at[i,"dupGenomes"],"\n"])))
+            for j in transBlocks[allTransIndexOrder[i]]:
+                fout.write("\t".join(map(str,orderedBlocks.iloc[j][:4])))
                 fout.write("\n")
-    fout.close()
-########################################################################################################################
-
-    fout = open(cwdPath+prefix+chromo+"_dupOut.txt","w")
-    for i in dupData.index.values:
-        fout.write("\t".join(map(str,["#",dupData.at[i,"aStart"],dupData.at[i,"aEnd"],"-",dupData.at[i,"bStart"],dupData.at[i,"bEnd"],"-", dupData.at[i,"dupGenomes"],"\n"])))
-        for j in transBlocks[allTransIndexOrder[i]]:
-            fout.write("\t".join(map(str,orderedBlocks.iloc[j][:4])))
-            fout.write("\n")
-    fout.close()
 
 ########################################################################################################################
 
-    fout = open(cwdPath+prefix+chromo+"_invDupOut.txt","w")
-    for i in invDupData.index.values:
-        fout.write("\t".join(map(str,["#",invDupData.at[i,"aStart"],invDupData.at[i,"aEnd"],"-",invDupData.at[i,"bStart"],invDupData.at[i,"bEnd"],"-", invDupData.at[i,"dupGenomes"],"\n"])))
-        for j in invTransBlocks[allTransIndexOrder[i]]:
-            fout.write("\t".join(map(str,invertedBlocks.iloc[j][:4])))
-            fout.write("\n")
-    fout.close()
+    with open(cwdPath+prefix+chromo+"_invDupOut.txt","w") as fout:
+        for i in invDupData.index.values:
+            fout.write("\t".join(map(str,["#",invDupData.at[i,"aStart"],invDupData.at[i,"aEnd"],"-",invDupData.at[i,"bStart"],invDupData.at[i,"bEnd"],"-", invDupData.at[i,"dupGenomes"],"\n"])))
+            for j in invTransBlocks[allTransIndexOrder[i]]:
+                fout.write("\t".join(map(str,invertedBlocks.iloc[j][:4])))
+                fout.write("\n")
 
 ########################################################################################################################
 
-    fout = open(cwdPath+prefix+chromo+"_TLOut.txt","w")
-    for i in TLData.index.values:
-        fout.write("\t".join(map(str,["#",TLData.at[i,"aStart"],TLData.at[i,"aEnd"],"-",TLData.at[i,"bStart"],TLData.at[i,"bEnd"],"\n"])))
-        for j in transBlocks[allTransIndexOrder[i]]:
-            fout.write("\t".join(map(str,orderedBlocks.iloc[j][:4])))
-            fout.write("\n")
-    fout.close()
+    with open(cwdPath+prefix+chromo+"_TLOut.txt","w") as fout:
+        for i in TLData.index.values:
+            fout.write("\t".join(map(str,["#",TLData.at[i,"aStart"],TLData.at[i,"aEnd"],"-",TLData.at[i,"bStart"],TLData.at[i,"bEnd"],"\n"])))
+            for j in transBlocks[allTransIndexOrder[i]]:
+                fout.write("\t".join(map(str,orderedBlocks.iloc[j][:4])))
+                fout.write("\n")
 
 ########################################################################################################################
 
-    fout = open(cwdPath+prefix+chromo+"_invTLOut.txt","w")
-    for i in invTLData.index.values:
-        fout.write("\t".join(map(str,["#",invTLData.at[i,"aStart"],invTLData.at[i,"aEnd"],"-",invTLData.at[i,"bStart"],invTLData.at[i,"bEnd"],"\n"])))
-        for j in invTransBlocks[allTransIndexOrder[i]]:
-            fout.write("\t".join(map(str,invertedBlocks.iloc[j][:4])))
-            fout.write("\n")
-    fout.close()
+    with open(cwdPath+prefix+chromo+"_invTLOut.txt","w") as fout:
+        for i in invTLData.index.values:
+            fout.write("\t".join(map(str,["#",invTLData.at[i,"aStart"],invTLData.at[i,"aEnd"],"-",invTLData.at[i,"bStart"],invTLData.at[i,"bEnd"],"\n"])))
+            for j in invTransBlocks[allTransIndexOrder[i]]:
+                fout.write("\t".join(map(str,invertedBlocks.iloc[j][:4])))
+                fout.write("\n")
 
+    return
+# END
 ########################################################################################################################
 
 

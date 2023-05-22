@@ -4,7 +4,7 @@
 import numpy as np
 from syri.scripts.func import *
 from igraph import *
-from scipy.stats import *
+# from scipy.stats import *
 import pandas as pd
 import logging
 from collections import deque
