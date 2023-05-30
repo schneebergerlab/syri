@@ -802,7 +802,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
     ## Grouping Syn blocks : Final synblock identification is done after ctx identification.
     allBlocks, outClusters = groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn)
     if outClusters == [[]]:
-        logger.error(f"No syntenic region found for chromosome: {chromo}. This is potentially caused by the two assemblies having different strands for this chromosomes. Reverse complementing the chromosome to ensure that the same strands are analysed. Exiting.")
+        logger.error(f"No syntenic region found for chromosome: {chromo}. This is potentially caused by the two assemblies having different strands for this chromosomes. Reverse complement the chromosome to ensure that the same strands are analysed. Exiting.")
         return -1
 
     orderedBlocks = outPlaceBlocks[outPlaceBlocks.bDir == 1]
