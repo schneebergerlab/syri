@@ -14,7 +14,7 @@ requires-python = ">=3.8"
 keywords = ["Structural Variation", "SV", "Pangenomics", "Bioinformatics"]
 license = {text = "MIT"}
 dependencies = [
-	"cython ==  0.29.36",
+	"cython <=  0.29.36",
 	"numpy", 
 	"pandas",
 	"scipy",

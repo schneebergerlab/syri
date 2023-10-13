@@ -21,7 +21,7 @@ requirements:
     - python  >=3.8
     - setuptools
     - numpy   >=1.21.2
-    - cython
+    - cython <=0.29.36
   run:
     - python  >=3.8
     - numpy   >=1.21
