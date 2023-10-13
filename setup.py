@@ -14,7 +14,7 @@ setup(name="syri",
       license_files=('LICENSE',),
       ext_modules=cythonize([
           Extension(f"syri.{name.split('/')[-1].split('.')[0]}", [name])
-          for name in glob.iglob('syri/pyxfiles/*.pyx')
+          for name in glob.iglob('syri/pyxFiles/*.pyx')
           ]),
       packages=["syri", "syri.scripts"],
       include_dirs=[numpy.get_include()],
