@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools", "numpy", "cython"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "syri"
+# project homepage: https://github.com/schneebergerlab/syri
+authors = [
+    {name = "Manish Goel", email="goel@mpipz.mpg.de"},
+]
+description = "Synteny and rearrangement identifier between whole-genome assemblies"
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["Structural Variation", "SV", "Pangenomics", "Bioinformatics"]
+license = {text = "MIT"}
+dependencies = [
+	"cython",
+	"numpy", 
+	"pandas",
+	"scipy",
+	"psutil",
+	"python-igraph",
+	"longestrunsubsequence",
+	"pulp",
+]
+dynamic = ["version"]
+
+
+[project.scripts]
+syri = "syri.scripts.syri:main"
+chroder = "syri.scripts.chroder:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "syri.__version__"}
+
+

@@ -273,7 +273,7 @@ def syri(args):
             fileRemove(args.dir + args.prefix + fin)
     logger.info("Finished syri")
 
-def main(cmd):
+def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     optional = parser._action_groups.pop()
     required = parser.add_argument_group("Input Files")
@@ -322,9 +322,5 @@ def main(cmd):
     optional.add_argument('--version', action='version', version='{version}'.format(version=__version__))
     parser._action_groups.append(optional)
 
-    args = parser.parse_args(cmd)
-    syri(args)
-
-
-
+    syri(parser.parse_args())
 
