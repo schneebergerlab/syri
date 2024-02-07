@@ -606,11 +606,13 @@ def getVCF(finname, foutname, cwdpath, prefix, sname):
         logger.debug('Chromosome values are sorted lexicographically.')
     data.sort_values(['achr', 'astart', 'aend'], inplace=True)
     data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']] = data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']].astype(str)
-    # TODO: Add contig/chrom information in the VCF
+    chr_sizes = data.aend.astype(int).groupby(data.achr).max()
     with open(cwdpath + prefix + foutname, 'w') as fout:
         fout.write('##fileformat=VCFv4.3\n')
         fout.write('##fileDate=' + str(date.today()).replace('-', '') + '\n')
         fout.write('##source=syri\n')
+        for cntg, ln in chr_sizes.items():
+            fout.write('##contig=<ID=' + cntg + ',length=' + str(ln) + '>\n')
         fout.write('##ALT=<ID=SYN,Description="Syntenic region">' + '\n')
         fout.write('##ALT=<ID=INV,Description="Inversion">' + '\n')
         fout.write('##ALT=<ID=TRANS,Description="Translocation">' + '\n')
