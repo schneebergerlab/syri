@@ -10,6 +10,7 @@ authors = [
 ]
 description = "Synteny and rearrangement identifier between whole-genome assemblies"
 readme = "README.md"
+# Limit python version as pysam is not available for higher python versions
 requires-python = ">=3.8, <=3.10"
 keywords = ["Structural Variation", "SV", "Pangenomics", "Bioinformatics"]
 license = {text = "MIT"}
