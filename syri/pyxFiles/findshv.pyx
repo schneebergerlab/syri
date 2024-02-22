@@ -2,7 +2,7 @@
 # distutils: language = c++
 
 import numpy as np
-from syri.scripts.func import *
+from syri.scripts.func import readfasta, fileRemove, revcomp
 from igraph import *
 from collections import defaultdict
 # from scipy.stats import *

@@ -7,6 +7,7 @@ from igraph import Graph
 from collections import deque
 from scipy.stats import *
 import logging
+import sys
 
 from libcpp.vector cimport vector as cpp_vec
 
