@@ -1,10 +1,9 @@
 from setuptools import setup, Extension
 import numpy
 from Cython.Build import cythonize
-from syri import __version__
+
 
 setup(name="syri",
-      version='{}'.format(__version__),
       description='Synteny and rearrangement identifier between whole-genome assemblies',
       author='Manish Goel',
       author_email='goel@mpipz.mpg.de',
@@ -19,6 +18,7 @@ setup(name="syri",
                              Extension('syri.writeout', ['syri/pyxFiles/writeout.pyx'])]),
       packages=["syri", "syri.scripts"],
       include_dirs=[numpy.get_include()],
-      scripts=['bin/syri', 'bin/chroder'],
+      #scripts=['bin/syri', 'bin/chroder'],
+      entry_points={"console_scripts": ["syri=syri.scripts.syri:main", "chroder=syri.scripts.chroder:main"]},
       long_description=open('README.rst').read(),
 )
