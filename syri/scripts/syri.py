@@ -149,6 +149,7 @@ def syri(args):
         bchr_size[achr] = coords.loc[coords.bChr == achr, ['bStart', 'bEnd']].max().max()
 
     key_found = []
+    achr_ref_length = {}
     if args.ref is not None:
         for chrid, seq in readfasta(args.ref.name).items():
             if chrid in achrs:
@@ -159,6 +160,7 @@ def syri(args):
                 except ValueError as e:
                     pass
                 key_found = key_found + [chrid]
+                achr_ref_length[chrid] = len(seq)
                 if len(seq) < achr_size[chrid]:
                     logger.error('Length of reference sequence of ' + chrid + ' is less than the maximum coordinate of its aligned regions. Exiting.')
                     sys.exit()
@@ -264,7 +266,7 @@ def syri(args):
             sys.exit()
         getTSV(args.dir, args.prefix, args.ref.name, args.hdrseq, args.maxs)
         logger.info('Generating VCF')
-        getVCF("syri.out", "syri.vcf", args.dir, args.prefix, args.sname)
+        getVCF("syri.out", "syri.vcf", args.dir, args.prefix, args.sname, achr_ref_length)
         getsum("syri.out", "syri.summary", args.dir, args.prefix)
 
     from syri.scripts.func import fileRemove

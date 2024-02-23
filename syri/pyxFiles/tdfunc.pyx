@@ -7,10 +7,11 @@ from collections import deque
 from datetime import datetime
 import logging
 import time
-from syri.scripts.func import *
+from syri.scripts.func import unlist, getValues, intersect
 from multiprocessing import Pool
 from functools import partial
 from gc import collect
+import sys
 
 from syri.pyxFiles.function cimport getOverlapWithSynBlocks, getmeblocks
 from libcpp.set cimport set as cpp_set

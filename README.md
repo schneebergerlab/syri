@@ -1,5 +1,4 @@
-## Help us in upgrading syri
-https://github.com/schneebergerlab/syri/discussions/230
+## [Help us in upgrading syri](https://github.com/schneebergerlab/syri/discussions/230)
 
 ## Introduction:
 

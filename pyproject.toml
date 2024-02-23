@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "numpy", "cython ==  0.29.36"]
+requires = ["setuptools", "numpy", "Cython"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,12 +10,13 @@ authors = [
 ]
 description = "Synteny and rearrangement identifier between whole-genome assemblies"
 readme = "README.md"
-requires-python = ">=3.8"
+# Limit python version as pysam is not available for higher python versions
+requires-python = ">=3.8, <=3.10"
 keywords = ["Structural Variation", "SV", "Pangenomics", "Bioinformatics"]
 license = {text = "MIT"}
 dependencies = [
-	"cython >=  3.0.8",
-	"numpy", 
+	"Cython",
+	"numpy",
 	"pandas",
 	"scipy",
 	"psutil",
@@ -32,6 +33,4 @@ chroder = "syri.scripts.chroder:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "syri.__version__"}
-
-
 

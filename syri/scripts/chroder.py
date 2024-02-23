@@ -978,7 +978,7 @@ def scaf(args):
 
 
 # if __name__ == "__main__":
-def main(cmd):
+def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("coords", help='Alignment coordinates in a tsv format', type=argparse.FileType("r"))
     parser.add_argument("ref", help='Assembly of genome A in multi-fasta format', type=argparse.FileType("r"))
@@ -989,6 +989,6 @@ def main(cmd):
     parser.add_argument('-noref', dest='noref', help="Use this parameter when no assembly is at chromosome level", default=False, action='store_true')
     parser.add_argument('-F', dest="ftype", help="Input coords type. T: Table, S: SAM, B: BAM", default="T", choices=['T', 'S', 'B'])
     parser.add_argument('--version', action='version', version='{version}'.format(version=__version__))
-    args = parser.parse_args(cmd)
+    args = parser.parse_args()
     scaf(args)
     print('Finished chroder')

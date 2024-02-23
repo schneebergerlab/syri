@@ -7,12 +7,13 @@ from libcpp.map cimport map as cpp_map
 from libcpp.vector cimport vector as cpp_vec
 from libcpp.deque cimport deque as cpp_deq
 from libcpp cimport bool as bool_t
-from syri.scripts.func import *
+from syri.scripts.func import unlist
 import pandas as pd
 from gc import collect
 import logging
 from syri.synsearchFunctions import apply_TS, alignmentBlock
 from syri.pyxFiles.function cimport getConnectivityGraph
+import sys
 from cython.operator cimport dereference as deref, preincrement as inc
 
 

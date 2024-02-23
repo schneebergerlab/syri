@@ -2,13 +2,14 @@
 # distutils: language = c++
 
 import numpy as np
-from syri.scripts.func import *
+from syri.scripts.func import readfasta, fileRemove, revcomp
 from igraph import *
 from collections import defaultdict
 # from scipy.stats import *
 import pandas as pd
 from functools import partial
 import os
+import sys
 import logging
 from re import findall
 
