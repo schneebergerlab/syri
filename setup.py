@@ -22,11 +22,7 @@ setup(name="syri",
           for name in glob.iglob('syri/pyxFiles/*.pyx')]),
       packages=["syri", "syri.scripts"],
       include_dirs=[numpy.get_include()],
-<<<<<<< HEAD
-      #scripts=['bin/syri', 'bin/chroder'],
-=======
       # scripts=['bin/syri', 'bin/chroder'],
->>>>>>> v1.7.0
       entry_points={"console_scripts": ["syri=syri.scripts.syri:main", "chroder=syri.scripts.chroder:main"]},
       long_description=open('README.rst').read(),
 )
