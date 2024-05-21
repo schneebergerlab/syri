@@ -634,14 +634,14 @@ def getVCF(finname, foutname, cwdpath, prefix, sname, chr_sizes):
         fout.write('##ALT=<ID=NOTAL,Description="Not Aligned region">' + '\n')
         fout.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position on reference genome">' + '\n')
         fout.write(
-            '##INFO=<ID=ChrB,Number=1,Type=String,Description="Chromoosme ID on the non-reference genome">' + '\n')
+            '##INFO=<ID=ChrB,Number=1,Type=String,Description="Chromosome ID on the non-reference genome">' + '\n')
         fout.write(
             '##INFO=<ID=StartB,Number=1,Type=Integer,Description="Start position on non-reference genome">' + '\n')
         fout.write(
             '##INFO=<ID=EndB,Number=1,Type=Integer,Description="End position on non-reference genome">' + '\n')
         fout.write('##INFO=<ID=Parent,Number=1,Type=String,Description="ID of the parent SR">' + '\n')
         fout.write(
-            '##INFO=<ID=VarType,Number=1,Type=String,Description="SR for syntenic regions, ShV for short variants, missing otherwise">' + '\n')
+            '##INFO=<ID=VarType,Number=1,Type=String,Description="SR for structural arrangements, ShV for short variants, missing otherwise">' + '\n')
         fout.write(
             '##INFO=<ID=DupType,Number=1,Type=String,Description="Copy gain or loss in the non-reference genome">' + '\n')
         fout.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">' + '\n')
