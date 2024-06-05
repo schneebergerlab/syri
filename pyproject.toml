@@ -20,7 +20,7 @@ dependencies = [
 	"pandas",
 	"scipy",
 	"psutil",
-	"python-igraph",
+	"igraph",
 	"longestrunsubsequence",
 	"pulp",
 ]
