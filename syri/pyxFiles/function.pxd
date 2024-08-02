@@ -15,15 +15,15 @@ cimport numpy as np
 cimport cython
 np.random.seed(1)
 
-cpdef inline getOverlapWithSynBlocks(np.ndarray[np.int_t, ndim=1] start, np.ndarray[np.int_t, ndim=1] end, np.ndarray chrom, np.ndarray[np.int_t, ndim=1] in_start, np.ndarray[np.int_t, ndim=1] in_end, np.ndarray in_chrom, np.int_t threshold, np.int_t count, np.int_t tUC, np.float_t tUP):
+cpdef inline getOverlapWithSynBlocks(np.ndarray[np.int64_t, ndim=1] start, np.ndarray[np.int64_t, ndim=1] end, np.ndarray chrom, np.ndarray[np.int64_t, ndim=1] in_start, np.ndarray[np.int64_t, ndim=1] in_end, np.ndarray in_chrom, np.int64_t threshold, np.int64_t count, np.int64_t tUC, np.float_t tUP):
 
     assert(len(start) == len(end) == len(chrom) ==count)
     assert(len(in_start) == len(in_end) == len(in_chrom))
 
     cdef Py_ssize_t i, j, n = len(in_start)
-    cdef np.int_t blockuni, s, e
+    cdef np.int64_t blockuni, s, e
     cdef np.ndarray[np.npy_bool, ndim = 1, cast=True] uni = np.zeros(count, dtype="bool")
-    cdef np.ndarray[np.int_t, ndim=1] blocks
+    cdef np.ndarray[np.int64_t, ndim=1] blocks
 
     for i in range(count):
         blocks = np.zeros(n, dtype="int")
@@ -63,10 +63,10 @@ cpdef inline getmeblocks(long[:] astart, long[:] aend, long[:] bstart, long[:] b
     # Function take the coordinates and cluster information of all translocated blocks and identifies mutually exclusive
     #  blocks (candidates with which a given candidate cannot co-exist) by comparing the coordinates of each block to the coordinates of the member blocks in its cluster
     logger = logging.getLogger("getmeblocks")
-    cdef np.ndarray[np.int_t, ndim=1] members, temp
+    cdef np.ndarray[np.int64_t, ndim=1] members, temp
     cdef np.ndarray[np.npy_bool, ndim=1, cast=True] meb, meb_a, meb_b, rem = np.zeros(len(astart), dtype="bool")
     cdef int overlap
-    cdef np.int_t i, j, index
+    cdef np.int64_t i, j, index
     meblock = {}            ## for blocks which are overlapping with inplace blocks
     melist = {}             ## for blocks which are not overlapping with inplace blocks
 
