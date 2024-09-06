@@ -26,7 +26,7 @@ Syri compares alignments between two chromosome-level assemblies and identifies 
 
 ## Installation:
 
-Easiest way to install SyRI is through anaconda:
+- Easiest way to install SyRI is through anaconda:
 
 ```
 # Create a new environment and install syri with all dependencies
@@ -35,9 +35,10 @@ conda create -n syri_env -c bioconda syri
 conda activate syri_env
 ```
 
-2
-For manual installation, download/clone the repository, open the folder and run:
+- For manual installation, download/clone the repository, open the folder and run:
 `python setup.py install`
+
+- [Niklas Schandry](https://github.com/nschan) has created a nextflow pipeline, called [nf-plotsv](https://github.com/nschan/nf-plotsv), that can also be used to install and run syri
 
 ## Running:
 
