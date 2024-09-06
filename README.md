@@ -35,9 +35,10 @@ conda create -n syri_env -c bioconda syri
 conda activate syri_env
 ```
 
-2
 For manual installation, download/clone the repository, open the folder and run:
 `python setup.py install`
+
+- [Niklas Schandry](https://github.com/nschan) has created a nextflow pipeline, called [nf-plotsv](https://github.com/nschan/nf-plotsv), that can also be used to install and run syri
 
 ## Running:
 
