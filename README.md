@@ -26,7 +26,7 @@ Syri compares alignments between two chromosome-level assemblies and identifies 
 
 ## Installation:
 
-- Easiest way to install SyRI is through anaconda:
+Easiest way to install SyRI is through anaconda:
 
 ```
 # Create a new environment and install syri with all dependencies
