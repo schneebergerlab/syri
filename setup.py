@@ -26,3 +26,4 @@ setup(name="syri",
       entry_points={"console_scripts": ["syri=syri.scripts.syri:main", "chroder=syri.scripts.chroder:main"]},
       long_description=open('README.rst').read(),
 )
+

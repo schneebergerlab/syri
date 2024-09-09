@@ -238,9 +238,6 @@ def getshv(args, coords, chrlink):
 
     else:
         logger.debug("finding short variation using CIGAR string")
-        # coordsfin = args.infile.name
-        # chrmatch = args.chrmatch
-        # coords, chrlink = readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar=True)
         allAlignments = readSRData(cwdpath, prefix, args.all)
         allAlignments["id"] = allAlignments.group.astype("str") + allAlignments.aChr + allAlignments.bChr + allAlignments.state
         allBlocks = pd.unique(allAlignments.id)
