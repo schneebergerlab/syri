@@ -1,3 +1,7 @@
+![python package](https://github.com/schneebergerlab/syri/actions/workflows/python-package.yml/badge.svg?event=push)
+[![Conda Downloads](https://img.shields.io/conda/dn/bioconda/syri.svg?label=Conda%20downloads)](
+https://anaconda.org/bioconda/syri)
+
 ## [Help us in upgrading syri](https://github.com/schneebergerlab/syri/discussions/230)
 
 ## Introduction:
