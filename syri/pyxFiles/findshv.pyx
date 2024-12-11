@@ -190,8 +190,16 @@ def getshv(args, coords, chrlink):
             logger.error('Error in finding SNPs using show-snps: ' + out[1].decode())
             sys.exit()
         else:
-            allsnps = pd.read_table(cwdpath + prefix + fname, header = None)
-            logger.debug('finished writing SNPs')
+            try:
+                allsnps = pd.read_table(cwdpath + prefix + fname, header = None)
+                logger.debug('finished writing SNPs')
+            except pd.errors.EmptyDataError as e:
+                logger.warning('No SNPs or small indels were identified in the alignments.')
+                if mapit == 1:
+                    fileRemove(cwdpath + prefix + fname)
+                with open(cwdpath + prefix + 'snps.txt', "w") as fout:
+                    pass
+                return None
 
         achrs = pd.unique(allAlignments['aChr'])
         bchrs = pd.unique(allAlignments['bChr'])

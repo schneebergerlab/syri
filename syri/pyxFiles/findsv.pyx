@@ -109,8 +109,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
     logger = logging.getLogger("getSV")
     offset = -abs(offset)
     fout = open(cwdPath + prefix + "sv.txt", "w")
-    allAlignments["id"] = allAlignments.group.astype(
-        "str") + 'Chr' + allAlignments.aChr + 'Chr' + allAlignments.bChr + allAlignments.state
+    allAlignments["id"] = allAlignments.group.astype("str") + 'Chr' + allAlignments.aChr + 'Chr' + allAlignments.bChr + allAlignments.state
     allBlocks = pd.unique(allAlignments.id)
 
     for i in allBlocks:
