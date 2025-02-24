@@ -99,15 +99,19 @@ def hapmerge(args):
     logger = logging.getLogger("hapmerge")
     v1 = VariantFile(vcf1, 'r')
     v2 = VariantFile(vcf2, 'r')
+    v1dict, garbv1, chridsv1 = readvcf(v1)
+    v2dict, garbv2, chridsv2 = readvcf(v2)
     if str(v1.header) != str(v2.header):
         logger.info(f"Input VCFs have different headers. Using the header from {vcf1} in the output file.")
     header = v1.header
-    header.formats.add(id='GT', number='1', type='String', description="Genotype after merging haplotype calls")
+    # header.formats.add(id='GT', number='1', type='String', description="Genotype after merging haplotype calls")
+    print('l1')
     header.samples.add(sample)
     # Read first vcf, save chromosome order, position and variations
-    v1dict, garbv1, chridsv1 = readvcf(v1)
-    v2dict, garbv2, chridsv2 = readvcf(v2)
+    print('l2')
+    print('l3')
     # TODO: Add IDs as well (can be added as a semicolon separated list)
+
     # Remove garb positions
     garbv1.extend(garbv2)
     for v in garbv1:
@@ -117,6 +121,7 @@ def hapmerge(args):
         except KeyError: pass
     vo = VariantFile(outvcf, 'w', header=header)
     # Iterate over chromosomes and print SVs corresponding to each chromosome
+
     for k in chridsv1:
         chrom = k
         pos = sorted(set(v1dict[k]).union(v2dict[k]))
