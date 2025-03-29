@@ -1,6 +1,5 @@
 # Alignment benchmark 2024
-#### _- Seungmin Park_
-
+#### _- Seungmin Park, Manish Goel_
 
 
 ### Table of contents
