@@ -13,5 +13,6 @@ Further, SyRI also identifies local variations within all syntenic and structura
 5. [Pseudo-genome generation](scaforder.md)
 6. [Plotting genomic structure](plotsr.md)
 7. [Alignment benchmark](alignment_benchmark_2024.md)
-8. [Citation](cite.md)
+8. [SV benchmark](sv_benchmark.md)
+9. [Citation](cite.md)
 
