@@ -76,6 +76,7 @@ We benchmark variants for the human HG002 genome using chromosome-level assembli
 * Assemblies were filtered to only contain autosomal chromosomes and then mapped to reference genomes (only autosomal chromosomes) using the commands described in the documentation for syri, svim-asm, and cuteSV.
 
 ### Variant calling 
+
 | Tool name   | parameters and settings                                                                       |
 |:------------|:----------------------------------------------------------------------------------------------|
 | Syri        | 1) Using default settings and 2) by turning off alignment filtering                           |
