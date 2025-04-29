@@ -126,10 +126,15 @@ SURVIVOR filter hg19.hg002.indels.recode.vcf NA 50 -1 0 -1 hg19.hg002.indels.lar
 # Hifi
 vcftools --gzvcf hg19.hg002.vcf.gz --keep-only-indels --recode --recode-INFO-all --bed $conbed --out hg19.hg002.indels
 SURVIVOR filter hg19.hg002.indels.recode.vcf NA 50 -1 0 -1 hg19.hg002.indels.large.vcf
+
 # diploid assembly
 vcftools --vcf hg19.hg002.dip_asm.vcf --keep-only-indels --recode --recode-INFO-all --bed $conbed --out hg19.hg002.diploid.indels
 SURVIVOR filter hg19.hg002.diploid.indels.recode.vcf NA 50 -1 0 -1 hg19.hg002.diploid.indels.large.vcf
 
+
+# diploid assembly v2
+vcftools --vcf hg19.hg002.v2.dip_asm.merged.vcf --keep-only-indels --recode --recode-INFO-all --bed $conbed --out hg19.hg002.v2.diploid.indels
+SURVIVOR filter hg19.hg002.v2.diploid.indels.recode.vcf NA 50 -1 0 -1 hg19.hg002.v2.diploid.indels.large.vcf
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -249,6 +254,10 @@ vcfdist hg19.hg002.indels.large.vcf $giabsvs $ref -b $conbed -p vcfdist_svs/ &
 vcfdist hg19.hg002.indels.large.vcf $giabsvs $ref -b $conbed -p vcfdist_svs/ -t 10 -v 0
 # Diploid assembly
 vcfdist hg19.hg002.diploid.indels.large.vcf $giabsvs $ref -b $conbed -p vcfdist_diploid_svs/ -t 10 -v 0 
+
+# Diploid assembly v2
+vcfdist hg19.hg002.v2.diploid.indels.large.vcf $giabsvs $ref -b $conbed -p vcfdist_diploid_v2_svs/ -t 20 -v 0
+
 
 #-----------------------------------------------------------------------------------------------------------------------
 # pbsv

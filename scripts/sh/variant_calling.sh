@@ -138,7 +138,6 @@ cuteSV hg002.dip_asm.sorted.bam $ref hg002.dip_asm.vcf hg002_dip_asm \
     --diff_ratio_merging_DEL 0.5
 python  /dss/dsslegfs01/pn29fi/pn29fi-dss-0003/software/bin_manish/anaconda3/envs/bmtools/lib/python3.8/site-packages/cuteSV/diploid_calling.py hg002_dip_asm/hg002.dip_asm.vcf hg002.dip_asm.merged.vcf
 
-
 # Hg19 -----------------------------------------------------------------------------------------------------------------
 
 ## Run cuteSV for hifi reads
@@ -163,6 +162,23 @@ cuteSV hg19.hg002.dip_asm.sorted.bam $ref hg19.hg002.dip_asm.vcf hg19.hg002_dip_
     --max_cluster_bias_DEL 1000 \
     --diff_ratio_merging_DEL 0.5
 python  /dss/dsslegfs01/pn29fi/pn29fi-dss-0003/software/bin_manish/anaconda3/envs/bmtools/lib/python3.8/site-packages/cuteSV/diploid_calling.py hg19.hg002.dip_asm.vcf hg19.hg002.dip_asm.merged.vcf
+
+# 28.04.2025 Running alignments using the new documentation https://github.com/tjiangHIT/cuteSV/wiki/Diploid-assembly-based-SV-detection-using-cuteSV
+
+cat <(pigz -d -c -p 10 $pat | sed 's/>/>cutesvh1_/g') \
+    <(pigz -d -c -p 10 $mat | sed 's/>/>cutesvh2_/g') \
+    | bgzip -@10  > hg002.v2.fa.gz
+
+minimap2 --paf-no-hit -a -x asm5 --cs -r 2k -t 25 $ref hg002.v2.fa.gz \
+|  samtools sort -@ 8 -o hg002.v2.dip_asm.sorted.bam -
+samtools index  hg002.v2.dip_asm.sorted.bam
+cuteSV hg002.v2.dip_asm.sorted.bam $ref hg19.hg002.v2.dip_asm.vcf ./ \
+    -s 1 --genotype --report_readid -p -1 -mi 500 -md 500 \
+    --max_cluster_bias_INS 1000 \
+    --diff_ratio_merging_INS 0.9 \
+    --max_cluster_bias_DEL 1000 \
+    --diff_ratio_merging_DEL 0.5
+python3  /dss/dsslegfs01/pn29fi/pn29fi-dss-0003/software/bin_manish/anaconda3/envs/bmtools/lib/python3.8/site-packages/cuteSV/diploid_calling.py hg19.hg002.v2.dip_asm.vcf  hg19.hg002.v2.dip_asm.merged.vcf
 
 ########################################################################################################################
 ## PBSV

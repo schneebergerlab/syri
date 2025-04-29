@@ -107,7 +107,7 @@ def get_SVs_plots():
     sniffles = getdata(f'{indir}/sniffle2/vcfdist_svs/precision-recall-summary.tsv', 'sniffles2', 'SVs')
     pbsv = getdata(f'{indir}/pbsv//vcfdist_svs/precision-recall-summary.tsv', 'pbsv', 'SVs')
     cutesv = getdata(f'{indir}/cutesv/vcfdist_svs/precision-recall-summary.tsv', 'cutesv', 'SVs')
-    cutesvasm = getdata(f'{indir}/cutesv/vcfdist_diploid_svs/precision-recall-summary.tsv', 'cutesv_assembly', 'SVs')
+    cutesvasm = getdata(f'{indir}/cutesv/vcfdist_diploid_v2_svs/precision-recall-summary.tsv', 'cutesv_assembly', 'SVs')
 
 
     svdf = pd.concat([syri, syrinofilt, svimasm, sniffles, pbsv, cutesv, cutesvasm])
@@ -159,8 +159,8 @@ def get_SVs_plots():
 
     # plt.legend(bbox_to_anchor=[1.01, 0.75], frameon=False)
     plt.tight_layout()
-    plt.savefig(f'{indir}/SV.png', dpi=300)
-    plt.savefig(f'{indir}/SV.pdf')
+    plt.savefig(f'{indir}/SV_v2.png', dpi=300)
+    plt.savefig(f'{indir}/SV_v2.pdf')
 
     return
 
