@@ -22,13 +22,12 @@ Compared to small variants, all tools had lower performance for SV calling. pbsv
 Typically, long-reads are sequenced with the objective of generating genome assemblies. In such a scenario, using assemblies with syri should result in better variant calling. However, when only long/HiFi reads are available then they can also deliver robust variant calling performance.
 
 <p align='center'>
-<img src='SV.png' alt>
+<img src='SV_v2.png' alt>
 <br />
 <em>Benchmarks for structural variation calling. Panels show values for precision, recall and F1-Qscores.</em>
 </p>
 
 ### Observations
-* The lower precision value for cutesv_assembly is probably caused by a bug in genotyping and might get easily resolved in future updates.
 * Since, syri analysis individual haplotypes, it phases variants perfectly (assuming no assembly errors). However, it requires additional methods (like SURVIVOR) to merge the VCFs from the two haplotypes. Long read-based variant callers and svim-asm did not generate phased variants, however, they can generate a combined VCF for both haplotypes with (presumably) correct genotypes.
 * Vcfdist works best on phased variation, however, the benchmark VCFs are unphased. Consequently, here only homozygous variants are benchmarked. Considering the inherent advantage that assemblies have in phasing variants, assembly-based variant callers would substantially outperform other methods. GIAB is constructing new benchmarks with [phased variants](https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/analysis/NIST_HG002_DraftBenchmark_defrabbV0.019-20241113/). However, the approach used to call SVs for these benchmarks is nearly identical to what syri does. As such, these benchmarks were not used to avoid biasing the results.
 * Syri_nofilt performed better compared to the default settings for small/structural variant identification, however, it could negatively affect the performance for structural rearrangement identification.  
