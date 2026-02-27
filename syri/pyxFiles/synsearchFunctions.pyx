@@ -532,7 +532,13 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
     logger.info(chromo+" " + str(coordsData.shape))
     logger.info("Identifying Synteny for chromosome " + chromo)
-    df = apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold)
+    # in case there are issues with the typed memory view conversion, try 
+    # .to_numpy(copy=True) instead of .values
+    df = apply_TS(coordsData.aStart.values,
+                  coordsData.aEnd.values,
+                  coordsData.bStart.values,
+                  coordsData.bEnd.values,
+                  threshold)
     blocks = [alignmentBlock(i, df[i], coordsData.iloc[i]) for i in df.keys()]
     for block in blocks:
         i = 0
@@ -860,11 +866,11 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
 ########################################################################################################################
 
 
-cpdef apply_TS(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold, int mxgap = 100000000000):
+cpdef apply_TS(const long[:] astart, const long[:] aend, const long[:] bstart, const long[:] bend, int threshold, int mxgap = 100000000000):
     cdef:
         Py_ssize_t                              i, j,  n = len(astart)
         cpp_map[long, cpp_deq[long]]            df
-        cpp_map[long, cpp_deq[long]].iterator   mapit
+        cpp_map[long, cpp_deq[long]].iterator   mapit # Leon: unused?
     for i in range(<Py_ssize_t> n):
         for j in range(<Py_ssize_t> i+1, <Py_ssize_t> n):
             if (astart[j] - aend[i]) < mxgap:        # Select only alignments with small gaps
