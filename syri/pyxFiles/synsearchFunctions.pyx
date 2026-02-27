@@ -251,7 +251,8 @@ def readPAF(paf):
         coords = pd.DataFrame(coords)
         coords.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
         coords.index = range(len(coords.index))
-        coords[6] = coords[6].astype('float')
+        #logger.info(coords[6])
+        #coords[6] = coords[6].astype('float') # unnecessary, and was causing the chained assignment error
         return coords
     except FileNotFoundError:
         logger.error("Cannot open {} file. Exiting".format(paf))
