@@ -1067,30 +1067,39 @@ def outSyn(cwdPath, threshold, prefix):
 def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn):
     
     synData = synData.drop(synData.index.values[badSyn])
-    allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
-    allBlocks["class"] = "syn"
+    #allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
+    #allBlocks["class"] = "syn"
+    #
+    #tempInvBlocks = pd.DataFrame(tempInvBlocks,columns =["aStart","aEnd","bStart","bEnd"], dtype= object)
+    #tempInvBlocks["class"] = "inv"
+    #
+    #tempDupData = pd.DataFrame(dupData[["aStart","aEnd","bStart","bEnd"]].copy())
+    #tempDupData["class"] = "dup"
+    #
+    #tempInvDupData = invDupData[["aStart","aEnd","bStart","bEnd"]].copy()
+    #tempInvDupData["class"] = "invDup"
+    #
+    #tempInvTLData = invTLData[["aStart","aEnd","bStart","bEnd"]].copy()
+    #tempInvTLData["class"] = "invTL"
+    #
+    #tempTLData = TLData[["aStart","aEnd","bStart","bEnd"]].copy()
+    #tempTLData["class"] = "TL"
+
+    cols = ["aStart", "aEnd", "bStart", "bEnd"]
+    def add_class(df, cls):
+        df = df.loc[:, cols].copy()
+        df.insert(df.shape[1], "class", cls)
+        return df
     
-    tempInvBlocks = pd.DataFrame(tempInvBlocks,columns =["aStart","aEnd","bStart","bEnd"], dtype= object)
-    tempInvBlocks["class"] = "inv"
-    
-    tempDupData = dupData[["aStart","aEnd","bStart","bEnd"]].copy()
-    tempDupData["class"] = "dup"
-    
-    tempInvDupData = invDupData[["aStart","aEnd","bStart","bEnd"]].copy()
-    tempInvDupData["class"] = "invDup"
-    
-    tempInvTLData = invTLData[["aStart","aEnd","bStart","bEnd"]].copy()
-    tempInvTLData["class"] = "invTL"
-    
-    tempTLData = TLData[["aStart","aEnd","bStart","bEnd"]].copy()
-    tempTLData["class"] = "TL"
-    
-    allBlocks = pd.concat([allBlocks,tempInvBlocks, tempInvDupData, tempInvTLData, tempTLData, tempDupData])
+    allBlocks = pd.concat([add_class(synData, "syn"),
+                           add_class(pd.DataFrame(tempInvBlocks, columns=cols), "inv"),
+                           add_class(invDupData, "dup"),
+                           add_class(invTLData, "invDup"),
+                           add_class(TLData, "invTL"),
+                           add_class(dupData, "TL")], copy=True)
     allBlocks.index = range(allBlocks.shape[0])
     
-    """
-    Take data of all blocks and create groups of syntenic blocks from syntenic alignments
-    """
+    #Take data of all blocks and create groups of syntenic blocks from syntenic alignments
     
     allBlocks.sort_values(["aStart","aEnd","bStart","bEnd"],inplace = True)
     
