@@ -818,6 +818,8 @@ def getBlocks(orderedBlocks, isinv, annoCoords, threshold, tUC, tUP, tdgl):
 
     outOrderedBlocks = makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, threshold, tdgl)
 
+    asorted_acs = annoCoords.sort_values(['aChr', 'aStart','aEnd'])
+    bsorted_acs = annoCoords.sort_values(['bChr', 'bStart','bEnd'])
     transBlocks = getProfitableTrans(outOrderedBlocks,
                                      orderedBlocks.aStart.values,
                                      orderedBlocks.aEnd.values,
@@ -828,12 +830,12 @@ def getBlocks(orderedBlocks, isinv, annoCoords, threshold, tUC, tUP, tdgl):
                                      orderedBlocks.iden.values.astype('float32'),
                                      orderedBlocks.aLen.values,
                                      orderedBlocks.bLen.values,
-                                     annoCoords.sort_values(['aChr', 'aStart','aEnd']).aStart.values,
-                                     annoCoords.sort_values(['aChr', 'aStart','aEnd']).aEnd.values,
-                                     annoCoords.sort_values(['bChr', 'bStart','bEnd']).bStart.values,
-                                     annoCoords.sort_values(['bChr', 'bStart','bEnd']).bEnd.to_numpy(copy=False),#values,
-                                     annoCoords.sort_values(['aChr', 'aStart','aEnd']).aChr.to_numpy(copy=False),#values,
-                                     annoCoords.sort_values(['bChr', 'bStart','bEnd']).bChr.values,
+                                     asorted_acs.aStart.values,
+                                     asorted_acs.aEnd.values,
+                                     bsorted_acs.bStart.values,
+                                     bsorted_acs.bEnd.values,
+                                     asorted_acs.aChr.to_numpy(copy=False),#values,
+                                     bsorted_acs.bChr.vto_numpy(copy=False),#values,
                                      tUC,
                                      tUP,
                                      isinv)
@@ -1134,8 +1136,8 @@ def blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
         transBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, orderedBlocks, threshold)
         outOrderedBlocks = makeBlocksTree(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, threshold, transBlocksNeighbours[0].values, transBlocksNeighbours[1].values, tdgl)
         ## need to have ref coords and query coords separately sorted
-        #asorted_ipbs = inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd'])
-        #bsorted_ipbs = inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd'])
+        asorted_ipbs = inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd'])
+        bsorted_ipbs = inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd'])
         transBlocks = getProfitableTrans(outOrderedBlocks,
                                          orderedBlocks.aStart.values,
                                          orderedBlocks.aEnd.values,
@@ -1146,12 +1148,12 @@ def blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
                                          orderedBlocks.iden.values.astype('float32'),
                                          orderedBlocks.aLen.values,
                                          orderedBlocks.bLen.values,
-                                         inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aStart.values,
-                                         inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aEnd.values,
-                                         inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bStart.values,
-                                         inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bEnd.values,
-                                         inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aChr.to_numpy(copy=False),#values,
-                                         inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bChr.to_numpy(copy=False),#values,
+                                         asorted_ipbs.aStart.values,
+                                         asorted_ipbs.aEnd.values,
+                                         bsorted_ipbs.bStart.values,
+                                         bsorted_ipbs.bEnd.values,
+                                         asorted_ipbs.aChr.to_numpy(copy=False),#values,
+                                         bsorted_ipbs.bChr.to_numpy(copy=False),#values,
                                          tUC,
                                          tUP)
     else:
@@ -1177,8 +1179,8 @@ def blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
         invertedCoords.bStart = invertedCoords.bStart - invertedCoords.bEnd
 
         # sort separately on A and B
-        #asorted_ipbs = inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd'])
-        #bsorted_ipbs = inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd'])
+        asorted_ipbs = inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd'])
+        bsorted_ipbs = inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd'])
         invTransBlocks = getProfitableTrans(outInvertedBlocks,
                                             invertedCoords.aStart.values,
                                             invertedCoords.aEnd.values,
@@ -1189,12 +1191,12 @@ def blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
                                             invertedCoords.iden.values.astype('float32'),
                                             invertedCoords.aLen.values,
                                             invertedCoords.bLen.values,
-                                            inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aStart.values,
-                                            inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aEnd.values,
-                                            inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bStart.values,
-                                            inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bEnd.values,
-                                            inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aChr.to_numpy(copy=False),#values,
-                                            inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bChr.to_numpy(copy=False),#values,
+                                            asorted_ipbs.aStart.values,
+                                            asorted_ipbs.aEnd.values,
+                                            bsorted_ipbs.bStart.values,
+                                            bsorted_ipbs.bEnd.values,
+                                            asorted_ipbs.aChr.to_numpy(copy=False),#values,
+                                            bsorted_ipbs.bChr.to_numpy(copy=False),#values,
                                             tUC,
                                             tUP,
                                             isinv = 1)
