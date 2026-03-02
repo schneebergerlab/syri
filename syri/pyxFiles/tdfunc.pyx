@@ -475,12 +475,13 @@ def readAnnoCoords(cwdPath, uniChromo, prefix):
     # concat, add index on A and B
     annoCoords = pd.concat(dfs)
     assert len(annoCoords) > 0
+    print(annoCoords)
     annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"], inplace=True)
     annoCoords.reset_index(inplace=True)
-    annoCoords["bIndex"] = annoCoords.index #range(len(annoCoords))
+    annoCoords.loc[:, "bIndex"] = annoCoords.index #range(len(annoCoords))
     annoCoords.sort_values(by = ["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace=True)
     annoCoords.reset_index(inplace=True) #index = range(len(annoCoords))
-    annoCoords["aIndex"] = annoCoords.index
+    annoCoords.loc[:, "aIndex"] = annoCoords.index
 
     return annoCoords
 
@@ -532,9 +533,9 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
     ctxData.loc[invCTXIndex, "bEnd"] = ctxData.loc[invCTXIndex].bStart - ctxData.loc[invCTXIndex].bEnd
     ctxData.loc[invCTXIndex, "bStart"] = ctxData.loc[invCTXIndex].bStart - ctxData.loc[invCTXIndex].bEnd
     ctxData.sort_values(by= ["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
-    ctxData["aIndex"] = range(ctxData.shape[0])
+    ctxData.loc[:, "aIndex"] = range(ctxData.shape[0])
     ctxData.sort_values(by= ["bChr","bStart","bEnd","aChr","aStart","aEnd"], inplace = True)
-    ctxData["bIndex"] = range(ctxData.shape[0])
+    ctxData.loc[:, "bIndex"] = range(ctxData.shape[0])
     ctxData.sort_values("aIndex", inplace = True)
 
     logger.debug("CTX identification: ctxdata size" + str(ctxData.shape))

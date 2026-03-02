@@ -924,7 +924,7 @@ def outSyn(cwdPath, threshold, prefix):
         synData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
     else:
         synData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","isinInv"]
-    synData["class"] = "syn"
+    synData.loc[:, "class"] = "syn"
 
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt","ctxOut.txt"]:
         data = []
@@ -935,7 +935,7 @@ def outSyn(cwdPath, threshold, prefix):
                     if line[0] == "#":
                         data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
                 data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
-                data["class"] = i.split("Out.txt")[0]
+                data.loc[:, "class"] = i.split("Out.txt")[0]
                 if len(data)>0:
                     # reCoords = reCoords.append(data)
                     reCoords = pd.concat([reCoords, data])
@@ -1065,8 +1065,9 @@ def outSyn(cwdPath, threshold, prefix):
 
         
 def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn):
-    
     synData = synData.drop(synData.index.values[badSyn])
+
+    # Rewritten below, left here in case a revert is needed
     #allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
     #allBlocks["class"] = "syn"
     #
@@ -1085,6 +1086,7 @@ def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, s
     #tempTLData = TLData[["aStart","aEnd","bStart","bEnd"]].copy()
     #tempTLData["class"] = "TL"
 
+    # add class info to copy of df
     cols = ["aStart", "aEnd", "bStart", "bEnd"]
     def add_class(df, cls):
         df = df.loc[:, cols].copy()
