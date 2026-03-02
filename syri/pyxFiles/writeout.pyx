@@ -57,11 +57,11 @@ def getsrtable(cwdpath, prefix):
                             sr_type = "INVDP"
                     entries[sr_type + str(sr_num)] = {
                         'achr': line[1],
-                        'astart': line[2],
-                        'aend': line[3],
+                        'astart': int(line[2]),
+                        'aend': int(line[3]),
                         'bchr': line[5],
-                        'bstart': line[6],
-                        'bend': line[7],
+                        'bstart': int(line[6]),
+                        'bend': int(line[7]),
                         'vartype': sr_type,
                         'parent': "-",
                         'dupclass': "-",
@@ -77,11 +77,11 @@ def getsrtable(cwdpath, prefix):
                 else:
                     entries[sr_type + "AL" + str(align_num)] = {
                         'achr': entries[sr_type + str(sr_num)]['achr'],
-                        'astart': line[0],
-                        'aend': line[1],
+                        'astart': int(line[0]),
+                        'aend': int(line[1]),
                         'bchr': entries[sr_type + str(sr_num)]['bchr'],
-                        'bstart': line[2],
-                        'bend': line[3],
+                        'bstart': int(line[2]),
+                        'bend': int(line[3]),
                         'vartype': sr_type + "AL",
                         'parent': sr_type + str(sr_num),
                         'dupclass': "-",
@@ -90,11 +90,15 @@ def getsrtable(cwdpath, prefix):
                     }
                     align_num += 1
 
+    print(entries)
     anno = pd.DataFrame.from_dict(entries, orient="index")
-    anno.loc[:, ['astart', 'aend', 'bstart', 'bend']] = anno.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-    anno['id'] = anno.index.values
-    anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+    # legacy type conversions, now done when reading in the lines above
+    #anno.loc[:, ['astart', 'aend', 'bstart', 'bend']] = anno.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+    #anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+    #print(anno)
     anno.sort_values(['achr', 'astart', 'aend'], inplace=True)
+    anno['id'] = anno.index
+    print(anno)
     return anno
 # END
 

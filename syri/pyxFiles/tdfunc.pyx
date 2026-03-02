@@ -454,7 +454,7 @@ def readAnnoCoords(cwdPath, uniChromo, prefix):
         if line[0] == "#":
             chromo = line[1]
             continue
-        synData.append(list(map(int,line[:4]))+[chromo,chromo])
+        synData.append(list(map(np.int64,line[:4]))+[chromo,chromo])
     fin.close()
     synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"])
     annoCoords = pd.concat([annoCoords, synData])
@@ -465,18 +465,19 @@ def readAnnoCoords(cwdPath, uniChromo, prefix):
         for line in fin:
             line = line.strip().split("\t")
             if line[0] == "#":
-                data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
+                data.append(list(map(np.int64,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
         fin.close()
-        data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
+        data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"])
         annoCoords = pd.concat([annoCoords, data])
 
-    annoCoords[["aStart","aEnd","bStart","bEnd"]] = annoCoords[["aStart","aEnd","bStart","bEnd"]].astype("int64")
-    annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"],inplace = True)
+    annoCoords = annoCoords.astype({"aStart":"int64", "aEnd":"int64", "bStart":"int64", "bEnd":"int64", "aChr":"str", "bChr":"str"})
+    annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"], inplace=True)
     annoCoords["bIndex"] = range(len(annoCoords))
-    annoCoords.sort_values(by = ["aChr","aStart","aEnd","bChr","bStart","bEnd"],inplace = True)
+    annoCoords.sort_values(by = ["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace=True)
     annoCoords.index = range(len(annoCoords))
-    annoCoords["aIndex"] = range(len(annoCoords))
-    return(annoCoords)
+    annoCoords["aIndex"] = annoCoords.index
+
+    return annoCoords
 
 
 def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores, tdgl, tdolp):
