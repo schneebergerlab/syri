@@ -446,35 +446,40 @@ def getScore(outBlocks, transBlocksData):
 
 
 def readAnnoCoords(cwdPath, uniChromo, prefix):
-    annoCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
-    synData = []
+    dfs = []
+    types_map = {"aStart":"int64", "aEnd":"int64", "bStart":"int64", "bEnd":"int64", "aChr":"str", "bChr":"str"}
+
+    # read in from synOut.txt; different format from other files, so do it separately
+    processed_lines = []
     fin = open(cwdPath+prefix+"synOut.txt","r")
     for line in fin:
         line = line.strip().split("\t")
         if line[0] == "#":
             chromo = line[1]
             continue
-        synData.append(list(map(np.int64,line[:4]))+[chromo,chromo])
+        processed_lines.append(list(map(np.int64,line[:4]))+[chromo,chromo])
     fin.close()
-    synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"])
-    annoCoords = pd.concat([annoCoords, synData])
+    dfs.append(pd.DataFrame(processed_lines, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]).astype(types_map))
 
+    # read in the rest
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt"]:
-        data = []
+        processed_lines = []
         fin = open(cwdPath+prefix+i,"r")
         for line in fin:
             line = line.strip().split("\t")
             if line[0] == "#":
-                data.append(list(map(np.int64,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
+                processed_lines.append(list(map(np.int64,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
         fin.close()
-        data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"])
-        annoCoords = pd.concat([annoCoords, data])
+        dfs.append(pd.DataFrame(processed_lines, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]).astype(types_map))
 
-    annoCoords = annoCoords.astype({"aStart":"int64", "aEnd":"int64", "bStart":"int64", "bEnd":"int64", "aChr":"str", "bChr":"str"})
+    # concat, add index on A and B
+    annoCoords = pd.concat(dfs)
+    assert len(annoCoords) > 0
     annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"], inplace=True)
-    annoCoords["bIndex"] = range(len(annoCoords))
+    annoCoords.reset_index(inplace=True)
+    annoCoords["bIndex"] = annoCoords.index #range(len(annoCoords))
     annoCoords.sort_values(by = ["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace=True)
-    annoCoords.index = range(len(annoCoords))
+    annoCoords.reset_index(inplace=True) #index = range(len(annoCoords))
     annoCoords["aIndex"] = annoCoords.index
 
     return annoCoords
