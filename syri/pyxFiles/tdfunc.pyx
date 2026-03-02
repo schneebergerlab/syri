@@ -816,7 +816,7 @@ def getBlocks(orderedBlocks, isinv, annoCoords, threshold, tUC, tUP, tdgl):
     if len(orderedBlocks) == 0:
         return([])
 
-    outOrderedBlocks = makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, threshold, tdgl)
+    outOrderedBlocks = makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.to_numpy(copy=False), orderedBlocks.bChr.to_numpy(copy=False), threshold, tdgl)
 
     asorted_acs = annoCoords.sort_values(['aChr', 'aStart','aEnd'])
     bsorted_acs = annoCoords.sort_values(['bChr', 'bStart','bEnd'])
@@ -835,7 +835,7 @@ def getBlocks(orderedBlocks, isinv, annoCoords, threshold, tUC, tUP, tdgl):
                                      bsorted_acs.bStart.values,
                                      bsorted_acs.bEnd.values,
                                      asorted_acs.aChr.to_numpy(copy=False),#values,
-                                     bsorted_acs.bChr.vto_numpy(copy=False),#values,
+                                     bsorted_acs.bChr.to_numpy(copy=False),#values,
                                      tUC,
                                      tUP,
                                      isinv)
