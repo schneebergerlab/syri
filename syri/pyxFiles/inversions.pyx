@@ -24,6 +24,7 @@ cimport numpy as np
 
 np.random.seed(1)
 
+# Leon: seems to not be called anywhere?
 cpdef invPath(cpp_map[long, cpp_vec[long]] invpos, long[:, :] neighbour, float[:] profit, long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd, long threshold):
     cdef:
         cpp_deq[long]               st, end, stb, endb, path
@@ -58,7 +59,7 @@ cpdef invPath(cpp_map[long, cpp_vec[long]] invpos, long[:, :] neighbour, float[:
         maxid = parents[maxid]
     return [path[i] for i in range(<Py_ssize_t> path.size())]
 
-cdef getProfitable(invblocks, long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd, float[:] iDen, cpp_map[int, cpp_vec[long]] neighbourSyn, float[:] synBlockScore, long[:] aStartSyn, long[:] aEndSyn, long tUC, float tUP, long threshold, brk = -1):
+cdef getProfitable(invblocks, const long[:] aStart, const long[:] aEnd, const long[:] bStart, const long[:] bEnd, const float[:] iDen, cpp_map[int, cpp_vec[long]] neighbourSyn, const float[:] synBlockScore, const long[:] aStartSyn, const long[:] aEndSyn, long tUC, float tUP, long threshold, brk = -1):
     cdef:
         long                            i, j, k, l, current, count
         long                            n_topo, n_edges, n_syn
@@ -539,7 +540,7 @@ cpdef dict getNeighbourSyn(np.ndarray aStartInv, np.ndarray aEndInv, np.ndarray 
 
 
 
-def getInversions(coords,chromo, threshold, synData, tUC, tUP, invgl):
+def getInversions(coords, chromo, threshold, synData, tUC, tUP, invgl):
     logger = logging.getLogger("getinversion."+chromo)
 
     class inversion:
