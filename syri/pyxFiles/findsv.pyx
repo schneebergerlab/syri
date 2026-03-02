@@ -47,10 +47,10 @@ def readSRData(cwdPath, prefix, dup = False):
             reps.extend(list(range(len(np.where(annoData[1] == i)[0]))))
         reps = np.repeat(reps, repCount)
 
-        coordsData["group"] = reps
-        coordsData["aChr"] = list(np.repeat(annoData[1], repCount))
-        coordsData["bChr"] = list(np.repeat(annoData[5], repCount))
-        coordsData["state"] = fileType.split("Out.txt")[0]
+        coordsData.loc[:, "group"] = reps
+        coordsData.loc[:, "aChr"] = list(np.repeat(annoData[1], repCount))
+        coordsData.loc[:, "bChr"] = list(np.repeat(annoData[5], repCount))
+        coordsData.loc[:, "state"] = fileType.split("Out.txt")[0]
         # annoCoords = annoCoords.append(coordsData.copy())
         annoCoords = pd.concat([annoCoords, coordsData.copy()])
 
@@ -74,10 +74,10 @@ def readSRData(cwdPath, prefix, dup = False):
         repCount = annoIndices[1:] - annoIndices[:-1] - 1
         reps = np.repeat(range(len(annoIndices)-1), repCount)
         stateReps = np.repeat(states, repCount)
-        coordsData1["aChr"] = np.repeat(coordsData[1], repCount).tolist()
-        coordsData1["bChr"] = np.repeat(coordsData[5], repCount).tolist()
-        coordsData1["group"] = reps
-        coordsData1["state"] = stateReps
+        coordsData1.loc[:, "aChr"] = np.repeat(coordsData[1], repCount).tolist()
+        coordsData1.loc[:, "bChr"] = np.repeat(coordsData[5], repCount).tolist()
+        coordsData1.loc[:, "group"] = reps
+        coordsData1.loc[:, "state"] = stateReps
         coordsData1 = coordsData1[[0,1,2,3,"group","aChr","bChr","state"]]
         coordsData1.loc[coordsData1.state == "translocation","state"] = "ctx"
         coordsData1.loc[coordsData1.state == "invTranslocation","state"] = "invCtx"
@@ -109,7 +109,7 @@ def getSV(cwdPath, allAlignments, prefix, offset):
     logger = logging.getLogger("getSV")
     offset = -abs(offset)
     fout = open(cwdPath + prefix + "sv.txt", "w")
-    allAlignments["id"] = allAlignments.group.astype("str") + 'Chr' + allAlignments.aChr + 'Chr' + allAlignments.bChr + allAlignments.state
+    allAlignments.loc[:, "id"] = allAlignments.group.astype("str") + 'Chr' + allAlignments.aChr + 'Chr' + allAlignments.bChr + allAlignments.state
     allBlocks = pd.unique(allAlignments.id)
 
     for i in allBlocks:
@@ -503,10 +503,12 @@ def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
         except Exception as e:
             print("ERROR: while trying to read ", fileType, "Out.txt", e)
             continue
+
         coordsData = fileData.loc[fileData[0] == "#",[2,3,6,7,1,5]].copy()
-        coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
+        #coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
         coordsData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
-        # annoCoords = annoCoords.append(coordsData.copy())
+        coordsData = coordsData.astype({"aStart":"int64", "aEnd":"int64", "bStart":"int64", "bEnd":"int64", "aChr":"str", "bChr":"str"})
+        #annoCoords = annoCoords.append(coordsData.copy())
         annoCoords = pd.concat([annoCoords, coordsData.copy()])
 
     try:
@@ -520,8 +522,9 @@ def getNotAligned(cwdPath, prefix, ref, qry, chrlink):
 #    fileData = pd.read_table(cwdPath+prefix+"ctxOut.txt", header = None, names = list(range(11)), dtype = object, sep ="\t")
     coordsData = fileData.loc[fileData[0] == "#"]
     coordsData = coordsData[[2,3,6,7,1,5]].copy()
-    coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
+    #coordsData[[2,3,6,7]] = coordsData[[2,3,6,7]].astype(dtype="int64")
     coordsData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
+    coordsData = coordsData.astype({"aStart":"int64", "aEnd":"int64", "bStart":"int64", "bEnd":"int64", "aChr":"str", "bChr":"str"})
 
     # annoCoords = annoCoords.append(coordsData.copy())
     annoCoords = pd.concat([annoCoords, coordsData.copy()])
