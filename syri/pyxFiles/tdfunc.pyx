@@ -475,7 +475,6 @@ def readAnnoCoords(cwdPath, uniChromo, prefix):
     # concat, add index on A and B
     annoCoords = pd.concat(dfs)
     assert len(annoCoords) > 0
-    print(annoCoords)
     annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"], inplace=True)
     annoCoords.reset_index(inplace=True)
     annoCoords.loc[:, "bIndex"] = annoCoords.index #range(len(annoCoords))

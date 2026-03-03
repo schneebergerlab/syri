@@ -90,7 +90,6 @@ def getsrtable(cwdpath, prefix):
                     }
                     align_num += 1
 
-    print(list(entries.keys()))
     anno = pd.DataFrame.from_dict(entries, orient="index").astype({
         "achr":"str", "astart":"int64", "aend":"int64", "aseq":"str",
         "bseq":"str", "bchr":"str", "bstart":"int64", "bend":"int64",
@@ -100,7 +99,7 @@ def getsrtable(cwdpath, prefix):
     #anno.loc[:, ['astart', 'aend', 'bstart', 'bend']] = anno.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
     #anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
     anno.sort_values(['achr', 'astart', 'aend'], inplace=True)
-    anno['id'] = anno.index
+    anno.loc[:, 'id'] = anno.index
     return anno
 # END
 
@@ -135,7 +134,9 @@ def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
         logger.debug("Number of SV annotations read from file: " + str(svdata.shape[0]))
         svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr', 'aseq', 'bseq']
         # Ensure that chromosome names are strings
-        svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
+        #svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
+        svdata = svdata.astype({"achr":"str", "bchr":"str"})
+
         # Read data
         entries = deque()
         for row in svdata.itertuples(index=False):
@@ -172,8 +173,8 @@ def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
         sv = pd.DataFrame.from_records(entries)
         if sv.shape[0] != 0:
             logger.debug("SV found in SV file. Number of SV that will be reported." + str(sv.shape[0]))
+            sv = sv.astype({'astart':"int64", 'aend':"int64", 'bstart':"int64", 'bend':"int64"})
             sv.index = sv['id']
-            sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
             sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
             sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
             # Get sequence at start position in reference sequence
@@ -347,7 +348,7 @@ def parsesnps(f: str, anno: pd.DataFrame, count: int, ref: str):
 
         snp = pd.DataFrame.from_records(entries)
         try:
-            snp.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snp.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+            snp = snp.astype({'astart':"int64", 'aend':"int64", 'bstart':"int64", 'bend':"int64"})
             snp.index = snp['id']
             snp = snp.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
             snp.sort_values(['achr', 'astart', 'aend'], inplace=True)
@@ -422,7 +423,7 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
         isempty = False
         try:
             notal = pd.read_table(cwdpath + prefix + "notAligned.txt", header=None)
-            notal[3] = notal[3].astype('str')
+            notal.loc[:, 3] = notal[3].astype('str')
         except pd.errors.EmptyDataError as e:
             isempty = True
             logger.debug("NOTAL file is empty")
@@ -431,7 +432,7 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
         if not isempty:
             logger.debug("Number of NOTAL annotations read from file: " + str(notal.shape[0]))
             notal.columns = ["gen", "start", "end", "chr"]
-            notal[["start", "end"]] = notal[["start", "end"]].astype("int")
+            notal = notal.astype({"start":"int64", "end":"int64"})
             entries = defaultdict()
             _c = 0
             for row in notal.itertuples(index=False):
@@ -469,7 +470,7 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
             notal = pd.DataFrame.from_dict(entries, orient="index")
             notal = notal.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
             notal.sort_values(['achr', 'astart', 'aend'], inplace=True)
-            notal['selected'] = -1
+            notal.insert(notal.shape[1], 'selected', -1)
     else:
         notal = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass', 'selected'])
     logger.debug("Number of NOTAL annotations to output: " + str(notal.shape[0]))
@@ -492,9 +493,9 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
 
         notA = notal.loc[notal.achr != "-"].copy()
         # notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
-        notA[["astart", "aend"]] = notA[["astart", "aend"]].astype("int")
+        notA = notA.astype({"astart":"int64", "aend":"int64"})
         notB = notal.loc[notal.bchr != "-"].copy()
-        notB[["bstart", "bend"]] = notB[["bstart", "bend"]].astype("int")
+        notB = notB.astype({"bstart":"int64", "bend":"int64"})
         row_old = -1
         for row in events.itertuples(index=False):
             if len(notA) > 0:
@@ -589,29 +590,27 @@ def getVCF(finname, foutname, cwdpath, prefix, sname, chr_sizes):
     data = pd.read_table(cwdpath + prefix + finname, header=None, keep_default_na=False, dtype=object)
     data.columns = ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']
     data = data.loc[data['achr'] != "-"].copy()
-    dtypes = {'achr': str,
-              'astart': int,
-              'aend': int,
-              'aseq': str,
-              'bseq': str,
-              'bchr': str,
-              'bstart': str,
-              'bend': str,
-              'id': str,
-              'parent': str,
-              'vartype': str,
-              'dupclass': str}
-    data = data.astype(dtypes)
+    #dtypes = {'achr': 'str',
+    #          'astart': 'int64',
+    #          'aend': 'int64',
+    #          'aseq': 'str',
+    #          'bseq': 'str',
+    #          'bchr': 'str',
+    #          'bstart': 'str',
+    #          'bend': 'str',
+    #          'id': 'str',
+    #          'parent': 'str',
+    #          'vartype': 'str',
+    #          'dupclass': 'str'}
+    data = data.astype('str')#dtypes)
+
     # Translation string for fixing IUPAC codes in sequence strings
     old = 'ACGTNacgtnRYSWKMBDHVryswkmbdhv'
     rev = 'ACGTNacgtnACCAGACAAAaccagacaaa'
     tab = str.maketrans(old, rev)
-    try:
-        data['achr'] = data['achr'].astype('int')
-    except ValueError as ve:
-        logger.debug('Chromosome values are sorted lexicographically.')
+
     data.sort_values(['achr', 'astart', 'aend'], inplace=True)
-    data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']] = data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']].astype(str)
+
     with open(cwdpath + prefix + foutname, 'w') as fout:
         fout.write('##fileformat=VCFv4.3\n')
         fout.write('##fileDate=' + str(date.today()).replace('-', '') + '\n')
