@@ -935,7 +935,9 @@ def outSyn(cwdPath, threshold, prefix):
                     if line[0] == "#":
                         data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
                 data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
-                data.loc[:, "class"] = i.split("Out.txt")[0]
+                # annotate as class according to file
+                cls = i.removesuffix("Out.txt")
+                data.insert(data.shape[1], "class", cls)
                 if len(data)>0:
                     # reCoords = reCoords.append(data)
                     reCoords = pd.concat([reCoords, data])
@@ -943,8 +945,8 @@ def outSyn(cwdPath, threshold, prefix):
                 for line in fin:
                     line = line.strip().split("\t")
                     if line[0] == "#":
-                        data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5],ctxAnnoDict[line[8]]])
-                data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","class"], dtype=object)
+                        data.append(list(map(int,getValues(line, [2, 3, 6, 7]))) + [line[1], line[5], ctxAnnoDict[line[8]]])
+                data = pd.DataFrame(data, columns = ["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr", "class"], dtype=object)
                 if len(data)>0:
                     # reCoords = reCoords.append(data)
                     reCoords = pd.concat([reCoords, data])
@@ -952,7 +954,7 @@ def outSyn(cwdPath, threshold, prefix):
     # allBlocks = synData[["aStart","aEnd","bStart","bEnd","aChr","bChr","class"]].append(reCoords)
     allBlocks = pd.concat([synData[["aStart","aEnd","bStart","bEnd","aChr","bChr","class"]], reCoords])
     allBlocks.index = range(allBlocks.shape[0])
-    allBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace= True)
+    allBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace=True)
     synLocs = {np.where(allBlocks.index.values == i)[0][0]:i for i in range(synData.shape[0])}
 
     allBlocks.index = range(allBlocks.shape[0])
