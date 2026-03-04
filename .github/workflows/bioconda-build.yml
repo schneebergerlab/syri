@@ -26,7 +26,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install bioconda
       run: |
-        conda install bioconda::bioconda-utils
+        conda install --channel bioconda bioconda::bioconda-utils
     - name: Run bioconda lint
       run: |
         bioconda-utils lint
