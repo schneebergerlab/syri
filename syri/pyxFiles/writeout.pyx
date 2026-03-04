@@ -584,7 +584,6 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
 
         chroms['-'] = '-' # handle missing chr info
         to_write.loc[:, 'bchr'] = to_write.loc[:, 'bchr'].map(lambda x: chroms[x])
-        print(to_write)
 
     to_write.to_csv(cwdpath + prefix + "syri.out", sep="\t", index=False, header=False)
     return 0
