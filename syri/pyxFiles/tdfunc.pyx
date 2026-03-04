@@ -1821,7 +1821,7 @@ cdef greedySubsetSelector(cluster, transBlocksData, seedblocks, iterCount = 100)
                 topBlocks = sorted(np.nonzero(tempcluster)[0], key = lambda x: transBlocksScore[x], reverse = True)[:20]
                 totalScore = sum(transBlocksScore[i] for i in topBlocks)
                 prob = [transBlocksScore[i]/totalScore for i in topBlocks]
-                newblock = int(np.random.choice(topBlocks, size = 1, p = prob))
+                newblock = np.random.choice(topBlocks, p = prob)
                 outblocks[newblock] = 1
                 tempcluster[newblock] = 0
                 ntmp-=1
