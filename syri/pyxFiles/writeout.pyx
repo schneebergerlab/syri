@@ -59,14 +59,14 @@ def getsrtable(cwdpath, prefix):
                         'achr': line[1],
                         'astart': np.int64(line[2]),
                         'aend': np.int64(line[3]),
+                        'aseq': "-",
+                        'bseq': "-",
                         'bchr': line[5],
                         'bstart': np.int64(line[6]),
                         'bend': np.int64(line[7]),
                         'vartype': sr_type,
                         'parent': "-",
                         'dupclass': "-",
-                        'aseq': "-",
-                        "bseq": "-"
                     }
                     if re_dup.search(file):
                         entries[sr_type + str(sr_num)]["dupclass"] = "copygain" if line[9] == "B" else "copyloss"
@@ -79,14 +79,14 @@ def getsrtable(cwdpath, prefix):
                         'achr': entries[sr_type + str(sr_num)]['achr'],
                         'astart': np.int64(line[0]),
                         'aend': np.int64(line[1]),
+                        'aseq': "-",
+                        'bseq': "-",
                         'bchr': entries[sr_type + str(sr_num)]['bchr'],
                         'bstart': np.int64(line[2]),
                         'bend': np.int64(line[3]),
                         'vartype': sr_type + "AL",
                         'parent': sr_type + str(sr_num),
                         'dupclass': "-",
-                        'aseq': "-",
-                        "bseq": "-"
                     }
                     align_num += 1
 
@@ -159,6 +159,8 @@ def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
                 'achr': row.achr,
                 'astart': row.astart,
                 'aend': row.aend,
+                'aseq': row.aseq,
+                'bseq': row.bseq,
                 'bchr': row.bchr,
                 'bstart': row.bstart,
                 'bend': row.bend,
@@ -166,8 +168,6 @@ def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
                 'parent': parent,
                 'id': row.vartype + str(count),
                 'dupclass': "-",
-                'aseq': row.aseq,
-                "bseq": row.bseq
             })
             count += 1
         sv = pd.DataFrame.from_records(entries)
@@ -237,13 +237,13 @@ def parsesnps(f: str, anno: pd.DataFrame, count: int, ref: str):
             'achr': achr,
             'astart': astart,
             'aend': aend,
+            'aseq': "-" if vtype == "INS" else seq,
+            'bseq': "-" if vtype == "DEL" else seq,
             'bchr': bchr,
             'bstart': bstart,
             'bend': bend,
             'vartype': vtype,
             'parent': p,
-            'aseq': "-" if vtype == "INS" else seq,
-            'bseq': "-" if vtype == "DEL" else seq,
             'id': vtype + str(count),
             'dupclass': "-"
         })
@@ -294,13 +294,13 @@ def parsesnps(f: str, anno: pd.DataFrame, count: int, ref: str):
                             'achr': line[10],
                             'astart': int(line[0]),
                             'aend': int(line[0]),
+                            'aseq': line[1],
+                            'bseq': line[2],
                             'bchr': line[11],
                             'bstart': int(line[3]),
                             'bend': int(line[3]),
                             'vartype': "SNP",
                             'parent': parent,
-                            'aseq': line[1],
-                            'bseq': line[2],
                             'id': "SNP" + str(count),
                             'dupclass': "-"
                         })
@@ -442,6 +442,8 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
                         'achr': row.chr,
                         'astart': row.start,
                         'aend': row.end,
+                        'aseq': "-",
+                        'bseq': "-",
                         'bchr': "-",
                         'bstart': "-",
                         'bend': "-",
@@ -449,14 +451,14 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
                         'parent': "-",
                         'id': "NOTAL" + str(_c),
                         'dupclass': "-",
-                        'aseq': "-",
-                        "bseq": "-"
                     }
                 elif row.gen == "Q":
                     entries["NOTAL" + str(_c)] = {
                         'achr': "-",
                         'astart': "-",
                         'aend': "-",
+                        'aseq': "-",
+                        'bseq': "-",
                         'bchr': row.chr,
                         'bstart': row.start,
                         'bend': row.end,
@@ -464,8 +466,6 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
                         'parent': "-",
                         'id': "NOTAL" + str(_c),
                         'dupclass': "-",
-                        'aseq': "-",
-                        'bseq': "-"
                     }
             notal = pd.DataFrame.from_dict(entries, orient="index")
             notal = notal.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
@@ -590,18 +590,9 @@ def getVCF(finname, foutname, cwdpath, prefix, sname, chr_sizes):
     data = pd.read_table(cwdpath + prefix + finname, header=None, keep_default_na=False, dtype=object)
     data.columns = ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']
     data = data.loc[data['achr'] != "-"].copy()
-    #dtypes = {'achr': 'str',
-    #          'astart': 'int64',
-    #          'aend': 'int64',
-    #          'aseq': 'str',
-    #          'bseq': 'str',
-    #          'bchr': 'str',
-    #          'bstart': 'str',
-    #          'bend': 'str',
-    #          'id': 'str',
-    #          'parent': 'str',
-    #          'vartype': 'str',
-    #          'dupclass': 'str'}
+    #dtypes = {'achr': 'str', 'astart': 'int64', 'aend': 'int64', 'aseq': 'str',
+    #          'bseq': 'str', 'bchr': 'str', 'bstart': 'str', 'bend': 'str',
+    #          'id': 'str', 'parent': 'str', 'vartype': 'str', 'dupclass': 'str'}
     data = data.astype('str')#dtypes)
 
     # Translation string for fixing IUPAC codes in sequence strings
