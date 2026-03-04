@@ -35,6 +35,13 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Test CLI
+      run: |
+        cd test/test_data
+        syri -c out.paf -F P -r tair10_chr4.fa.gz -q ler_chr4.fa.gz --prefix test_paf
+        file test_pafsyri.out test_pafsyri.vcf test_pafsyri.summary # test output files exist
+        syri -c out.bam -F B -r tair10_chr4.fa.gz -q ler_chr4.fa.gz --prefix test_bam
+        file test_bamsyri.out test_bamsyri.vcf test_bamsyri.summary # test output files exist
     - name: Test with pytest.py
       run: |
         python -m pip install .
