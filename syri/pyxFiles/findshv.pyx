@@ -109,7 +109,7 @@ def getsnps(blocks, allAlignments):
         snps = chrsnps[achr][bchr]
         outsnps = pd.DataFrame()
         for row in alignments.itertuples(index=False):
-            if not 'inv' in row.state:
+            if 'inv' not in row.state:
                 # outsnps = outsnps.append(snps.loc[(snps[0] > row.aStart) &
                 #                         (snps[0] < row.aEnd) &
                 #                         (snps[3] > row.bStart) &
