@@ -483,98 +483,110 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
         snp.loc[(snp.vartype == 'INS') & (snp.bend - snp.bstart > maxs), 'aseq'] = '-'
         snp.loc[(snp.vartype == 'INS') & (snp.bend - snp.bstart > maxs), 'bseq'] = '-'
 
+    ## prepare list of DFs containing all records in output format
     events = anno.loc[anno.parent == "-"]
     logger.debug('Starting output file generation')
-    with open(cwdpath + prefix + "syri.out", "w") as fout:
-        logger.debug("All annotation count. " + "SR anno: " + str(anno.shape[0]) + " SV anno: " + str(sv.shape[0]) + " ShV anno: " + str(snp.shape[0]) + " notal anno: " + str(notal.shape[0]))
-        annogrp = anno.groupby('parent')
-        svgrp = sv.groupby('parent')
-        snpgrp = snp.groupby('parent')
+    out = []
+    logger.debug("All annotation count. " + "SR anno: " + str(anno.shape[0]) + " SV anno: " + str(sv.shape[0]) + " ShV anno: " + str(snp.shape[0]) + " notal anno: " + str(notal.shape[0]))
+    annogrp = anno.groupby('parent')
+    svgrp = sv.groupby('parent')
+    snpgrp = snp.groupby('parent')
 
-        notA = notal.loc[notal.achr != "-"].copy()
-        # notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
-        notA = notA.astype({"astart":"int64", "aend":"int64"})
-        notB = notal.loc[notal.bchr != "-"].copy()
-        notB = notB.astype({"bstart":"int64", "bend":"int64"})
-        row_old = -1
-        for row in events.itertuples(index=False):
-            if len(notA) > 0:
-                if row_old != -1 and row_old.achr != row.achr:
-                    _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
-                    notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
-                    if len(_notA) == 0:
-                        pass
-                    elif len(_notA) == 1:
-                        fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
-                    else:
-                        logger.error("too many notA regions")
-                        sys.exit()
-                _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
-                notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart - 1), 'selected'] = 1
+    notA = notal.loc[notal.achr != "-"].copy()
+    # notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
+    notA = notA.astype({"astart":"int64", "aend":"int64"})
+    notB = notal.loc[notal.bchr != "-"].copy()
+    notB = notB.astype({"bstart":"int64", "bend":"int64"})
+    row_old = -1
+    for row in events.itertuples(index=False):
+        if len(notA) > 0:
+            if row_old != -1 and row_old.achr != row.achr:
+                _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
+                notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
                 if len(_notA) == 0:
                     pass
                 elif len(_notA) == 1:
-                    fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+                    out.append(_notA[0:1])
+                    #out.append(pd.DataFrame([_notA.iloc[0]]))
+                    #fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
                 else:
                     logger.error("too many notA regions")
                     sys.exit()
-            fout.write("\t".join(list(map(str, row))) + "\n")
-            # Update row_old when chromosome change or the max coordinate increases
-            if row_old == -1: row_old = row
-            elif row.achr != row_old.achr: row_old = row
-            elif row_old.aend < row.aend: row_old = row
-            # row_old = row
-
-            try:
-                a = annogrp.get_group(row.id)
-            except KeyError:
-                a = pd.DataFrame()
-            except Exception as e:
-                logger.debug('Error in finding key for anno.' + e)
-
-            try:
-                b = svgrp.get_group(row.id)
-            except KeyError as k:
-                b = pd.DataFrame()
-            except Exception as e:
-                logger.debug('Error in finding key for anno.' + e)
-
-            try:
-                c = snpgrp.get_group(row.id)
-            except KeyError:
-                c = pd.DataFrame()
-            except Exception as e:
-                logger.debug('Error in finding key for anno.' + e)
-
-            outdata = pd.concat([a, b, c])
-            outdata.sort_values(["astart", "aend"], inplace=True)
-            fout.write(outdata.to_csv(sep="\t", index=False, header=False))
-        if len(notA) > 0:
-            _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
-            notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
+            _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
+            notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart - 1), 'selected'] = 1
             if len(_notA) == 0:
                 pass
             elif len(_notA) == 1:
-                fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+                out.append(_notA[0:1])
+                #out.append(pd.DataFrame([_notA.iloc[0]]))
+                #fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
             else:
                 logger.error("too many notA regions")
                 sys.exit()
-        fout.write(notB.loc[:, notB.columns != 'selected'].to_csv(sep="\t", index=False, header=False))
+        out.append(pd.DataFrame([row]))
+        #fout.write("\t".join(list(map(str, row))) + "\n")
+        # Update row_old when chromosome change or the max coordinate increases
+        if row_old == -1: row_old = row
+        elif row.achr != row_old.achr: row_old = row
+        elif row_old.aend < row.aend: row_old = row
+        # row_old = row
 
-    logger.debug('Remapping query genome ids')
+        try:
+            a = annogrp.get_group(row.id)
+        except KeyError:
+            a = pd.DataFrame()
+        except Exception as e:
+            logger.debug('Error in finding key for anno.' + e)
+
+        try:
+            b = svgrp.get_group(row.id)
+        except KeyError as k:
+            b = pd.DataFrame()
+        except Exception as e:
+            logger.debug('Error in finding key for anno.' + e)
+
+        try:
+            c = snpgrp.get_group(row.id)
+        except KeyError:
+            c = pd.DataFrame()
+        except Exception as e:
+            logger.debug('Error in finding key for anno.' + e)
+
+        outdata = pd.concat([a, b, c])
+        outdata.sort_values(["astart", "aend"], inplace=True)
+        out.append(outdata)
+        #fout.write(outdata.to_csv(sep="\t", index=False, header=False))
+    if len(notA) > 0:
+        _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
+        notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
+        if len(_notA) == 0:
+            pass
+        elif len(_notA) == 1:
+            out.append(_notA[0:1])
+            #out.append(pd.DataFrame(_notA.iloc[0]))
+            #fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+        else:
+            logger.error("too many notA regions")
+            sys.exit()
+    out.append(notB.loc[:, notB.columns != 'selected'])
+    #fout.write(notB.loc[:, notB.columns != 'selected'].to_csv(sep="\t", index=False, header=False))
+
+    to_write = pd.concat(out)
+    # remap chrs, if necessary
+    logger.debug('Remapping query genome ids as specified in {')
     if os.path.isfile(cwdpath+prefix+"mapids.txt"):
+        # read in mapping
         chroms = {}
         with open(cwdpath+prefix+"mapids.txt", "r") as m:
             for line in m:
                 l = line.strip().split()
                 chroms[l[0]] = l[1]
-        lines = open(cwdpath + prefix + "syri.out", "r").readlines()
-        with open(cwdpath + prefix + "syri.out", "w") as fout:
-            for line in lines:
-                line = line.strip().split('\t')
-                if line[5] != "-":
-                    line[5] = chroms[line[5]]
-                fout.write("\t".join(line) + '\n')
+
+        chroms['-'] = '-' # handle missing chr info
+        to_write.loc[:, 'bchr'] = to_write.loc[:, 'bchr'].map(lambda x: chroms[x])
+        print(to_write)
+
+    to_write.to_csv(cwdpath + prefix + "syri.out", sep="\t", index=False, header=False)
     return 0
 # END
 
