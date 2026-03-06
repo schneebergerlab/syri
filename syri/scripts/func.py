@@ -131,7 +131,7 @@ def readfasta(f):
                         if chrid in out.keys():
                             sys.exit(" Duplicate chromosome IDs are not accepted. Chromosome ID {} is duplicated. Provided chromosome with unique IDs".format(chrid))
                     else:
-                        chrseq.append(line.strip().decode())
+                        chrseq.append(line.strip().decode().strip())
         else:
             with open(f, 'r') as fin:
                 for line in fin:
