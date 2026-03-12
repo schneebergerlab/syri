@@ -661,6 +661,7 @@ def getVCF(finname, foutname, cwdpath, prefix, sname, chr_sizes):
         ## Iterate over each line from syri.out
         for line in data.itertuples(index=False):
             pos = [line[0], line[1], line[8], 'N', '<' + line[10] + '>', '.', 'PASS']
+            _info = None
 
             if line[10] in ["SYN", "INV", "TRANS", "INVTR", "DUP", "INVDP"]:
                 _info = ';'.join(['END='+line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=.', 'VarType='+'SR', 'DupType='+line[11]])
@@ -684,6 +685,9 @@ def getVCF(finname, foutname, cwdpath, prefix, sname, chr_sizes):
                     if line[3].translate(tab).upper() == line[4].translate(tab).upper(): continue
                     pos = [line[0], line[1], line[8], line[3].translate(tab), line[4].translate(tab), '.', 'PASS']
                     _info = ";".join(['END=' + line[2], 'ChrB=' + line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=' + line[9], 'VarType=ShV', 'DupType=.'])
+
+            if _info is None:
+                continue
 
             pos.append(_info)
             pos.append(frmt)
