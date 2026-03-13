@@ -4,7 +4,6 @@
 import pandas as pd
 import numpy as np
 from collections import deque
-from datetime import datetime
 import logging
 import time
 from syri.scripts.func import unlist, getValues, intersect
@@ -481,7 +480,7 @@ def readAnnoCoords(cwdPath, uniChromo, prefix):
 
 def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores, tdgl, tdolp):
     logger = logging.getLogger("getCTX")
-    logger.info("Identifying cross-chromosomal translocation and duplication for chromosome" + str(datetime.now()))
+    logger.info("Identifying cross-chromosomal translocation and duplication for chromosome")
 
     def getDupCTX(indices, allTransBlocksData, transClasses, astart, aend, bstart, bend, aindex, bindex, agroup, bgroup, threshold, meclass, tdolp):
         dupGenomes = {}
@@ -516,7 +515,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
                 dupGenomes[index] = "A"
         return(dupGenomes)
 
-    logger.debug("Reading Coords" + str(datetime.now()))
+    logger.debug("Reading Coords")
 
     annoCoords = readAnnoCoords(cwdPath, uniChromo, prefix)
     ctxData = coords.loc[coords['aChr'] != coords['bChr']].copy()
@@ -1050,7 +1049,6 @@ cpdef getProfitableTrans(cpp_map[long, cpp_set[long]] graph, long[:] astart, lon
         dist[i] = 0
 
         # Process vertices in topological order
-        st = datetime.now()
         a = deque()
         a.append(i)
         for k in range(edgecnt):
@@ -1059,7 +1057,6 @@ cpdef getProfitableTrans(cpp_map[long, cpp_set[long]] graph, long[:] astart, lon
                 dist[target[k]] = dist[source[k]] + weight[k]
                 pred[target[k]] = source[k]
 
-        st = datetime.now()
         cnt = 0
         #for j in n:
         for j in set(a):

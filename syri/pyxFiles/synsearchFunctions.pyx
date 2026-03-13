@@ -8,7 +8,6 @@ from syri.scripts.func import *
 import sys
 from collections import deque, defaultdict
 # from scipy.stats import *
-from datetime import datetime
 import pandas as pd
 from multiprocessing import Pool
 from functools import partial
@@ -622,7 +621,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
     for i in range(len(allTransCluster)):
         allTransClusterIndices.update(dict.fromkeys(allTransCluster[i], i))
 
-    logger.debug("Translocations : making blocks data " + chromo +" " + str(datetime.now()))
+    logger.debug("Translocations : making blocks data " + chromo)
     logger.debug("memory usage: " + str(psutil.Process(os.getpid()).memory_info()[0]/2.**30))
 
     if len(allTransBlocks) > 0:
@@ -709,7 +708,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
         # del(aUni, bUni, status, aIndex, bIndex, aGroups, bGroups, out)
         # collect()
 
-    logger.debug("Translocations : finding solutions "+ chromo + str(datetime.now()))
+    logger.debug("Translocations : finding solutions "+ chromo)
     clusterSolutions = []
     for i in range(len(allTransCluster)):
         if len(allTransCluster[i]) > 0:
@@ -721,7 +720,7 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
     clusterSolutionBlocks = [i[1] for i in clusterSolutions]
     #clusterBlocks = unlist(clusterSolutionBlocks)
 
-    logger.debug("Translocations : processing translocations " + chromo + str(datetime.now()))
+    logger.debug("Translocations : processing translocations " + chromo)
 
     garb = deque()
     for i in range(len(allTransBlocksData)):
