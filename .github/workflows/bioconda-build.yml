@@ -1,0 +1,33 @@
+#name: Conda package
+#
+#on:
+#  push:
+#    branches: [ "master" ]
+#  pull_request:
+#    branches: [ "master" ]
+#
+# bioconda-utils is not installable via conda, and don't wanna bother installing something manually
+#jobs:
+#  bioconda-build:
+#
+#    runs-on: ubuntu-latest
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+#
+#    steps:
+#    - uses: conda-incubator/setup-miniconda@v3
+#      with:
+#        auto-update-conda: true
+#        python-version: ${{ matrix.python-version }}
+#    - uses: actions/checkout@v4
+#    - name: Install bioconda
+#      run: |
+#        conda install --channel bioconda bioconda::bioconda-utils
+#    - name: Run bioconda lint
+#      run: |
+#        bioconda-utils lint
+#    - name: Build recipe using bioconda
+#      run: |
+#        bioconda-utils build

@@ -445,37 +445,43 @@ def getScore(outBlocks, transBlocksData):
 
 
 def readAnnoCoords(cwdPath, uniChromo, prefix):
-    annoCoords = pd.DataFrame(columns=["aStart","aEnd","bStart","bEnd","aChr","bChr"])
-    synData = []
+    dfs = []
+    types_map = {"aStart":"int64", "aEnd":"int64", "bStart":"int64", "bEnd":"int64", "aChr":"str", "bChr":"str"}
+
+    # read in from synOut.txt; different format from other files, so do it separately
+    processed_lines = []
     fin = open(cwdPath+prefix+"synOut.txt","r")
     for line in fin:
         line = line.strip().split("\t")
         if line[0] == "#":
             chromo = line[1]
             continue
-        synData.append(list(map(int,line[:4]))+[chromo,chromo])
+        processed_lines.append(list(map(np.int64,line[:4]))+[chromo,chromo])
     fin.close()
-    synData = pd.DataFrame(synData,columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"])
-    annoCoords = pd.concat([annoCoords, synData])
+    dfs.append(pd.DataFrame(processed_lines, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]).astype(types_map))
 
+    # read in the rest
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt"]:
-        data = []
+        processed_lines = []
         fin = open(cwdPath+prefix+i,"r")
         for line in fin:
             line = line.strip().split("\t")
             if line[0] == "#":
-                data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
+                processed_lines.append(list(map(np.int64,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
         fin.close()
-        data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
-        annoCoords = pd.concat([annoCoords, data])
+        dfs.append(pd.DataFrame(processed_lines, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]).astype(types_map))
 
-    annoCoords[["aStart","aEnd","bStart","bEnd"]] = annoCoords[["aStart","aEnd","bStart","bEnd"]].astype("int64")
-    annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"],inplace = True)
-    annoCoords["bIndex"] = range(len(annoCoords))
-    annoCoords.sort_values(by = ["aChr","aStart","aEnd","bChr","bStart","bEnd"],inplace = True)
-    annoCoords.index = range(len(annoCoords))
-    annoCoords["aIndex"] = range(len(annoCoords))
-    return(annoCoords)
+    # concat, add index on A and B
+    annoCoords = pd.concat(dfs)
+    assert len(annoCoords) > 0
+    annoCoords.sort_values(by = ["bChr","bStart","bEnd","aChr","aStart","aEnd"], inplace=True)
+    annoCoords.reset_index(inplace=True)
+    annoCoords.loc[:, "bIndex"] = annoCoords.index #range(len(annoCoords))
+    annoCoords.sort_values(by = ["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace=True)
+    annoCoords.reset_index(inplace=True) #index = range(len(annoCoords))
+    annoCoords.loc[:, "aIndex"] = annoCoords.index
+
+    return annoCoords
 
 
 def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores, tdgl, tdolp):
@@ -525,9 +531,9 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
     ctxData.loc[invCTXIndex, "bEnd"] = ctxData.loc[invCTXIndex].bStart - ctxData.loc[invCTXIndex].bEnd
     ctxData.loc[invCTXIndex, "bStart"] = ctxData.loc[invCTXIndex].bStart - ctxData.loc[invCTXIndex].bEnd
     ctxData.sort_values(by= ["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace = True)
-    ctxData["aIndex"] = range(ctxData.shape[0])
+    ctxData.loc[:, "aIndex"] = range(ctxData.shape[0])
     ctxData.sort_values(by= ["bChr","bStart","bEnd","aChr","aStart","aEnd"], inplace = True)
-    ctxData["bIndex"] = range(ctxData.shape[0])
+    ctxData.loc[:, "bIndex"] = range(ctxData.shape[0])
     ctxData.sort_values("aIndex", inplace = True)
 
     logger.debug("CTX identification: ctxdata size" + str(ctxData.shape))
@@ -736,7 +742,7 @@ def getCTX(coords, cwdPath, uniChromo, threshold, bRT, prefix, tUC, tUP, nCores,
 
     return 0
 
-cpdef makeBlocksTree(long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd, int threshold, long[:] left, long[:] right, int tdgl):
+cpdef makeBlocksTree(const long[:] aStart, const long[:] aEnd, const long[:] bStart, const long[:] bEnd, int threshold, const long[:] left, const long[:] right, int tdgl):
     """Compute whether two alignments can be part of one translation block. For this:
         the alignments should not be separated by any inPlaceBlock on both ends and
         they should be collinear with respect to each other.
@@ -773,7 +779,7 @@ cpdef makeBlocksTree(long[:] aStart, long[:] aEnd, long[:] bStart, long[:] bEnd,
         inc(it)
     return(outdict)
 
-cpdef makeBlocksTree_ctx(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, long[:] bdir, np.ndarray achr, np.ndarray bchr, int threshold, int tdgl):
+cpdef makeBlocksTree_ctx(const long[:] astart, const long[:] aend, const long[:] bstart, const long[:] bend, const long[:] bdir, np.ndarray achr, np.ndarray bchr, int threshold, int tdgl):
     """Compute whether two alignments can be part of one translation block. For this:
        they should be syntenic with respect to each other.
     """
@@ -815,24 +821,26 @@ def getBlocks(orderedBlocks, isinv, annoCoords, threshold, tUC, tUP, tdgl):
     if len(orderedBlocks) == 0:
         return([])
 
-    outOrderedBlocks = makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.values, orderedBlocks.bChr.values, threshold, tdgl)
+    outOrderedBlocks = makeBlocksTree_ctx(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, orderedBlocks.bDir.values, orderedBlocks.aChr.to_numpy(copy=False), orderedBlocks.bChr.to_numpy(copy=False), threshold, tdgl)
 
+    asorted_acs = annoCoords.sort_values(['aChr', 'aStart','aEnd'])
+    bsorted_acs = annoCoords.sort_values(['bChr', 'bStart','bEnd'])
     transBlocks = getProfitableTrans(outOrderedBlocks,
                                      orderedBlocks.aStart.values,
                                      orderedBlocks.aEnd.values,
                                      orderedBlocks.bStart.values,
                                      orderedBlocks.bEnd.values,
-                                     orderedBlocks.aChr.values,
-                                     orderedBlocks.bChr.values,
+                                     orderedBlocks.aChr.to_numpy(copy=False),#values,
+                                     orderedBlocks.bChr.to_numpy(copy=False),#values,
                                      orderedBlocks.iden.values.astype('float32'),
                                      orderedBlocks.aLen.values,
                                      orderedBlocks.bLen.values,
-                                     annoCoords.sort_values(['aChr', 'aStart','aEnd']).aStart.values,
-                                     annoCoords.sort_values(['aChr', 'aStart','aEnd']).aEnd.values,
-                                     annoCoords.sort_values(['bChr', 'bStart','bEnd']).bStart.values,
-                                     annoCoords.sort_values(['bChr', 'bStart','bEnd']).bEnd.values,
-                                     annoCoords.sort_values(['aChr', 'aStart','aEnd']).aChr.values,
-                                     annoCoords.sort_values(['bChr', 'bStart','bEnd']).bChr.values,
+                                     asorted_acs.aStart.values,
+                                     asorted_acs.aEnd.values,
+                                     bsorted_acs.bStart.values,
+                                     bsorted_acs.bEnd.values,
+                                     asorted_acs.aChr.to_numpy(copy=False),#values,
+                                     bsorted_acs.bChr.to_numpy(copy=False),#values,
                                      tUC,
                                      tUP,
                                      isinv)
@@ -840,7 +848,7 @@ def getBlocks(orderedBlocks, isinv, annoCoords, threshold, tUC, tUP, tdgl):
 
 
 
-cpdef getProfitableTrans(cpp_map[long, cpp_set[long]] graph, long[:] astart, long[:] aend, long[:] bstart, long[:] bend, np.ndarray achr, np.ndarray bchr, float[:] iden, long[:] alen, long[:] blen, long[:] inastart, long[:] inaend, long[:] inbstart, long[:] inbend, np.ndarray inachr, np.ndarray inbchr, long tUC, float tUP, int isinv = 0, brk = -1):
+cpdef getProfitableTrans(cpp_map[long, cpp_set[long]] graph, const long[:] astart, const long[:] aend, const long[:] bstart, const long[:] bend, np.ndarray achr, np.ndarray bchr, const float[:] iden, const long[:] alen, const long[:] blen, const long[:] inastart, const long[:] inaend, const long[:] inbstart, const long[:] inbend, np.ndarray inachr, np.ndarray inbchr, long tUC, float tUP, int isinv = 0, brk = -1):
     """
     Input:
      1) dictionary in which each key corresponds to trans alignment and the corresponding values are the alignments which are colinear with key.
@@ -1131,22 +1139,24 @@ def blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
         transBlocksNeighbours = getTransSynOrientation(inPlaceBlocks, orderedBlocks, threshold)
         outOrderedBlocks = makeBlocksTree(orderedBlocks.aStart.values, orderedBlocks.aEnd.values, orderedBlocks.bStart.values, orderedBlocks.bEnd.values, threshold, transBlocksNeighbours[0].values, transBlocksNeighbours[1].values, tdgl)
         ## need to have ref coords and query coords separately sorted
+        asorted_ipbs = inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd'])
+        bsorted_ipbs = inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd'])
         transBlocks = getProfitableTrans(outOrderedBlocks,
                                          orderedBlocks.aStart.values,
                                          orderedBlocks.aEnd.values,
                                          orderedBlocks.bStart.values,
                                          orderedBlocks.bEnd.values,
-                                         orderedBlocks.aChr.values,
-                                         orderedBlocks.bChr.values,
+                                         orderedBlocks.aChr.to_numpy(copy=False),#values,
+                                         orderedBlocks.bChr.to_numpy(copy=False),#values,
                                          orderedBlocks.iden.values.astype('float32'),
                                          orderedBlocks.aLen.values,
                                          orderedBlocks.bLen.values,
-                                         inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aStart.values,
-                                         inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aEnd.values,
-                                         inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bStart.values,
-                                         inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bEnd.values,
-                                         inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aChr.values,
-                                         inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bChr.values,
+                                         asorted_ipbs.aStart.values,
+                                         asorted_ipbs.aEnd.values,
+                                         bsorted_ipbs.bStart.values,
+                                         bsorted_ipbs.bEnd.values,
+                                         asorted_ipbs.aChr.to_numpy(copy=False),#values,
+                                         bsorted_ipbs.bChr.to_numpy(copy=False),#values,
                                          tUC,
                                          tUP)
     else:
@@ -1170,22 +1180,26 @@ def blocksdata(outPlaceBlocks, inPlaceBlocks, threshold, tUC, tUP, chromo, tdgl)
         invertedCoords.bStart = invertedCoords.bStart + invertedCoords.bEnd
         invertedCoords.bEnd = invertedCoords.bStart - invertedCoords.bEnd
         invertedCoords.bStart = invertedCoords.bStart - invertedCoords.bEnd
+
+        # sort separately on A and B
+        asorted_ipbs = inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd'])
+        bsorted_ipbs = inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd'])
         invTransBlocks = getProfitableTrans(outInvertedBlocks,
                                             invertedCoords.aStart.values,
                                             invertedCoords.aEnd.values,
                                             invertedCoords.bStart.values,
                                             invertedCoords.bEnd.values,
-                                            invertedCoords.aChr.values,
-                                            invertedCoords.bChr.values,
+                                            invertedCoords.aChr.to_numpy(copy=False),#values,.values,
+                                            invertedCoords.bChr.to_numpy(copy=False),#values,.values,
                                             invertedCoords.iden.values.astype('float32'),
                                             invertedCoords.aLen.values,
                                             invertedCoords.bLen.values,
-                                            inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aStart.values,
-                                            inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aEnd.values,
-                                            inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bStart.values,
-                                            inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bEnd.values,
-                                            inPlaceBlocks.sort_values(['aChr', 'aStart','aEnd']).aChr.values,
-                                            inPlaceBlocks.sort_values(['bChr', 'bStart','bEnd']).bChr.values,
+                                            asorted_ipbs.aStart.values,
+                                            asorted_ipbs.aEnd.values,
+                                            bsorted_ipbs.bStart.values,
+                                            bsorted_ipbs.bEnd.values,
+                                            asorted_ipbs.aChr.to_numpy(copy=False),#values,
+                                            bsorted_ipbs.bChr.to_numpy(copy=False),#values,
                                             tUC,
                                             tUP,
                                             isinv = 1)
@@ -1804,7 +1818,7 @@ cdef greedySubsetSelector(cluster, transBlocksData, seedblocks, iterCount = 100)
                 topBlocks = sorted(np.nonzero(tempcluster)[0], key = lambda x: transBlocksScore[x], reverse = True)[:20]
                 totalScore = sum(transBlocksScore[i] for i in topBlocks)
                 prob = [transBlocksScore[i]/totalScore for i in topBlocks]
-                newblock = int(np.random.choice(topBlocks, size = 1, p = prob))
+                newblock = np.random.choice(topBlocks, p = prob)
                 outblocks[newblock] = 1
                 tempcluster[newblock] = 0
                 ntmp-=1

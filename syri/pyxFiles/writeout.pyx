@@ -57,16 +57,16 @@ def getsrtable(cwdpath, prefix):
                             sr_type = "INVDP"
                     entries[sr_type + str(sr_num)] = {
                         'achr': line[1],
-                        'astart': line[2],
-                        'aend': line[3],
+                        'astart': np.int64(line[2]),
+                        'aend': np.int64(line[3]),
+                        'aseq': "-",
+                        'bseq': "-",
                         'bchr': line[5],
-                        'bstart': line[6],
-                        'bend': line[7],
+                        'bstart': np.int64(line[6]),
+                        'bend': np.int64(line[7]),
                         'vartype': sr_type,
                         'parent': "-",
                         'dupclass': "-",
-                        'aseq': "-",
-                        "bseq": "-"
                     }
                     if re_dup.search(file):
                         entries[sr_type + str(sr_num)]["dupclass"] = "copygain" if line[9] == "B" else "copyloss"
@@ -77,24 +77,29 @@ def getsrtable(cwdpath, prefix):
                 else:
                     entries[sr_type + "AL" + str(align_num)] = {
                         'achr': entries[sr_type + str(sr_num)]['achr'],
-                        'astart': line[0],
-                        'aend': line[1],
+                        'astart': np.int64(line[0]),
+                        'aend': np.int64(line[1]),
+                        'aseq': "-",
+                        'bseq': "-",
                         'bchr': entries[sr_type + str(sr_num)]['bchr'],
-                        'bstart': line[2],
-                        'bend': line[3],
+                        'bstart': np.int64(line[2]),
+                        'bend': np.int64(line[3]),
                         'vartype': sr_type + "AL",
                         'parent': sr_type + str(sr_num),
                         'dupclass': "-",
-                        'aseq': "-",
-                        "bseq": "-"
                     }
                     align_num += 1
 
-    anno = pd.DataFrame.from_dict(entries, orient="index")
-    anno.loc[:, ['astart', 'aend', 'bstart', 'bend']] = anno.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-    anno['id'] = anno.index.values
-    anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+    anno = pd.DataFrame.from_dict(entries, orient="index").astype({
+        "achr":"str", "astart":"int64", "aend":"int64", "aseq":"str",
+        "bseq":"str", "bchr":"str", "bstart":"int64", "bend":"int64",
+        "parent":"str", "vartype":"str", "dupclass":"str",
+        })
+    # legacy type conversions, now done when reading in the lines above
+    #anno.loc[:, ['astart', 'aend', 'bstart', 'bend']] = anno.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+    #anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
     anno.sort_values(['achr', 'astart', 'aend'], inplace=True)
+    anno.loc[:, 'id'] = anno.index
     return anno
 # END
 
@@ -129,7 +134,9 @@ def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
         logger.debug("Number of SV annotations read from file: " + str(svdata.shape[0]))
         svdata.columns = ["vartype", "astart", 'aend', 'bstart', 'bend', 'achr', 'bchr', 'aseq', 'bseq']
         # Ensure that chromosome names are strings
-        svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
+        #svdata[['achr', 'bchr']] = svdata[['achr', 'bchr']].astype('str')
+        svdata = svdata.astype({"achr":"str", "bchr":"str"})
+
         # Read data
         entries = deque()
         for row in svdata.itertuples(index=False):
@@ -152,6 +159,8 @@ def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
                 'achr': row.achr,
                 'astart': row.astart,
                 'aend': row.aend,
+                'aseq': row.aseq,
+                'bseq': row.bseq,
                 'bchr': row.bchr,
                 'bstart': row.bstart,
                 'bend': row.bend,
@@ -159,15 +168,13 @@ def parsesvs(f: str, anno: pd.DataFrame, count: int, ref: str):
                 'parent': parent,
                 'id': row.vartype + str(count),
                 'dupclass': "-",
-                'aseq': row.aseq,
-                "bseq": row.bseq
             })
             count += 1
         sv = pd.DataFrame.from_records(entries)
         if sv.shape[0] != 0:
             logger.debug("SV found in SV file. Number of SV that will be reported." + str(sv.shape[0]))
+            sv = sv.astype({'astart':"int64", 'aend':"int64", 'bstart':"int64", 'bend':"int64"})
             sv.index = sv['id']
-            sv.loc[:, ['astart', 'aend', 'bstart', 'bend']] = sv.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
             sv = sv.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
             sv.sort_values(['achr', 'astart', 'aend'], inplace=True)
             # Get sequence at start position in reference sequence
@@ -230,13 +237,13 @@ def parsesnps(f: str, anno: pd.DataFrame, count: int, ref: str):
             'achr': achr,
             'astart': astart,
             'aend': aend,
+            'aseq': "-" if vtype == "INS" else seq,
+            'bseq': "-" if vtype == "DEL" else seq,
             'bchr': bchr,
             'bstart': bstart,
             'bend': bend,
             'vartype': vtype,
             'parent': p,
-            'aseq': "-" if vtype == "INS" else seq,
-            'bseq': "-" if vtype == "DEL" else seq,
             'id': vtype + str(count),
             'dupclass': "-"
         })
@@ -287,13 +294,13 @@ def parsesnps(f: str, anno: pd.DataFrame, count: int, ref: str):
                             'achr': line[10],
                             'astart': int(line[0]),
                             'aend': int(line[0]),
+                            'aseq': line[1],
+                            'bseq': line[2],
                             'bchr': line[11],
                             'bstart': int(line[3]),
                             'bend': int(line[3]),
                             'vartype': "SNP",
                             'parent': parent,
-                            'aseq': line[1],
-                            'bseq': line[2],
                             'id': "SNP" + str(count),
                             'dupclass': "-"
                         })
@@ -341,7 +348,7 @@ def parsesnps(f: str, anno: pd.DataFrame, count: int, ref: str):
 
         snp = pd.DataFrame.from_records(entries)
         try:
-            snp.loc[:, ['astart', 'aend', 'bstart', 'bend']] = snp.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
+            snp = snp.astype({'astart':"int64", 'aend':"int64", 'bstart':"int64", 'bend':"int64"})
             snp.index = snp['id']
             snp = snp.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
             snp.sort_values(['achr', 'astart', 'aend'], inplace=True)
@@ -416,7 +423,7 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
         isempty = False
         try:
             notal = pd.read_table(cwdpath + prefix + "notAligned.txt", header=None)
-            notal[3] = notal[3].astype('str')
+            notal.loc[:, 3] = notal[3].astype('str')
         except pd.errors.EmptyDataError as e:
             isempty = True
             logger.debug("NOTAL file is empty")
@@ -425,7 +432,7 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
         if not isempty:
             logger.debug("Number of NOTAL annotations read from file: " + str(notal.shape[0]))
             notal.columns = ["gen", "start", "end", "chr"]
-            notal[["start", "end"]] = notal[["start", "end"]].astype("int")
+            notal = notal.astype({"start":"int64", "end":"int64"})
             entries = defaultdict()
             _c = 0
             for row in notal.itertuples(index=False):
@@ -435,6 +442,8 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
                         'achr': row.chr,
                         'astart': row.start,
                         'aend': row.end,
+                        'aseq': "-",
+                        'bseq': "-",
                         'bchr': "-",
                         'bstart': "-",
                         'bend': "-",
@@ -442,14 +451,14 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
                         'parent': "-",
                         'id': "NOTAL" + str(_c),
                         'dupclass': "-",
-                        'aseq': "-",
-                        "bseq": "-"
                     }
                 elif row.gen == "Q":
                     entries["NOTAL" + str(_c)] = {
                         'achr': "-",
                         'astart': "-",
                         'aend': "-",
+                        'aseq': "-",
+                        'bseq': "-",
                         'bchr': row.chr,
                         'bstart': row.start,
                         'bend': row.end,
@@ -457,13 +466,11 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
                         'parent': "-",
                         'id': "NOTAL" + str(_c),
                         'dupclass': "-",
-                        'aseq': "-",
-                        'bseq': "-"
                     }
             notal = pd.DataFrame.from_dict(entries, orient="index")
             notal = notal.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
             notal.sort_values(['achr', 'astart', 'aend'], inplace=True)
-            notal['selected'] = -1
+            notal.insert(notal.shape[1], 'selected', -1)
     else:
         notal = pd.DataFrame(columns=['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass', 'selected'])
     logger.debug("Number of NOTAL annotations to output: " + str(notal.shape[0]))
@@ -476,98 +483,109 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
         snp.loc[(snp.vartype == 'INS') & (snp.bend - snp.bstart > maxs), 'aseq'] = '-'
         snp.loc[(snp.vartype == 'INS') & (snp.bend - snp.bstart > maxs), 'bseq'] = '-'
 
+    ## prepare list of DFs containing all records in output format
     events = anno.loc[anno.parent == "-"]
     logger.debug('Starting output file generation')
-    with open(cwdpath + prefix + "syri.out", "w") as fout:
-        logger.debug("All annotation count. " + "SR anno: " + str(anno.shape[0]) + " SV anno: " + str(sv.shape[0]) + " ShV anno: " + str(snp.shape[0]) + " notal anno: " + str(notal.shape[0]))
-        annogrp = anno.groupby('parent')
-        svgrp = sv.groupby('parent')
-        snpgrp = snp.groupby('parent')
+    out = []
+    logger.debug("All annotation count. " + "SR anno: " + str(anno.shape[0]) + " SV anno: " + str(sv.shape[0]) + " ShV anno: " + str(snp.shape[0]) + " notal anno: " + str(notal.shape[0]))
+    annogrp = anno.groupby('parent')
+    svgrp = sv.groupby('parent')
+    snpgrp = snp.groupby('parent')
 
-        notA = notal.loc[notal.achr != "-"].copy()
-        # notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
-        notA[["astart", "aend"]] = notA[["astart", "aend"]].astype("int")
-        notB = notal.loc[notal.bchr != "-"].copy()
-        notB[["bstart", "bend"]] = notB[["bstart", "bend"]].astype("int")
-        row_old = -1
-        for row in events.itertuples(index=False):
-            if len(notA) > 0:
-                if row_old != -1 and row_old.achr != row.achr:
-                    _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
-                    notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
-                    if len(_notA) == 0:
-                        pass
-                    elif len(_notA) == 1:
-                        fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
-                    else:
-                        logger.error("too many notA regions")
-                        sys.exit()
-                _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
-                notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart - 1), 'selected'] = 1
+    notA = notal.loc[notal.achr != "-"].copy()
+    # notA.loc[:, ["astart", "aend"]] = notA.loc[:, ["astart", "aend"]].astype("int")
+    notA = notA.astype({"astart":"int64", "aend":"int64"})
+    notB = notal.loc[notal.bchr != "-"].copy()
+    notB = notB.astype({"bstart":"int64", "bend":"int64"})
+    row_old = -1
+    for row in events.itertuples(index=False):
+        if len(notA) > 0:
+            if row_old != -1 and row_old.achr != row.achr:
+                _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
+                notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
                 if len(_notA) == 0:
                     pass
                 elif len(_notA) == 1:
-                    fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+                    out.append(_notA[0:1])
+                    #out.append(pd.DataFrame([_notA.iloc[0]]))
+                    #fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
                 else:
                     logger.error("too many notA regions")
                     sys.exit()
-            fout.write("\t".join(list(map(str, row))) + "\n")
-            # Update row_old when chromosome change or the max coordinate increases
-            if row_old == -1: row_old = row
-            elif row.achr != row_old.achr: row_old = row
-            elif row_old.aend < row.aend: row_old = row
-            # row_old = row
-
-            try:
-                a = annogrp.get_group(row.id)
-            except KeyError:
-                a = pd.DataFrame()
-            except Exception as e:
-                logger.debug('Error in finding key for anno.' + e)
-
-            try:
-                b = svgrp.get_group(row.id)
-            except KeyError as k:
-                b = pd.DataFrame()
-            except Exception as e:
-                logger.debug('Error in finding key for anno.' + e)
-
-            try:
-                c = snpgrp.get_group(row.id)
-            except KeyError:
-                c = pd.DataFrame()
-            except Exception as e:
-                logger.debug('Error in finding key for anno.' + e)
-
-            outdata = pd.concat([a, b, c])
-            outdata.sort_values(["astart", "aend"], inplace=True)
-            fout.write(outdata.to_csv(sep="\t", index=False, header=False))
-        if len(notA) > 0:
-            _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
-            notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
+            _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
+            notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart - 1), 'selected'] = 1
             if len(_notA) == 0:
                 pass
             elif len(_notA) == 1:
-                fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+                out.append(_notA[0:1])
+                #out.append(pd.DataFrame([_notA.iloc[0]]))
+                #fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
             else:
                 logger.error("too many notA regions")
                 sys.exit()
-        fout.write(notB.loc[:, notB.columns != 'selected'].to_csv(sep="\t", index=False, header=False))
+        out.append(pd.DataFrame([row]))
+        #fout.write("\t".join(list(map(str, row))) + "\n")
+        # Update row_old when chromosome change or the max coordinate increases
+        if row_old == -1: row_old = row
+        elif row.achr != row_old.achr: row_old = row
+        elif row_old.aend < row.aend: row_old = row
+        # row_old = row
 
-    logger.debug('Remapping query genome ids')
+        try:
+            a = annogrp.get_group(row.id)
+        except KeyError:
+            a = pd.DataFrame()
+        except Exception as e:
+            logger.debug('Error in finding key for anno.' + e)
+
+        try:
+            b = svgrp.get_group(row.id)
+        except KeyError as k:
+            b = pd.DataFrame()
+        except Exception as e:
+            logger.debug('Error in finding key for anno.' + e)
+
+        try:
+            c = snpgrp.get_group(row.id)
+        except KeyError:
+            c = pd.DataFrame()
+        except Exception as e:
+            logger.debug('Error in finding key for anno.' + e)
+
+        outdata = pd.concat([a, b, c])
+        outdata.sort_values(["astart", "aend"], inplace=True)
+        out.append(outdata)
+        #fout.write(outdata.to_csv(sep="\t", index=False, header=False))
+    if len(notA) > 0:
+        _notA = notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend+1) & (notA.selected != 1), notA.columns != 'selected']
+        notA.loc[(notA.achr == row_old.achr) & (notA.astart == row_old.aend + 1), 'selected'] = 1
+        if len(_notA) == 0:
+            pass
+        elif len(_notA) == 1:
+            out.append(_notA[0:1])
+            #out.append(pd.DataFrame(_notA.iloc[0]))
+            #fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
+        else:
+            logger.error("too many notA regions")
+            sys.exit()
+    out.append(notB.loc[:, notB.columns != 'selected'])
+    #fout.write(notB.loc[:, notB.columns != 'selected'].to_csv(sep="\t", index=False, header=False))
+
+    to_write = pd.concat(out)
+    # remap chrs, if necessary
+    logger.debug('Remapping query genome ids as specified in {')
     if os.path.isfile(cwdpath+prefix+"mapids.txt"):
+        # read in mapping
         chroms = {}
         with open(cwdpath+prefix+"mapids.txt", "r") as m:
             for line in m:
                 l = line.strip().split()
                 chroms[l[0]] = l[1]
-        lines = open(cwdpath + prefix + "syri.out", "r").readlines()
-        with open(cwdpath + prefix + "syri.out", "w") as fout:
-            for line in lines:
-                line = line.strip().split('\t')
-                if line[5] != "-":
-                    line[5] = chroms[line[5]]
-                fout.write("\t".join(line) + '\n')
+
+        chroms['-'] = '-' # handle missing chr info
+        to_write.loc[:, 'bchr'] = to_write.loc[:, 'bchr'].map(lambda x: chroms[x])
+
+    to_write.to_csv(cwdpath + prefix + "syri.out", sep="\t", index=False, header=False)
     return 0
 # END
 
@@ -583,29 +601,18 @@ def getVCF(finname, foutname, cwdpath, prefix, sname, chr_sizes):
     data = pd.read_table(cwdpath + prefix + finname, header=None, keep_default_na=False, dtype=object)
     data.columns = ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']
     data = data.loc[data['achr'] != "-"].copy()
-    dtypes = {'achr': str,
-              'astart': int,
-              'aend': int,
-              'aseq': str,
-              'bseq': str,
-              'bchr': str,
-              'bstart': str,
-              'bend': str,
-              'id': str,
-              'parent': str,
-              'vartype': str,
-              'dupclass': str}
-    data = data.astype(dtypes)
+    #dtypes = {'achr': 'str', 'astart': 'int64', 'aend': 'int64', 'aseq': 'str',
+    #          'bseq': 'str', 'bchr': 'str', 'bstart': 'str', 'bend': 'str',
+    #          'id': 'str', 'parent': 'str', 'vartype': 'str', 'dupclass': 'str'}
+    data = data.astype('str')#dtypes)
+
     # Translation string for fixing IUPAC codes in sequence strings
     old = 'ACGTNacgtnRYSWKMBDHVryswkmbdhv'
     rev = 'ACGTNacgtnACCAGACAAAaccagacaaa'
     tab = str.maketrans(old, rev)
-    try:
-        data['achr'] = data['achr'].astype('int')
-    except ValueError as ve:
-        logger.debug('Chromosome values are sorted lexicographically.')
+
     data.sort_values(['achr', 'astart', 'aend'], inplace=True)
-    data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']] = data.loc[:, ['achr', 'astart', 'aend', 'bstart', 'bend']].astype(str)
+
     with open(cwdpath + prefix + foutname, 'w') as fout:
         fout.write('##fileformat=VCFv4.3\n')
         fout.write('##fileDate=' + str(date.today()).replace('-', '') + '\n')
@@ -654,6 +661,7 @@ def getVCF(finname, foutname, cwdpath, prefix, sname, chr_sizes):
         ## Iterate over each line from syri.out
         for line in data.itertuples(index=False):
             pos = [line[0], line[1], line[8], 'N', '<' + line[10] + '>', '.', 'PASS']
+            _info = None
 
             if line[10] in ["SYN", "INV", "TRANS", "INVTR", "DUP", "INVDP"]:
                 _info = ';'.join(['END='+line[2], 'ChrB='+line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=.', 'VarType='+'SR', 'DupType='+line[11]])
@@ -677,6 +685,9 @@ def getVCF(finname, foutname, cwdpath, prefix, sname, chr_sizes):
                     if line[3].translate(tab).upper() == line[4].translate(tab).upper(): continue
                     pos = [line[0], line[1], line[8], line[3].translate(tab), line[4].translate(tab), '.', 'PASS']
                     _info = ";".join(['END=' + line[2], 'ChrB=' + line[5], 'StartB='+line[6], 'EndB='+line[7], 'Parent=' + line[9], 'VarType=ShV', 'DupType=.'])
+
+            if _info is None:
+                continue
 
             pos.append(_info)
             pos.append(frmt)

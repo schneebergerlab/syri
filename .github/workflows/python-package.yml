@@ -16,8 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
-
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"] #, "3.14"] # 3.14 works locally, but for some reason the github runners lack bzip2 and thus fail to install pysam
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
@@ -35,7 +34,16 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest.py
+    - name: Install syri
       run: |
         python -m pip install .
+    - name: Test CLI
+      run: |
+        cd test/test_data
+        syri -c out.paf -F P -r tair10_chr4.fa.gz -q ler_chr4.fa.gz --prefix test_paf
+        file test_pafsyri.out test_pafsyri.vcf test_pafsyri.summary # test output files exist
+        syri -c out.bam -F B -r tair10_chr4.fa.gz -q ler_chr4.fa.gz --prefix test_bam
+        file test_bamsyri.out test_bamsyri.vcf test_bamsyri.summary # test output files exist
+    - name: Test with pytest.py
+      run: |
         python test/pytest.py
