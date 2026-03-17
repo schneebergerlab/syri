@@ -30,7 +30,7 @@ def samtocoords(f):
     from pandas import DataFrame
     from collections import deque
     logger = logging.getLogger('SAM reader')
-    rc = {}        # Referece chromosomes
+    rc = {}        # Reference chromosomes
     rcs = {}        # Selected chromosomes
     al = deque()    # Individual alignment
     try:
@@ -54,12 +54,12 @@ def samtocoords(f):
 
                 if 'M' in l[5]:
                     logger.error(f'Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: {l[5]}. If using minimap2 for alignment, then use the --eqx parameter.')
-                    sys.exit()
+                    sys.exit(1)
                 cgt = [[int(j[0]), j[1]] for j in [i.split(';') for i in l[5].replace('S', ';S,').replace('H', ';H,').replace('=', ';=,').replace('X', ';X,').replace('I', ';I,').replace('D', ';D,').split(',')[:-1]]]
                 if len(cgt) > 2:
                     if True in [True if i[1] in ['S', 'H'] else False for i in cgt[1:-1]]:
                         logger.error("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + aln.cigarstring)
-                        sys.exit()
+                        sys.exit(1)
 
                 bf = '{:012b}'.format(int(l[1]))
 
@@ -105,7 +105,7 @@ def samtocoords(f):
                 if k not in rcs: logger.warning(l[0]+ ' do not align with any query sequence and cannot be analysed. Remove all unplaced scaffolds and contigs from the assemblies.')
     except Exception as e:
         logger.error('Error in reading SAM file: ' + str(e))
-        sys.exit()
+        sys.exit(1)
     al = DataFrame(list(al))
     al[6] = al[6].astype('float')
     al.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
@@ -125,13 +125,13 @@ def readSAMBAM(fin, type='B'):
             raise ValueError("Wrong parameter")
     except ValueError as e:
         logger.error("Error in opening BAM/SAM file. " + str(e))
-        sys.exit()
+        sys.exit(1)
     except OSError as e:
         logger.error("Error in reading input file." + str(e))
-        sys.exit()
+        sys.exit(1)
     except Exception as e:
         logger.error("Unexpected error in opening BAM/SAM file. " + str(e))
-        sys.exit()
+        sys.exit(1)
 
     try:
         qry_prim = {}
@@ -163,11 +163,11 @@ def readSAMBAM(fin, type='B'):
             ## Check CIGAR:
             if False in [False if i[0] not in [1,2,4,5,7,8] else True for i in aln.cigartuples]:
                 logger.error(f'Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: {aln.cigarstring}. If using minimap2 for alignment, then use the --eqx parameter.')
-                sys.exit()
+                sys.exit(1)
             if len(aln.cigartuples) > 2:
                 if True in [True if i[0] in [4,5] else False for i in aln.cigartuples[1:-1]]:
                     logger.error("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + aln.cigarstring)
-                    sys.exit()
+                    sys.exit(1)
 
             ## Parse information from the aln object
             astart = aln.reference_start+1
@@ -211,7 +211,7 @@ def readSAMBAM(fin, type='B'):
         return coords
     except Exception as e:
         logger.error("Error in reading BAM/SAM file. " + str(e))
-        sys.exit()
+        sys.exit(1)
 # END
 
 def readPAF(paf):
@@ -232,16 +232,16 @@ def readPAF(paf):
                 cg = [i.split(":")[-1] for i in line[12:] if i[:2] == 'cg']
                 if len(cg) != 1:
                     logger.error("CIGAR string is not present in PAF at line {}. Exiting.".format("\t".join(line)))
-                    sys.exit()
+                    sys.exit(1)
                 cg = cg[0]
                 ## Check CIGAR:
                 if not all([True if i[1] in {'I', 'D', 'H', 'S', 'X', '='} else False for i in cgtpl(cg)]):
                     logger.error(f'Incorrect CIGAR string found. CIGAR string can only have I/D/H/S/X/=. CIGAR STRING: {cg}. If using minimap2 for alignment, then use the --eqx parameter.')
-                    sys.exit()
+                    sys.exit(1)
                 if len(cgtpl(cg)) > 2:
                     if any([True if i[1] in {'H', 'S'} else False for i in cgtpl(cg)]):
                         logger.error("Incorrect CIGAR string found. Clipped bases inside alignment. H/S can only be in the terminal. CIGAR STRING: " + str(cg))
-                        sys.exit()
+                        sys.exit(1)
 
                 iden = round((sum([int(i[0]) for i in cgtpl(cg) if i[1] == '='])/sum([int(i[0]) for i in cgtpl(cg) if i[1] in {'=', 'X', 'D', 'I'}]))*100, 2)
                 achr = line[5]
@@ -250,14 +250,15 @@ def readPAF(paf):
         coords = pd.DataFrame(coords)
         coords.sort_values([9,0,1,2,3,10], inplace = True, ascending=True)
         coords.index = range(len(coords.index))
-        coords[6] = coords[6].astype('float')
+        #logger.info(coords[6])
+        #coords[6] = coords[6].astype('float') # unnecessary, and was causing the chained assignment error
         return coords
     except FileNotFoundError:
         logger.error("Cannot open {} file. Exiting".format(paf))
-        sys.exit()
+        sys.exit(1)
     except ValueError as e:
         logger.error("Error in reading PAF: {}. Exiting".format(e))
-        sys.exit()
+        sys.exit(1)
 # END
 
 def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
@@ -272,31 +273,31 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
             coords = pd.read_table(coordsfin, header = None, engine = "python")
         except Exception as e:
             logger.error("Error in reading the alignment file. " + e)
-            sys.exit()
+            sys.exit(1)
     elif args.ftype == 'S':
         logger.info("Reading input from SAM file")
         try:
             coords = readSAMBAM(coordsfin, type='S')
         except Exception as e:
             logger.error("Error in reading the alignment file. " + e)
-            sys.exit()
+            sys.exit(1)
     elif args.ftype == 'B':
         logger.info("Reading input from BAM file")
         try:
             coords = readSAMBAM(coordsfin, type='B')
         except Exception as e:
             logger.error("Error in reading the alignment file" + e)
-            sys.exit()
+            sys.exit(1)
     elif args.ftype == 'P':
         logger.info("Reading input from PAF file")
         try:
             coords = readPAF(coordsfin)
         except Exception as e:
             logger.error("Error in reading the alignment file" + e)
-            sys.exit()
+            sys.exit(1)
     else:
         logger.error("Incorrect alignment file type specified.")
-        sys.exit()
+        sys.exit(1)
 
     if not cigar:
         if coords.shape[1] >= 12:
@@ -312,76 +313,76 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
         coords.aStart = coords.aStart.astype('int')
     except ValueError:
         logger.error('astart is not int')
-        sys.exit()
+        sys.exit(1)
 
     try:
         coords.aEnd = coords.aEnd.astype('int')
     except ValueError:
         logger.error('aend is not int')
-        sys.exit()
+        sys.exit(1)
 
     try:
         coords.bStart = coords.bStart.astype('int')
     except ValueError:
         logger.error('bstart is not int')
-        sys.exit()
+        sys.exit(1)
 
     try:
         coords.bEnd = coords.bEnd.astype('int')
     except ValueError:
         logger.error('abend is not int')
-        sys.exit()
+        sys.exit(1)
 
     try:
         coords.aLen = coords.aLen.astype('int')
     except ValueError:
         logger.error('alen is not int')
-        sys.exit()
+        sys.exit(1)
 
     try:
         coords.bLen = coords.bLen.astype('int')
     except ValueError:
         logger.error('blen is not int')
-        sys.exit()
+        sys.exit(1)
 
     try:
         coords.iden = coords.iden.astype('float')
     except ValueError:
         logger.error('iden is not float')
-        sys.exit()
+        sys.exit(1)
 
     try:
         coords.aDir = coords.aDir.astype('int')
     except ValueError:
         logger.error('aDir is not int')
-        sys.exit()
+        sys.exit(1)
 
     if any(coords.aDir != 1):
         logger.error('aDir can only have values 1')
-        sys.exit()
+        sys.exit(1)
 
     try:
         coords.bDir = coords.bDir.astype('int')
     except ValueError:
         logger.error('bDir is not int')
-        sys.exit()
+        sys.exit(1)
 
     for i in coords.bDir:
         if i not in [1,-1]:
             logger.error('bDir can only have values 1/-1')
-            sys.exit()
+            sys.exit(1)
 
     try:
         coords.aChr = coords.aChr.astype(str)
     except:
         logger.error('aChr is not string')
-        sys.exit()
+        sys.exit(1)
 
     try:
         coords.bChr = coords.bChr.astype(str)
     except:
         logger.error('bChr is not string')
-        sys.exit()
+        sys.exit(1)
 
     # Filter small alignments
     if args.f:
@@ -395,7 +396,7 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
     check = np.unique(coords.loc[coords.bDir == -1, 'bStart'] > coords.loc[coords.bDir == -1, 'bEnd'])
     if len(check) > 1:
         logger.error('Inconsistent start and end position for inverted alignment in query genome. For inverted alignments, either all bstart < bend or all bend > bstart')
-        sys.exit()
+        sys.exit(1)
     elif len(check) == 0:
         logger.info('No Inverted alignments present.')
     elif check[0] == True:
@@ -416,7 +417,7 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
         if not chrmatch:
             if len(np.unique(coords.aChr)) != len(np.unique(coords.bChr)):
                 logger.error("Unequal number of chromosomes in the genomes. Exiting")
-                sys.exit()
+                sys.exit(1)
             else:
                 logger.warning("Matching them automatically. For each reference genome, most similar query genome will be selected. Check mapids.txt for mapping used.")
                 chromMaps = defaultdict(dict)
@@ -434,7 +435,7 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
                         logger.error("{} in genome B is best match for two chromosomes in genome A. Cannot assign chromosomes automatically.".format(maxid))
                         fout.close()
                         fileRemove(cwdpath+prefix+"mapids.txt")
-                        sys.exit()
+                        sys.exit(1)
                     assigned.append(maxid)
                     fout.write(chrom+"\t"+maxid+"\n")
                     logger.info("setting {} as {}".format(maxid, chrom))
@@ -461,7 +462,7 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
                 hombchr = achr
             else:
                 logger.error('Homologous chromosomes were not identified correctly. Try assigning the chromosome ids manually.')
-                sys.exit()
+                sys.exit(1)
             logger.warning('Reference chromosome ' + achr + ' do not have any directed alignments with its homologous chromosome in the query genome (' + hombchr + '). Filtering out all corresponding alignments.')
             coords = coords.loc[~(coords.aChr == achr)]
             coords = coords.loc[~(coords.bChr == achr)]
@@ -480,7 +481,7 @@ def readCoords(coordsfin, chrmatch, cwdpath, prefix, args, cigar = False):
                 hombchr = achr
             else:
                 logger.error('Homologous chromosomes were not identified correctly. Try assigning the chromosome ids manually.')
-                sys.exit()
+                sys.exit(1)
             logger.warning('Reference chromosome ' + achr + ' has high fraction of inverted alignments with its homologous chromosome in the query genome (' + hombchr + '). Ensure that same chromosome-strands are being compared in the two genomes, as different strand can result in unexpected errors.')
     return coords, chrlink
 
@@ -530,7 +531,13 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
     coordsData = coords[(coords.aChr == chromo) & (coords.bChr == chromo) & (coords.bDir == 1)]
     logger.info(chromo+" " + str(coordsData.shape))
     logger.info("Identifying Synteny for chromosome " + chromo)
-    df = apply_TS(coordsData.aStart.values,coordsData.aEnd.values,coordsData.bStart.values,coordsData.bEnd.values, threshold)
+    # in case there are issues with the typed memory view conversion, try 
+    # .to_numpy(copy=True) instead of .values
+    df = apply_TS(coordsData.aStart.values,
+                  coordsData.aEnd.values,
+                  coordsData.bStart.values,
+                  coordsData.bEnd.values,
+                  threshold)
     blocks = [alignmentBlock(i, df[i], coordsData.iloc[i]) for i in df.keys()]
     for block in blocks:
         i = 0
@@ -858,11 +865,11 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
 ########################################################################################################################
 
 
-cpdef apply_TS(long[:] astart, long[:] aend, long[:] bstart, long[:] bend, int threshold, int mxgap = 100000000000):
+cpdef apply_TS(const long[:] astart, const long[:] aend, const long[:] bstart, const long[:] bend, int threshold, int mxgap = 100000000000):
     cdef:
         Py_ssize_t                              i, j,  n = len(astart)
         cpp_map[long, cpp_deq[long]]            df
-        cpp_map[long, cpp_deq[long]].iterator   mapit
+        cpp_map[long, cpp_deq[long]].iterator   mapit # Leon: unused?
     for i in range(<Py_ssize_t> n):
         for j in range(<Py_ssize_t> i+1, <Py_ssize_t> n):
             if (astart[j] - aend[i]) < mxgap:        # Select only alignments with small gaps
@@ -916,7 +923,7 @@ def outSyn(cwdPath, threshold, prefix):
         synData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"]
     else:
         synData.columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","isinInv"]
-    synData["class"] = "syn"
+    synData.loc[:, "class"] = "syn"
 
     for i in ["invOut.txt", "TLOut.txt", "invTLOut.txt", "dupOut.txt", "invDupOut.txt","ctxOut.txt"]:
         data = []
@@ -927,7 +934,9 @@ def outSyn(cwdPath, threshold, prefix):
                     if line[0] == "#":
                         data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5]])
                 data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr"], dtype=object)
-                data["class"] = i.split("Out.txt")[0]
+                # annotate as class according to file
+                cls = i.removesuffix("Out.txt")
+                data.insert(data.shape[1], "class", cls)
                 if len(data)>0:
                     # reCoords = reCoords.append(data)
                     reCoords = pd.concat([reCoords, data])
@@ -935,8 +944,8 @@ def outSyn(cwdPath, threshold, prefix):
                 for line in fin:
                     line = line.strip().split("\t")
                     if line[0] == "#":
-                        data.append(list(map(int,getValues(line,[2,3,6,7]))) + [line[1],line[5],ctxAnnoDict[line[8]]])
-                data = pd.DataFrame(data, columns = ["aStart","aEnd","bStart","bEnd","aChr","bChr","class"], dtype=object)
+                        data.append(list(map(int,getValues(line, [2, 3, 6, 7]))) + [line[1], line[5], ctxAnnoDict[line[8]]])
+                data = pd.DataFrame(data, columns = ["aStart", "aEnd", "bStart", "bEnd", "aChr", "bChr", "class"], dtype=object)
                 if len(data)>0:
                     # reCoords = reCoords.append(data)
                     reCoords = pd.concat([reCoords, data])
@@ -944,7 +953,7 @@ def outSyn(cwdPath, threshold, prefix):
     # allBlocks = synData[["aStart","aEnd","bStart","bEnd","aChr","bChr","class"]].append(reCoords)
     allBlocks = pd.concat([synData[["aStart","aEnd","bStart","bEnd","aChr","bChr","class"]], reCoords])
     allBlocks.index = range(allBlocks.shape[0])
-    allBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace= True)
+    allBlocks.sort_values(["aChr","aStart","aEnd","bChr","bStart","bEnd"], inplace=True)
     synLocs = {np.where(allBlocks.index.values == i)[0][0]:i for i in range(synData.shape[0])}
 
     allBlocks.index = range(allBlocks.shape[0])
@@ -1057,32 +1066,43 @@ def outSyn(cwdPath, threshold, prefix):
 
         
 def groupSyn(tempInvBlocks, dupData, invDupData, invTLData, TLData, threshold, synData, badSyn):
-    
     synData = synData.drop(synData.index.values[badSyn])
-    allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
-    allBlocks["class"] = "syn"
+
+    # Rewritten below, left here in case a revert is needed
+    #allBlocks = synData[["aStart","aEnd","bStart","bEnd"]].copy()
+    #allBlocks["class"] = "syn"
+    #
+    #tempInvBlocks = pd.DataFrame(tempInvBlocks,columns =["aStart","aEnd","bStart","bEnd"], dtype= object)
+    #tempInvBlocks["class"] = "inv"
+    #
+    #tempDupData = pd.DataFrame(dupData[["aStart","aEnd","bStart","bEnd"]].copy())
+    #tempDupData["class"] = "dup"
+    #
+    #tempInvDupData = invDupData[["aStart","aEnd","bStart","bEnd"]].copy()
+    #tempInvDupData["class"] = "invDup"
+    #
+    #tempInvTLData = invTLData[["aStart","aEnd","bStart","bEnd"]].copy()
+    #tempInvTLData["class"] = "invTL"
+    #
+    #tempTLData = TLData[["aStart","aEnd","bStart","bEnd"]].copy()
+    #tempTLData["class"] = "TL"
+
+    # add class info to copy of df
+    cols = ["aStart", "aEnd", "bStart", "bEnd"]
+    def add_class(df, cls):
+        df = df.loc[:, cols].copy()
+        df.insert(df.shape[1], "class", cls)
+        return df
     
-    tempInvBlocks = pd.DataFrame(tempInvBlocks,columns =["aStart","aEnd","bStart","bEnd"], dtype= object)
-    tempInvBlocks["class"] = "inv"
-    
-    tempDupData = dupData[["aStart","aEnd","bStart","bEnd"]].copy()
-    tempDupData["class"] = "dup"
-    
-    tempInvDupData = invDupData[["aStart","aEnd","bStart","bEnd"]].copy()
-    tempInvDupData["class"] = "invDup"
-    
-    tempInvTLData = invTLData[["aStart","aEnd","bStart","bEnd"]].copy()
-    tempInvTLData["class"] = "invTL"
-    
-    tempTLData = TLData[["aStart","aEnd","bStart","bEnd"]].copy()
-    tempTLData["class"] = "TL"
-    
-    allBlocks = pd.concat([allBlocks,tempInvBlocks, tempInvDupData, tempInvTLData, tempTLData, tempDupData])
+    allBlocks = pd.concat([add_class(synData, "syn"),
+                           add_class(pd.DataFrame(tempInvBlocks, columns=cols), "inv"),
+                           add_class(invDupData, "dup"),
+                           add_class(invTLData, "invDup"),
+                           add_class(TLData, "invTL"),
+                           add_class(dupData, "TL")], copy=True)
     allBlocks.index = range(allBlocks.shape[0])
     
-    """
-    Take data of all blocks and create groups of syntenic blocks from syntenic alignments
-    """
+    #Take data of all blocks and create groups of syntenic blocks from syntenic alignments
     
     allBlocks.sort_values(["aStart","aEnd","bStart","bEnd"],inplace = True)
     
