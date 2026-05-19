@@ -44,6 +44,11 @@ jobs:
         file test_pafsyri.out test_pafsyri.vcf test_pafsyri.summary # test output files exist
         syri -c out.bam -F B -r tair10_chr4.fa.gz -q ler_chr4.fa.gz --prefix test_bam
         file test_bamsyri.out test_bamsyri.vcf test_bamsyri.summary # test output files exist
+    - name: Test chroder
+      run: |
+        cd test/test_data
+        chroder chroder_aln.paf chroder_fulltest.fa chroder_fragtest.fa -o chroder.out
+        file chroder.out
     - name: Test with pytest.py
       run: |
         python test/pytest.py

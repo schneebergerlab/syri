@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict, deque, Counter
 from syri.scripts.func import mergeRanges, readfasta, revcomp
-from syri.synsearchFunctions import readSAMBAM
+from syri.synsearchFunctions import readSAMBAM, readPAF
 import operator
 
 try:
@@ -524,6 +524,7 @@ def scaf(args):
     # Read coords and genome size
 
     if F == 'T':    coords = pd.read_table(args.coords.name, header=None)
+    elif F == 'P':  coords = readPAF(args.coords.name)
     elif F == 'B':  coords = readSAMBAM(args.coords.name, type='B')
     elif F == 'S':  coords = readSAMBAM(args.coords.name, type='S')
     coords = coords[list(range(11))]
@@ -533,7 +534,7 @@ def scaf(args):
     refsize = {("ref"+id): len(seq) for id, seq in readfasta(refin).items()}
     qrysize = {("qry"+id): len(seq) for id, seq in readfasta(qryin).items()}
 
-    print(coords.columns, coords.loc[1])
+    #print(coords.columns, coords.loc[1])
     reflength = defaultdict(dict)
     for i in np.unique(coords['aChr']):
         for r in range(0, refsize[i], 10000):
@@ -990,9 +991,29 @@ def main():
 #    parser.add_argument("-l", dest="length", help='length of the range', type=int, default=10000)
     parser.add_argument("-n", dest='ncount', help="number of N's to be inserted", type=int, default=500)
     parser.add_argument('-o', dest='out', help="output file prefix", default="out", type=str)
-    parser.add_argument('-noref', dest='noref', help="Use this parameter when no assembly is at chromosome level", default=False, action='store_true')
-    parser.add_argument('-F', dest="ftype", help="Input coords type. T: Table, S: SAM, B: BAM", default="T", choices=['T', 'S', 'B'])
+    parser.add_argument('-noref', '--noref', dest='noref', help="Use this parameter when no assembly is at chromosome level", default=False, action='store_true')
+    parser.add_argument('-F', dest="ftype", help="Input coords type. T: Table, S: SAM, B: BAM, P: PAF. If empty chroder will try to guess the file format by extension.", default="", choices=['T', 'S', 'B', 'P'])
     parser.add_argument('--version', action='version', version='{version}'.format(version=__version__))
     args = parser.parse_args()
+
+    if not args.ftype:
+        # guess file type
+        ext = args.coords.name.split('.')[-1].strip().lower()
+        if ext == 'tsv':
+            args.ftype = 'T'
+            print(f"INFO: Guessing {args.coords.name} is in TSV format. Pass -F if this is incorrect!")
+        elif ext == 'sam':
+            args.ftype = 'S'
+            print(f"INFO: Guessing {args.coords.name} is in SAM format. Pass -F if this is incorrect!")
+        elif ext == 'bam':
+            args.ftype = 'B'
+            print(f"INFO: Guessing {args.coords.name} is in BAM format. Pass -F if this is incorrect!")
+        elif ext == 'paf':
+            args.ftype = 'P'
+            print(f"INFO: Guessing {args.coords.name} is in PAF format. Pass -F if this is incorrect!")
+        else:
+            print(f"WARN: Cannot guess format of {args.coords.name}. Try to pass -F, or convert it into one of the accepted formats.")
+
+
     scaf(args)
-    print('Finished chroder')
+    print(f"Finished chroder, wrote output to {args.out}")
