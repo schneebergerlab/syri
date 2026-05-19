@@ -528,13 +528,14 @@ def scaf(args):
     elif F == 'S':  coords = readSAMBAM(args.coords.name, type='S')
     coords = coords[list(range(11))]
     coords.columns = ["aStart", "aEnd", "bStart", "bEnd", "aLen", "bLen", "iden", "aDir", "bDir", "aChr", "bChr"]
-    coords.aChr = "ref"+coords.aChr
-    coords.bChr = "qry"+coords.bChr
+    coords.aChr = ["ref"+str(chrom) for chrom in coords.aChr]
+    coords.bChr = ["qry"+str(chrom) for chrom in coords.bChr]
     refsize = {("ref"+id): len(seq) for id, seq in readfasta(refin).items()}
     qrysize = {("qry"+id): len(seq) for id, seq in readfasta(qryin).items()}
 
+    print(coords.columns, coords.loc[1])
     reflength = defaultdict(dict)
-    for i in np.unique(coords.aChr):
+    for i in np.unique(coords['aChr']):
         for r in range(0, refsize[i], 10000):
             a = coords.loc[(coords.aChr == i) & (coords.aStart < (r + 10000)) & (coords.aEnd > r)]
             if a.shape[0] == 0:
@@ -876,8 +877,11 @@ def scaf(args):
 
         bestpath = defaultdict()
         for path in unipaths:
-            rids = pd.unique([loci[i][0] for i in path[0]])
-            qids = pd.unique([loci[i][0] for i in path[1]])
+            # most straightforward way to make a list unique in python
+            # previously used pandas, dont think this is necessary
+            #qids = pd.unique([loci[i][0] for i in path[1]])
+            rids = list(set([loci[i][0] for i in path[0]]))
+            qids = list(set([loci[i][0] for i in path[1]]))
             score = np.mean([np.sum([refsize[i] for i in rids]), np.sum([qrysize[i] for i in qids])])
 
             if len(bestpath) == 0:
