@@ -48,7 +48,7 @@ jobs:
       run: |
         cd test/test_data
         chroder chroder_aln.paf chroder_fulltest.fa chroder_fragtest.fa -o chroder.out
-        file chroder.out
+        file chroder.out.anno chroder.out.qry.fasta chroder.out.ref.fasta
     - name: Test with pytest.py
       run: |
         python test/pytest.py
