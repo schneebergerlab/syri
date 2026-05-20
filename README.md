@@ -13,10 +13,12 @@ Syri compares alignments between two chromosome-level assemblies and identifies 
 
 ## Pre-requisite:
 
-1. Python >=3.8 and the following packages: Cython-0.29.23, numpy-1.21.2, scipy-1.6.2, pandas-1.2.4, python-igraph-0.9.1, psutil-5.8.0, pysam-0.16.0.1, and matplotlib-3.3.4
-2. C/C++ compiler: g++
+1. Python >= 3.9 and the following packages: Cython >= 0.29.23, numpy >= 2.0, scipy >= 1.6.2, pandas >= 1.3, python-igraph >= 0.9.1, psutil >= 5.8.0, pysam >= 0.16.0.1, and matplotlib >= 3.3.4
+2. C++ compiler such as g++
 
-## Recent major updates:
+## Recent updates:
+(20-05-2026)
+* Updated to support modern python and pandas 2.x
 (20-06-2022)
 * Added printing of large indels and HDR.
 * Added parameter `--maxsize` to regulate the maximum size of SV for which sequence would be printed.
@@ -40,7 +42,7 @@ conda activate syri_env
 ```
 
 - For manual installation, download/clone the repository, open the folder and run:
-`python setup.py install`
+`pip install .`
 
 - [Niklas Schandry](https://github.com/nschan) has created a nextflow pipeline, called [nf-plotsv](https://github.com/nschan/nf-plotsv), that can also be used to install and run syri
 
