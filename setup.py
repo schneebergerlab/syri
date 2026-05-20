@@ -24,6 +24,6 @@ setup(name="syri",
       include_dirs=[numpy.get_include()],
       # scripts=['bin/syri', 'bin/chroder'],
       entry_points={"console_scripts": ["syri=syri.scripts.syri:main", "chroder=syri.scripts.chroder:main"]},
-      long_description=open('README.rst').read(),
+      long_description=open('README.md').read(),
 )
 
