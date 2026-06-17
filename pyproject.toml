@@ -23,7 +23,6 @@ dependencies = [
 	"igraph",
 	"longestrunsubsequence",
 	'pysam',
-	"pulp",
 ]
 dynamic = ["version"]
 
