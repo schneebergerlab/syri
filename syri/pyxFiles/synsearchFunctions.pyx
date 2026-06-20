@@ -865,20 +865,25 @@ def syri(chromo, threshold, coords, cwdPath, bRT, prefix, tUC, tUP, invgl, tdgl,
 ########################################################################################################################
 
 
-cpdef apply_TS(const long[:] astart, const long[:] aend, const long[:] bstart, const long[:] bend, int threshold, int mxgap = 100000000000):
+# builds a matrix indicating which alignments are consistent with one another
+cpdef apply_TS(const long[:] astart, const long[:] aend, const long[:] bstart, const long[:] bend, int threshold, int mxgap = 100_000_000_000):
     cdef:
-        Py_ssize_t                              i, j,  n = len(astart)
+        Py_ssize_t                              i, j # init loop vars
+        Py_ssize_t                              n = len(astart)
         cpp_map[long, cpp_deq[long]]            df
-        cpp_map[long, cpp_deq[long]].iterator   mapit # Leon: unused?
+        #cpp_map[long, cpp_deq[long]].iterator   mapit # Leon: unused?
+    # handle single aln case
+    if n == 1:
+        return {0:[0]}
+
     for i in range(<Py_ssize_t> n):
         for j in range(<Py_ssize_t> i+1, <Py_ssize_t> n):
-            if (astart[j] - aend[i]) < mxgap:        # Select only alignments with small gaps
-                if (astart[j] - astart[i]) > threshold:
+            if ((astart[j] - aend[i]) < mxgap) and ((bstart[j] - bend[i]) < mxgap):        # Select only alignments with small gaps
+                if (astart[j] - astart[i]) > threshold: # check compatibility on a
                     if (aend[j] - aend[i]) > threshold:
-                        if (bstart[j] - bend[i]) < mxgap:        # Select only alignments with small gaps
-                            if (bstart[j] - bstart[i]) > threshold:
-                                if (bend[j] - bend[i]) > threshold:
-                                    df[i].push_back(j)
+                        if (bstart[j] - bstart[i]) > threshold: # check compatibility on b
+                            if (bend[j] - bend[i]) > threshold:
+                                df[i].push_back(j) # add to list of compatible alns
     out = {}
     for i in range(n):
         if df.count(i)== 1:
