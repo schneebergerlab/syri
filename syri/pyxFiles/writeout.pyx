@@ -97,7 +97,7 @@ def getsrtable(cwdpath, prefix):
         })
     # legacy type conversions, now done when reading in the lines above
     #anno.loc[:, ['astart', 'aend', 'bstart', 'bend']] = anno.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-    anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'parent', 'vartype', 'dupclass']]
+    #anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'parent', 'vartype', 'dupclass']]
     anno.sort_values(['achr', 'astart', 'aend'], inplace=True)
     anno.loc[:, 'id'] = anno.index
     return anno
@@ -511,7 +511,7 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
                     #fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
                 else:
                     logger.error("too many notA regions")
-                    sys.exit()
+                    sys.exit(1)
             _notA = notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart-1) & (notA.selected != 1), notA.columns != 'selected']
             notA.loc[(notA.achr == row.achr) & (notA.aend == row.astart - 1), 'selected'] = 1
             if len(_notA) == 0:
@@ -522,7 +522,7 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
                 #fout.write("\t".join(list(map(str, _notA.iloc[0]))) + "\n")
             else:
                 logger.error("too many notA regions")
-                sys.exit()
+                sys.exit(1)
         out.append(pd.DataFrame([row]))
         #fout.write("\t".join(list(map(str, row))) + "\n")
         # Update row_old when chromosome change or the max coordinate increases
@@ -584,8 +584,9 @@ def getTSV(cwdpath: str, prefix: str, ref: str, hdrseq: bool, maxs: int):
 
         chroms['-'] = '-' # handle missing chr info
         to_write.loc[:, 'bchr'] = to_write.loc[:, 'bchr'].map(lambda x: chroms[x])
-
-    to_write.to_csv(cwdpath + prefix + "syri.out", sep="\t", index=False, header=False)
+    # make sure the ordering is correct
+    to_write.reindex(['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass'], axis='columns'
+                     ).to_csv(cwdpath + prefix + "syri.out", sep="\t", index=False, header=False)
     return 0
 # END
 
