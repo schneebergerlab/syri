@@ -97,7 +97,7 @@ def getsrtable(cwdpath, prefix):
         })
     # legacy type conversions, now done when reading in the lines above
     #anno.loc[:, ['astart', 'aend', 'bstart', 'bend']] = anno.loc[:, ['astart', 'aend', 'bstart', 'bend']].astype('int')
-    #anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
+    anno = anno.loc[:, ['achr', 'astart', 'aend', 'aseq', 'bseq', 'bchr', 'bstart', 'bend', 'id', 'parent', 'vartype', 'dupclass']]
     anno.sort_values(['achr', 'astart', 'aend'], inplace=True)
     anno.loc[:, 'id'] = anno.index
     return anno
